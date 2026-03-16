@@ -100,7 +100,12 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                       {TREND_ICONS[row.trend]}
                     </span>
                   )}
-                  {!['rank', 'name', 'points', 'eventsPlayed', 'events', 'trend'].includes(col.key) && (
+                  {col.key === 'flight' && (
+                    <span className="text-xs text-gray-400 font-sans bg-gray-800 px-2 py-0.5 rounded whitespace-nowrap">
+                      {row.flight}
+                    </span>
+                  )}
+                  {!['rank', 'name', 'points', 'eventsPlayed', 'events', 'trend', 'flight'].includes(col.key) && (
                     <span className="text-gray-300 font-sans">{row[col.key]}</span>
                   )}
                 </td>
