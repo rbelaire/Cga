@@ -3,7 +3,7 @@ import PageWrapper from '../components/layout/PageWrapper'
 import StandingsTable from '../components/ui/StandingsTable'
 import poy from '../data/poy.json'
 
-const TABS = ['Scratch POY', 'Handicap POY', 'Championship', 'A Flight', 'B Flight', 'C Flight']
+const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 
 const eventsColumns = [
   { key: 'rank', label: 'Rank', sortable: false },
@@ -15,26 +15,19 @@ const eventsColumns = [
 export default function PlayerOfTheYear() {
   const [tab, setTab] = useState(0)
 
-  const getData = () => {
-    if (tab === 0) return poy.scratch
-    if (tab === 1) return poy.handicap
-    const flightName = TABS[tab]
-    return poy.flights[flightName] || []
-  }
-
   return (
     <PageWrapper>
       <div className="mb-8">
         <h1 className="section-title text-3xl sm:text-4xl">Player of the Year</h1>
         <div className="gold-divider" />
         <p className="text-gray-600 font-sans text-sm">
-          POY standings track cumulative season points across all eligible tournaments.
+          POY standings track cumulative season points across all eligible tournaments. 1 event played.
         </p>
       </div>
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {TABS.map((label, i) => (
+        {FLIGHTS.map((label, i) => (
           <button
             key={label}
             onClick={() => setTab(i)}
@@ -50,7 +43,11 @@ export default function PlayerOfTheYear() {
       </div>
 
       <div className="bg-gray-950 rounded-xl p-1">
-        <StandingsTable data={getData()} columns={eventsColumns} highlightTop={1} />
+        <StandingsTable
+          data={poy.flights[FLIGHTS[tab]] || []}
+          columns={eventsColumns}
+          highlightTop={3}
+        />
       </div>
     </PageWrapper>
   )

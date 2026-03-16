@@ -1,38 +1,92 @@
 {
-  "scratch": [
-    { "rank": 1, "name": "Marcus Thibodaux", "points": 245, "events": 4 },
-    { "rank": 2, "name": "Tony Comeaux", "points": 220, "events": 3 },
-    { "rank": 3, "name": "Derek Broussard", "points": 205, "events": 4 },
-    { "rank": 4, "name": "Ryan Trahan", "points": 190, "events": 3 },
-    { "rank": 5, "name": "Chad Thibodeaux", "points": 175, "events": 3 }
-  ],
-  "handicap": [
-    { "rank": 1, "name": "Brad Fontenot", "points": 260, "events": 4 },
-    { "rank": 2, "name": "Mike Landry", "points": 240, "events": 3 },
-    { "rank": 3, "name": "Norman Leger", "points": 215, "events": 3 },
-    { "rank": 4, "name": "Lance Chiasson", "points": 200, "events": 4 },
-    { "rank": 5, "name": "Eric Romero", "points": 185, "events": 3 }
-  ],
   "flights": {
     "Championship": [
-      { "rank": 1, "name": "Marcus Thibodaux", "points": 245, "events": 4 },
-      { "rank": 2, "name": "Tony Comeaux", "points": 220, "events": 3 },
-      { "rank": 3, "name": "Derek Broussard", "points": 205, "events": 4 }
+      { "rank": 1, "name": "Myron Lane", "points": 36, "events": 1 },
+      { "rank": 2, "name": "Richard Bourgeois", "points": 34, "events": 1 },
+      { "rank": 3, "name": "Brett Myhand", "points": 34, "events": 1 },
+      { "rank": 4, "name": "Alan Chasteen", "points": 33, "events": 1 },
+      { "rank": 5, "name": "Ralph Jordan", "points": 33, "events": 1 },
+      { "rank": 6, "name": "Jay O'Connor", "points": 33, "events": 1 },
+      { "rank": 7, "name": "Toby Guy", "points": 32, "events": 1 },
+      { "rank": 8, "name": "Roy Vanhaverbeke", "points": 32, "events": 1 },
+      { "rank": 9, "name": "Corey Latiolais", "points": 32, "events": 1 },
+      { "rank": 10, "name": "Garry Forestier", "points": 31, "events": 1 },
+      { "rank": 11, "name": "Doug Guidry", "points": 31, "events": 1 },
+      { "rank": 12, "name": "Jeff Richard", "points": 31, "events": 1 }
     ],
-    "A Flight": [
-      { "rank": 1, "name": "Antoine Fontenot", "points": 215, "events": 3 },
-      { "rank": 2, "name": "Ryan Trahan", "points": 190, "events": 3 },
-      { "rank": 3, "name": "Chris Mouton", "points": 175, "events": 3 }
+    "1st Flight": [
+      { "rank": 1, "name": "Brandon Borne", "points": 30, "events": 1 },
+      { "rank": 2, "name": "Joseph Myhand", "points": 30, "events": 1 },
+      { "rank": 3, "name": "Alan Chasteen Sr", "points": 30, "events": 1 },
+      { "rank": 4, "name": "Carter Breaux", "points": 29, "events": 1 },
+      { "rank": 5, "name": "Jacob Hooper", "points": 29, "events": 1 },
+      { "rank": 6, "name": "Cory Dupuis", "points": 28, "events": 1 },
+      { "rank": 7, "name": "Frank Malambri", "points": 28, "events": 1 },
+      { "rank": 8, "name": "Donald Chauvin", "points": 27, "events": 1 },
+      { "rank": 9, "name": "Mark Bruno", "points": 27, "events": 1 },
+      { "rank": 10, "name": "Cooper Breaux", "points": 27, "events": 1 },
+      { "rank": 11, "name": "Bryan Estes", "points": 26, "events": 1 },
+      { "rank": 12, "name": "Brian McCarley", "points": 26, "events": 1 }
     ],
-    "B Flight": [
-      { "rank": 1, "name": "Glenn Cormier", "points": 205, "events": 3 },
-      { "rank": 2, "name": "Jason Guillory", "points": 185, "events": 3 },
-      { "rank": 3, "name": "Steve Doucet", "points": 165, "events": 2 }
+    "2nd Flight": [
+      { "rank": 1, "name": "Drake Menard", "points": 26, "events": 1 },
+      { "rank": 2, "name": "Jeremy Whittington", "points": 26, "events": 1 },
+      { "rank": 3, "name": "Dale Broussard", "points": 26, "events": 1 },
+      { "rank": 4, "name": "Ernie Bennett", "points": 26, "events": 1 },
+      { "rank": 5, "name": "Brett Breaux", "points": 26, "events": 1 },
+      { "rank": 6, "name": "Jessie Myhand", "points": 25, "events": 1 },
+      { "rank": 7, "name": "Wayne Shullaw", "points": 25, "events": 1 },
+      { "rank": 8, "name": "Ryan Brown", "points": 25, "events": 1 },
+      { "rank": 9, "name": "Stephen Boudreaux", "points": 24, "events": 1 },
+      { "rank": 10, "name": "Eddie Meche", "points": 24, "events": 1 },
+      { "rank": 11, "name": "Scott Tabor", "points": 24, "events": 1 },
+      { "rank": 12, "name": "Kyle Lebourgeois", "points": 24, "events": 1 },
+      { "rank": 13, "name": "Dave Tuttle", "points": 24, "events": 1 }
     ],
-    "C Flight": [
-      { "rank": 1, "name": "Brad Fontenot", "points": 260, "events": 4 },
-      { "rank": 2, "name": "Mike Landry", "points": 240, "events": 3 },
-      { "rank": 3, "name": "Phil Bertrand", "points": 200, "events": 2 }
+    "3rd Flight": [
+      { "rank": 1, "name": "Trae Mouton", "points": 24, "events": 1 },
+      { "rank": 2, "name": "Joe Ballard", "points": 23, "events": 1 },
+      { "rank": 3, "name": "Dexter Babineaux", "points": 23, "events": 1 },
+      { "rank": 4, "name": "Carroll Robicheaux", "points": 23, "events": 1 },
+      { "rank": 5, "name": "Tyler Seaux", "points": 23, "events": 1 },
+      { "rank": 6, "name": "David Gleason", "points": 22, "events": 1 },
+      { "rank": 7, "name": "Ronnie Landry", "points": 22, "events": 1 },
+      { "rank": 8, "name": "David Melancon", "points": 22, "events": 1 },
+      { "rank": 9, "name": "Coby Tabor", "points": 22, "events": 1 },
+      { "rank": 10, "name": "Dameyon Kelly", "points": 21, "events": 1 },
+      { "rank": 11, "name": "Adam Latiolais", "points": 21, "events": 1 },
+      { "rank": 12, "name": "Kurt Bourg", "points": 21, "events": 1 },
+      { "rank": 13, "name": "Teddy Menard", "points": 21, "events": 1 }
+    ],
+    "4th Flight": [
+      { "rank": 1, "name": "Gary Angelle", "points": 21, "events": 1 },
+      { "rank": 2, "name": "EJ Louviere", "points": 20, "events": 1 },
+      { "rank": 3, "name": "Grant Citron", "points": 20, "events": 1 },
+      { "rank": 4, "name": "Dion Bearb", "points": 19, "events": 1 },
+      { "rank": 5, "name": "David Gerard", "points": 19, "events": 1 },
+      { "rank": 6, "name": "Cedric Gaspard", "points": 19, "events": 1 },
+      { "rank": 7, "name": "Bryan Benoit", "points": 18, "events": 1 },
+      { "rank": 8, "name": "Buster Langston", "points": 18, "events": 1 },
+      { "rank": 9, "name": "Kyle Bolivar", "points": 17, "events": 1 },
+      { "rank": 10, "name": "David Mouton", "points": 17, "events": 1 },
+      { "rank": 11, "name": "Blake Boudreaux", "points": 15, "events": 1 },
+      { "rank": 12, "name": "Brock Boudreaux", "points": 15, "events": 1 },
+      { "rank": 13, "name": "Paul Darbonne", "points": 14, "events": 1 }
+    ],
+    "5th Flight": [
+      { "rank": 1, "name": "Danny Leblanc", "points": 14, "events": 1 },
+      { "rank": 2, "name": "Joseph Zanetti", "points": 14, "events": 1 },
+      { "rank": 3, "name": "Phillip Broussard", "points": 14, "events": 1 },
+      { "rank": 4, "name": "Eric McGuire", "points": 14, "events": 1 },
+      { "rank": 5, "name": "Colby Colomb", "points": 13, "events": 1 },
+      { "rank": 6, "name": "Lucas Dupuis", "points": 13, "events": 1 },
+      { "rank": 7, "name": "Seth Breaux", "points": 12, "events": 1 },
+      { "rank": 8, "name": "Rickey Lavergne", "points": 12, "events": 1 },
+      { "rank": 9, "name": "Neal Angelle", "points": 12, "events": 1 },
+      { "rank": 10, "name": "Cory Darby", "points": 12, "events": 1 },
+      { "rank": 11, "name": "John Landry", "points": 9, "events": 1 },
+      { "rank": 12, "name": "Ryan Belaire", "points": 9, "events": 1 },
+      { "rank": 13, "name": "Des Bourgeois", "points": 6, "events": 1 }
     ]
   }
 }

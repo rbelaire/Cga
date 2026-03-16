@@ -1,14 +1,25 @@
 [
   {
+    "id": "2026-00",
+    "name": "Koasati Flow Control Open",
+    "date": "2026-03-15",
+    "course": "Koasati Pines Golf Club",
+    "format": "Individual Stroke Play",
+    "entryFee": 50,
+    "flights": ["Championship", "1st", "2nd", "3rd", "4th", "5th"],
+    "status": "completed",
+    "notes": "Season opener — 5 flights"
+  },
+  {
     "id": "2026-01",
     "name": "Season Opener",
     "date": "2026-03-21",
     "course": "Les Vieux Chenes Golf Course",
     "format": "Individual Stroke Play",
     "entryFee": 50,
-    "flights": ["Championship", "A", "B", "C"],
+    "flights": ["Championship", "1st", "2nd", "3rd", "4th", "5th"],
     "status": "upcoming",
-    "notes": "Season kickoff — all members welcome"
+    "notes": ""
   },
   {
     "id": "2026-02",
@@ -17,7 +28,7 @@
     "course": "The Wetlands Golf Course",
     "format": "Individual Stroke Play",
     "entryFee": 50,
-    "flights": ["Championship", "A", "B", "C"],
+    "flights": ["Championship", "1st", "2nd", "3rd", "4th", "5th"],
     "status": "upcoming",
     "notes": ""
   },
@@ -39,7 +50,7 @@
     "course": "Les Vieux Chenes Golf Course",
     "format": "Individual Stroke Play",
     "entryFee": 55,
-    "flights": ["Championship", "A", "B", "C"],
+    "flights": ["Championship", "1st", "2nd", "3rd", "4th", "5th"],
     "status": "upcoming",
     "notes": ""
   },
@@ -50,7 +61,7 @@
     "course": "The Wetlands Golf Course",
     "format": "Individual Stroke Play",
     "entryFee": 50,
-    "flights": ["Championship", "A", "B", "C"],
+    "flights": ["Championship", "1st", "2nd", "3rd", "4th", "5th"],
     "status": "upcoming",
     "notes": "Early tee times available — beat the heat"
   },
@@ -61,7 +72,7 @@
     "course": "Le Triomphe Golf & Country Club",
     "format": "Best Ball (2-Man)",
     "entryFee": 60,
-    "flights": ["Championship", "A/B"],
+    "flights": ["Championship", "Open"],
     "status": "upcoming",
     "notes": "2-man best ball format"
   },
@@ -72,7 +83,7 @@
     "course": "Les Vieux Chenes Golf Course",
     "format": "Individual Stroke Play",
     "entryFee": 50,
-    "flights": ["Championship", "A", "B", "C"],
+    "flights": ["Championship", "1st", "2nd", "3rd", "4th", "5th"],
     "status": "upcoming",
     "notes": ""
   },
@@ -83,7 +94,7 @@
     "course": "Le Triomphe Golf & Country Club",
     "format": "Individual Stroke Play",
     "entryFee": 75,
-    "flights": ["Championship", "A", "B", "C"],
+    "flights": ["Championship", "1st", "2nd", "3rd", "4th", "5th"],
     "status": "upcoming",
     "notes": "Season finale — top qualifiers only for Championship Flight"
   }
