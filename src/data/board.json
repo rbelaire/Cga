@@ -1,0 +1,38 @@
+[
+  {
+    "name": "James Guidry",
+    "role": "President",
+    "since": 2022,
+    "photo": null
+  },
+  {
+    "name": "Derek Broussard",
+    "role": "Vice President",
+    "since": 2022,
+    "photo": null
+  },
+  {
+    "name": "Paul Hebert",
+    "role": "Treasurer",
+    "since": 2020,
+    "photo": null
+  },
+  {
+    "name": "Antoine Fontenot",
+    "role": "Secretary",
+    "since": 2023,
+    "photo": null
+  },
+  {
+    "name": "Marcus Thibodaux",
+    "role": "Tournament Director",
+    "since": 2021,
+    "photo": null
+  },
+  {
+    "name": "Kevin Arceneaux",
+    "role": "Membership Chair",
+    "since": 2022,
+    "photo": null
+  }
+]

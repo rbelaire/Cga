@@ -1,0 +1,38 @@
+{
+  "scratch": [
+    { "rank": 1, "name": "Marcus Thibodaux", "points": 245, "events": 4 },
+    { "rank": 2, "name": "Tony Comeaux", "points": 220, "events": 3 },
+    { "rank": 3, "name": "Derek Broussard", "points": 205, "events": 4 },
+    { "rank": 4, "name": "Ryan Trahan", "points": 190, "events": 3 },
+    { "rank": 5, "name": "Chad Thibodeaux", "points": 175, "events": 3 }
+  ],
+  "handicap": [
+    { "rank": 1, "name": "Brad Fontenot", "points": 260, "events": 4 },
+    { "rank": 2, "name": "Mike Landry", "points": 240, "events": 3 },
+    { "rank": 3, "name": "Norman Leger", "points": 215, "events": 3 },
+    { "rank": 4, "name": "Lance Chiasson", "points": 200, "events": 4 },
+    { "rank": 5, "name": "Eric Romero", "points": 185, "events": 3 }
+  ],
+  "flights": {
+    "Championship": [
+      { "rank": 1, "name": "Marcus Thibodaux", "points": 245, "events": 4 },
+      { "rank": 2, "name": "Tony Comeaux", "points": 220, "events": 3 },
+      { "rank": 3, "name": "Derek Broussard", "points": 205, "events": 4 }
+    ],
+    "A Flight": [
+      { "rank": 1, "name": "Antoine Fontenot", "points": 215, "events": 3 },
+      { "rank": 2, "name": "Ryan Trahan", "points": 190, "events": 3 },
+      { "rank": 3, "name": "Chris Mouton", "points": 175, "events": 3 }
+    ],
+    "B Flight": [
+      { "rank": 1, "name": "Glenn Cormier", "points": 205, "events": 3 },
+      { "rank": 2, "name": "Jason Guillory", "points": 185, "events": 3 },
+      { "rank": 3, "name": "Steve Doucet", "points": 165, "events": 2 }
+    ],
+    "C Flight": [
+      { "rank": 1, "name": "Brad Fontenot", "points": 260, "events": 4 },
+      { "rank": 2, "name": "Mike Landry", "points": 240, "events": 3 },
+      { "rank": 3, "name": "Phil Bertrand", "points": 200, "events": 2 }
+    ]
+  }
+}
