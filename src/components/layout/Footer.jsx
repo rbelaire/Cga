@@ -8,7 +8,7 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <img src="/cga-logo.jpg" alt="CGA Logo" className="h-10 w-10 object-contain" />
+              <img src={`${import.meta.env.BASE_URL}cga-logo.jpg`} alt="CGA Logo" className="h-10 w-10 object-contain" />
               <div>
                 <span className="text-offwhite font-serif text-base font-semibold block leading-tight">
                   Carencro Golf Association
