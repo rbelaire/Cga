@@ -1,0 +1,62 @@
+{
+  "tournament": [
+    {
+      "name": "Acadiana Chevrolet",
+      "tier": "tournament",
+      "url": "https://www.example.com",
+      "logo": null
+    },
+    {
+      "name": "Lafayette General Health",
+      "tier": "tournament",
+      "url": "https://www.example.com",
+      "logo": null
+    },
+    {
+      "name": "Bayou Brewing Co.",
+      "tier": "tournament",
+      "url": "https://www.example.com",
+      "logo": null
+    },
+    {
+      "name": "Broussard & Associates Law",
+      "tier": "tournament",
+      "url": "https://www.example.com",
+      "logo": null
+    }
+  ],
+  "banquet": [
+    {
+      "name": "Prejean's Restaurant",
+      "tier": "banquet",
+      "url": "https://www.example.com",
+      "logo": null
+    },
+    {
+      "name": "Olde Tyme Grocery",
+      "tier": "banquet",
+      "url": "https://www.example.com",
+      "logo": null
+    }
+  ],
+  "trophy": [
+    {
+      "name": "Hebert's Trophy & Awards",
+      "tier": "trophy",
+      "url": "https://www.example.com",
+      "logo": null
+    },
+    {
+      "name": "Carencro True Value Hardware",
+      "tier": "trophy",
+      "url": "https://www.example.com",
+      "logo": null
+    },
+    {
+      "name": "Fontenot Printing",
+      "tier": "trophy",
+      "url": "https://www.example.com",
+      "logo": null
+    }
+  ]
+}

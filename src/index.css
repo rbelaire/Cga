@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-forest: #0B3D2C;
+  --color-gold: #C8A951;
+  --color-cream: #FAF7F0;
+  --color-charcoal: #1A1A1A;
+  --color-offwhite: #F5F5F0;
+  --color-darktext: #2D2D2D;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-cream text-darktext font-sans antialiased;
+    margin: 0;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-gold text-forest font-sans font-semibold px-6 py-3 rounded transition-colors duration-200 hover:bg-gold-dark inline-block;
+  }
+
+  .btn-outline {
+    @apply border border-gold text-gold font-sans font-semibold px-6 py-3 rounded transition-colors duration-200 hover:bg-gold hover:text-forest inline-block;
+  }
+
+  .section-title {
+    @apply text-3xl font-bold text-forest mb-2;
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+
+  .gold-divider {
+    @apply w-16 h-0.5 bg-gold mb-6;
+  }
+
+  .table-header {
+    @apply font-sans text-xs font-semibold uppercase tracking-widest text-gold cursor-pointer select-none py-3 px-4;
+  }
+
+  .stat-number {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}

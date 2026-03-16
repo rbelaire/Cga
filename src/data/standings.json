@@ -1,0 +1,17 @@
+[
+  { "rank": 1, "name": "Marcus Thibodaux", "points": 245, "eventsPlayed": 4, "trend": "up" },
+  { "rank": 2, "name": "Derek Broussard", "points": 230, "eventsPlayed": 4, "trend": "up" },
+  { "rank": 3, "name": "Antoine Fontenot", "points": 215, "eventsPlayed": 3, "trend": "stable" },
+  { "rank": 4, "name": "James Guidry", "points": 200, "eventsPlayed": 4, "trend": "down" },
+  { "rank": 5, "name": "Ryan Trahan", "points": 190, "eventsPlayed": 3, "trend": "up" },
+  { "rank": 6, "name": "Paul Hebert", "points": 185, "eventsPlayed": 4, "trend": "stable" },
+  { "rank": 7, "name": "Chris Mouton", "points": 175, "eventsPlayed": 3, "trend": "up" },
+  { "rank": 8, "name": "Kevin Arceneaux", "points": 165, "eventsPlayed": 4, "trend": "down" },
+  { "rank": 9, "name": "Scott Blanchard", "points": 155, "eventsPlayed": 3, "trend": "stable" },
+  { "rank": 10, "name": "Tony Comeaux", "points": 145, "eventsPlayed": 2, "trend": "up" },
+  { "rank": 11, "name": "Brad Fontenot", "points": 135, "eventsPlayed": 3, "trend": "stable" },
+  { "rank": 12, "name": "Mike Landry", "points": 125, "eventsPlayed": 2, "trend": "down" },
+  { "rank": 13, "name": "Glenn Cormier", "points": 115, "eventsPlayed": 3, "trend": "stable" },
+  { "rank": 14, "name": "Steve Doucet", "points": 110, "eventsPlayed": 2, "trend": "up" },
+  { "rank": 15, "name": "Phil Bertrand", "points": 100, "eventsPlayed": 2, "trend": "stable" }
+]

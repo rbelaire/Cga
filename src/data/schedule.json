@@ -1,0 +1,90 @@
+[
+  {
+    "id": "2026-01",
+    "name": "Season Opener",
+    "date": "2026-03-21",
+    "course": "Les Vieux Chenes Golf Course",
+    "format": "Individual Stroke Play",
+    "entryFee": 50,
+    "flights": ["Championship", "A", "B", "C"],
+    "status": "upcoming",
+    "notes": "Season kickoff — all members welcome"
+  },
+  {
+    "id": "2026-02",
+    "name": "Spring Classic",
+    "date": "2026-04-18",
+    "course": "The Wetlands Golf Course",
+    "format": "Individual Stroke Play",
+    "entryFee": 50,
+    "flights": ["Championship", "A", "B", "C"],
+    "status": "upcoming",
+    "notes": ""
+  },
+  {
+    "id": "2026-03",
+    "name": "Team Scramble",
+    "date": "2026-05-16",
+    "course": "Le Triomphe Golf & Country Club",
+    "format": "4-Man Scramble",
+    "entryFee": 60,
+    "flights": ["Open"],
+    "status": "upcoming",
+    "notes": "Teams of 4, pick your partners"
+  },
+  {
+    "id": "2026-04",
+    "name": "Mid-Summer Invitational",
+    "date": "2026-06-20",
+    "course": "Les Vieux Chenes Golf Course",
+    "format": "Individual Stroke Play",
+    "entryFee": 55,
+    "flights": ["Championship", "A", "B", "C"],
+    "status": "upcoming",
+    "notes": ""
+  },
+  {
+    "id": "2026-05",
+    "name": "Dog Days Open",
+    "date": "2026-07-18",
+    "course": "The Wetlands Golf Course",
+    "format": "Individual Stroke Play",
+    "entryFee": 50,
+    "flights": ["Championship", "A", "B", "C"],
+    "status": "upcoming",
+    "notes": "Early tee times available — beat the heat"
+  },
+  {
+    "id": "2026-06",
+    "name": "Parish Cup",
+    "date": "2026-08-15",
+    "course": "Le Triomphe Golf & Country Club",
+    "format": "Best Ball (2-Man)",
+    "entryFee": 60,
+    "flights": ["Championship", "A/B"],
+    "status": "upcoming",
+    "notes": "2-man best ball format"
+  },
+  {
+    "id": "2026-07",
+    "name": "Fall Classic",
+    "date": "2026-09-19",
+    "course": "Les Vieux Chenes Golf Course",
+    "format": "Individual Stroke Play",
+    "entryFee": 50,
+    "flights": ["Championship", "A", "B", "C"],
+    "status": "upcoming",
+    "notes": ""
+  },
+  {
+    "id": "2026-08",
+    "name": "CGA Championship",
+    "date": "2026-10-17",
+    "course": "Le Triomphe Golf & Country Club",
+    "format": "Individual Stroke Play",
+    "entryFee": 75,
+    "flights": ["Championship", "A", "B", "C"],
+    "status": "upcoming",
+    "notes": "Season finale — top qualifiers only for Championship Flight"
+  }
+]
