@@ -5,12 +5,12 @@
 @tailwind utilities;
 
 :root {
-  --color-forest: #0B3D2C;
-  --color-gold: #C8A951;
-  --color-cream: #FAF7F0;
-  --color-charcoal: #1A1A1A;
-  --color-offwhite: #F5F5F0;
-  --color-darktext: #2D2D2D;
+  --color-forest:   #1B3B6F;
+  --color-gold:     #E8861A;
+  --color-cream:    #F0F4FA;
+  --color-charcoal: #1A1E2E;
+  --color-offwhite: #EEF2FA;
+  --color-darktext: #1B1B2E;
 }
 
 @layer base {
@@ -36,11 +36,11 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-gold text-forest font-sans font-semibold px-6 py-3 rounded transition-colors duration-200 hover:bg-gold-dark inline-block;
+    @apply bg-gold text-white font-sans font-semibold px-6 py-3 rounded transition-colors duration-200 hover:bg-gold-dark inline-block;
   }
 
   .btn-outline {
-    @apply border border-gold text-gold font-sans font-semibold px-6 py-3 rounded transition-colors duration-200 hover:bg-gold hover:text-forest inline-block;
+    @apply border-2 border-gold text-gold font-sans font-semibold px-6 py-3 rounded transition-colors duration-200 hover:bg-gold hover:text-white inline-block;
   }
 
   .section-title {
