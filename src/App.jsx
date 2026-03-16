@@ -10,6 +10,7 @@ import Members from './pages/Members'
 import Eligibility from './pages/Eligibility'
 import Board from './pages/Board'
 import Sponsors from './pages/Sponsors'
+import Rules from './pages/Rules'
 
 function NotFound() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/eligibility" element={<Eligibility />} />
           <Route path="/board" element={<Board />} />
           <Route path="/sponsors" element={<Sponsors />} />
+          <Route path="/rules" element={<Rules />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <Footer />
