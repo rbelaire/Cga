@@ -24,19 +24,21 @@ export default function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-shadow duration-300 ${
-        scrolled ? 'shadow-lg' : ''
-      } bg-forest`}
+      className={`sticky top-0 z-50 transition-shadow duration-300 bg-forest ${
+        scrolled ? 'shadow-lg shadow-black/30' : ''
+      }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 group" onClick={() => setMenuOpen(false)}>
-            <div className="w-9 h-9 rounded-full border-2 border-gold flex items-center justify-center">
-              <span className="text-gold font-serif font-bold text-sm leading-none">CGA</span>
-            </div>
+          <Link to="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
+            <img
+              src="/cga-logo.jpg"
+              alt="CGA Logo"
+              className="h-10 w-10 object-contain"
+            />
             <div className="hidden sm:block">
-              <span className="text-offwhite font-serif text-base font-semibold tracking-wide leading-tight block">
+              <span className="text-white font-serif text-base font-semibold tracking-wide leading-tight block">
                 Carencro Golf
               </span>
               <span className="text-gold text-xs font-sans tracking-widest uppercase">
@@ -55,7 +57,7 @@ export default function Header() {
                   `px-3 py-2 text-sm font-sans font-medium rounded transition-colors duration-150 ${
                     isActive
                       ? 'text-gold border-b-2 border-gold'
-                      : 'text-offwhite hover:text-gold'
+                      : 'text-white/90 hover:text-gold'
                   }`
                 }
               >
@@ -66,7 +68,7 @@ export default function Header() {
 
           {/* Mobile hamburger */}
           <button
-            className="lg:hidden text-offwhite p-2 rounded focus:outline-none focus:ring-2 focus:ring-gold"
+            className="lg:hidden text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-gold"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
@@ -84,7 +86,7 @@ export default function Header() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="lg:hidden bg-forest-dark border-t border-forest-light">
+        <div className="lg:hidden bg-forest-dark border-t border-forest-light/30">
           <nav className="px-4 py-3 flex flex-col gap-1">
             {navLinks.map(({ to, label }) => (
               <NavLink
@@ -95,7 +97,7 @@ export default function Header() {
                   `block px-4 py-3 text-sm font-sans font-medium rounded ${
                     isActive
                       ? 'text-gold bg-forest'
-                      : 'text-offwhite hover:text-gold hover:bg-forest'
+                      : 'text-white/80 hover:text-gold hover:bg-forest'
                   }`
                 }
               >
