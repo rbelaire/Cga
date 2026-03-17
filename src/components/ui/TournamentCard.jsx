@@ -44,7 +44,7 @@ export default function TournamentCard({ tournament, compact = false }) {
               {format}
             </span>
             <span className="text-xs bg-gray-800 text-gold px-2 py-1 rounded font-sans font-medium stat-number">
-              ${entryFee} entry
+              {isNaN(entryFee) ? entryFee : `$${entryFee}`}
             </span>
           </div>
         )}

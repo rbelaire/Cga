@@ -28,7 +28,7 @@ export default function NextTournament() {
                 {next.format}
               </span>
               <span className="text-xs bg-gray-800 text-gold px-2.5 py-1 rounded-full font-sans font-medium stat-number">
-                ${next.entryFee} entry
+                {isNaN(next.entryFee) ? next.entryFee : `$${next.entryFee}`}
               </span>
             </div>
           </div>
