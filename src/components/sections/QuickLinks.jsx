@@ -76,15 +76,15 @@ export default function QuickLinks() {
             <Link
               key={to}
               to={to}
-              className="group flex flex-col items-center text-center p-5 bg-charcoal border border-gray-700 rounded-lg hover:border-gold transition-all duration-200 hover:-translate-y-0.5"
+              className="group flex flex-col items-center text-center p-5 bg-white border border-gray-200 rounded-lg hover:border-gold hover:shadow-sm transition-all duration-200"
             >
-              <div className="text-gold mb-3 group-hover:scale-110 transition-transform duration-200">
+              <div className="text-gray-400 mb-3 group-hover:text-gold transition-colors duration-200">
                 {icon}
               </div>
-              <span className="text-offwhite text-xs font-sans font-semibold leading-tight mb-1">
+              <span className="text-darktext text-xs font-sans font-semibold leading-tight mb-1">
                 {label}
               </span>
-              <span className="text-gray-500 text-xs font-sans hidden sm:block">{description}</span>
+              <span className="text-gray-400 text-xs font-sans hidden sm:block">{description}</span>
             </Link>
           ))}
         </div>

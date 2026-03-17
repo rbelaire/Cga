@@ -16,14 +16,14 @@ export default function Home() {
       <QuickLinks />
 
       {/* Mini standings preview */}
-      <section className="py-16 bg-gray-950">
+      <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-6">
             <div>
-              <h2 className="section-title text-offwhite">2026 Standings</h2>
+              <h2 className="section-title">2026 Standings</h2>
               <div className="gold-divider" />
             </div>
-            <Link to="/standings" className="text-gold text-sm font-sans hover:text-gold-light transition-colors mb-7">
+            <Link to="/standings" className="text-forest text-sm font-sans hover:text-gold transition-colors mb-7">
               Full standings →
             </Link>
           </div>
@@ -32,11 +32,11 @@ export default function Home() {
       </section>
 
       {/* Dues CTA */}
-      <section className="py-16 bg-forest">
+      <section className="py-16 bg-amber-50 border-y border-amber-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div>
-            <h2 className="text-offwhite font-serif text-2xl font-bold mb-1">2026 Dues Now Open</h2>
-            <p className="text-gray-300 font-sans text-sm">Annual membership dues are $75. Pay via Venmo to stay active for the season.</p>
+            <h2 className="text-darktext font-serif text-2xl font-bold mb-1">2026 Dues Now Open</h2>
+            <p className="text-gray-600 font-sans text-sm">Annual membership dues are $75. Pay via Venmo to stay active for the season.</p>
           </div>
           <a
             href="https://venmo.com/CGA-Pay"

@@ -21,7 +21,7 @@ export default function Standings() {
         </p>
       </div>
 
-      <div className="bg-gray-950 rounded-xl p-1 mb-3">
+      <div className="mb-3">
         <StandingsTable data={standings} columns={columns} highlightTop={3} />
       </div>
     </PageWrapper>

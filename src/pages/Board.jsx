@@ -23,7 +23,7 @@ export default function Board() {
           return (
             <div
               key={member.name}
-              className="bg-charcoal border border-gray-700 rounded-lg p-6 hover:border-gold transition-colors"
+              className="bg-white border border-gray-200 rounded-lg p-6 hover:border-gold hover:shadow-sm transition-colors"
             >
               <div className="flex items-center gap-4 mb-4">
                 {member.photo ? (
@@ -39,7 +39,7 @@ export default function Board() {
                   </div>
                 )}
                 <div>
-                  <p className="text-offwhite font-serif text-lg font-semibold leading-tight">{member.name}</p>
+                  <p className="text-darktext font-serif text-lg font-semibold leading-tight">{member.name}</p>
                   <p className="text-gold text-xs font-sans font-semibold uppercase tracking-wide mt-0.5">
                     {member.role}
                   </p>

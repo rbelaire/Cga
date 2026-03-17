@@ -74,16 +74,16 @@ export default function Rules() {
       {/* Rule cards */}
       <div className="space-y-4 mb-10">
         {rules.map(({ title, icon, body }) => (
-          <div key={title} className="bg-charcoal border border-gray-700 rounded-lg overflow-hidden">
+          <div key={title} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-forest px-5 py-3 flex items-center gap-3">
               <span className="text-xl" role="presentation">{icon}</span>
-              <h2 className="text-offwhite font-serif text-lg font-semibold">{title}</h2>
+              <h2 className="text-white font-serif text-lg font-semibold">{title}</h2>
             </div>
             <ul className="px-5 py-4 space-y-2">
               {body.map((line, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gold flex-shrink-0" />
-                  <span className="text-gray-300 font-sans text-sm leading-relaxed">{line}</span>
+                  <span className="text-gray-600 font-sans text-sm leading-relaxed">{line}</span>
                 </li>
               ))}
             </ul>

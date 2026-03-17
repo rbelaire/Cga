@@ -34,7 +34,7 @@ export default function PlayerOfTheYear() {
             className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
               tab === i
                 ? 'bg-gold text-forest'
-                : 'bg-charcoal text-gray-400 border border-gray-700 hover:text-gold hover:border-gold'
+                : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
             }`}
           >
             {label}
@@ -42,7 +42,7 @@ export default function PlayerOfTheYear() {
         ))}
       </div>
 
-      <div className="bg-gray-950 rounded-xl p-1">
+      <div>
         <StandingsTable
           data={poy.flights[FLIGHTS[tab]] || []}
           columns={eventsColumns}
