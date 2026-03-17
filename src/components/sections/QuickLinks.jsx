@@ -65,18 +65,18 @@ const links = [
 
 export default function QuickLinks() {
   return (
-    <section className="py-12">
+    <section className="py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
+        <div className="mb-10">
           <h2 className="section-title">Quick Access</h2>
           <div className="gold-divider" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
           {links.map(({ to, label, description, icon }) => (
             <Link
               key={to}
               to={to}
-              className="group flex flex-col items-center text-center p-4 bg-charcoal border border-gray-700 rounded-lg hover:border-gold transition-all duration-200 hover:-translate-y-0.5"
+              className="group flex flex-col items-center text-center p-5 bg-charcoal border border-gray-700 rounded-lg hover:border-gold transition-all duration-200 hover:-translate-y-0.5"
             >
               <div className="text-gold mb-3 group-hover:scale-110 transition-transform duration-200">
                 {icon}
