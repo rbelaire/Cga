@@ -40,9 +40,9 @@ export default function Sponsors() {
         sponsors={sponsors.trophy}
       />
 
-      <div className="mt-8 bg-charcoal border border-gray-700 rounded-lg p-6 text-center">
-        <h3 className="text-offwhite font-serif text-lg font-semibold mb-2">Interested in Sponsoring?</h3>
-        <p className="text-gray-400 font-sans text-sm mb-4">
+      <div className="mt-8 bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+        <h3 className="text-darktext font-serif text-lg font-semibold mb-2">Interested in Sponsoring?</h3>
+        <p className="text-gray-500 font-sans text-sm mb-4">
           Contact a board member to learn about sponsorship opportunities for the 2026 season.
         </p>
       </div>

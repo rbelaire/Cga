@@ -6,9 +6,9 @@ const TREND_ICONS = {
   stable: '–',
 }
 const TREND_COLORS = {
-  up: 'text-green-400',
-  down: 'text-red-400',
-  stable: 'text-gray-500',
+  up: 'text-green-600',
+  down: 'text-red-500',
+  stable: 'text-gray-400',
 }
 
 export default function StandingsTable({ data, columns, highlightTop = 3 }) {
@@ -42,20 +42,20 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
     : data
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-700">
+    <div className="overflow-x-auto rounded-lg border border-gray-200">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="bg-forest border-b border-gray-700">
+          <tr className="bg-forest border-b border-forest">
             {defaultColumns.map((col) => (
               <th
                 key={col.key}
-                className="table-header"
+                className="table-header text-white"
                 onClick={() => col.sortable && handleSort(col.key)}
               >
                 <span className="flex items-center gap-1">
                   {col.label}
                   {col.sortable && sortKey === col.key && (
-                    <span className="text-gold-light">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                    <span className="text-gold">{sortDir === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </span>
               </th>
@@ -66,34 +66,34 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
           {sorted.map((row, idx) => (
             <tr
               key={row.name || idx}
-              className={`border-b border-gray-800 transition-colors hover:bg-gray-800 ${
-                idx % 2 === 0 ? 'bg-charcoal' : 'bg-gray-900'
+              className={`border-b border-gray-100 transition-colors hover:bg-blue-50 ${
+                idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
               }`}
             >
               {defaultColumns.map((col) => (
                 <td key={col.key} className="px-4 py-3">
                   {col.key === 'rank' && (
                     <span
-                      className={`stat-number font-medium ${
-                        idx < highlightTop ? 'text-gold' : 'text-gray-400'
+                      className={`stat-number font-semibold ${
+                        idx < highlightTop ? 'text-gold' : 'text-gray-500'
                       }`}
                     >
                       {idx < highlightTop ? `#${row.rank || idx + 1}` : row.rank || idx + 1}
                     </span>
                   )}
                   {col.key === 'name' && (
-                    <span className={`font-sans ${idx < highlightTop ? 'text-offwhite font-medium' : 'text-gray-300'}`}>
+                    <span className={`font-sans ${idx < highlightTop ? 'text-darktext font-semibold' : 'text-darktext'}`}>
                       {row.name}
                     </span>
                   )}
                   {col.key === 'points' && (
-                    <span className="stat-number text-offwhite">{row.points}</span>
+                    <span className="stat-number text-darktext font-medium">{row.points}</span>
                   )}
                   {col.key === 'eventsPlayed' && (
-                    <span className="stat-number text-gray-400">{row.eventsPlayed ?? row.events}</span>
+                    <span className="stat-number text-gray-500">{row.eventsPlayed ?? row.events}</span>
                   )}
                   {col.key === 'events' && (
-                    <span className="stat-number text-gray-400">{row.events}</span>
+                    <span className="stat-number text-gray-500">{row.events}</span>
                   )}
                   {col.key === 'trend' && row.trend && (
                     <span className={`text-base font-bold ${TREND_COLORS[row.trend]}`}>
@@ -101,12 +101,12 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                     </span>
                   )}
                   {col.key === 'flight' && (
-                    <span className="text-xs text-gray-400 font-sans bg-gray-800 px-2 py-0.5 rounded whitespace-nowrap">
+                    <span className="text-xs text-forest font-sans bg-blue-50 border border-blue-100 px-2 py-0.5 rounded whitespace-nowrap">
                       {row.flight}
                     </span>
                   )}
                   {!['rank', 'name', 'points', 'eventsPlayed', 'events', 'trend', 'flight'].includes(col.key) && (
-                    <span className="text-gray-300 font-sans">{row[col.key]}</span>
+                    <span className="text-darktext font-sans">{row[col.key]}</span>
                   )}
                 </td>
               ))}
