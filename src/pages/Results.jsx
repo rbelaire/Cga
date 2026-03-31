@@ -102,8 +102,8 @@ function FlightLeaderboards({ leaderboard }) {
     { key: 'rank',      label: 'Rank',   sortable: false },
     { key: 'name',      label: 'Player', sortable: true  },
     { key: 'poy',       label: 'POY',    sortable: true  },
-    { key: 'points',    label: 'PTM',    sortable: true  },
-    { key: 'score',     label: 'Score',  sortable: true  },
+    { key: 'points',    label: 'Score',  sortable: true  },
+    { key: 'ptm',       label: 'PTM',    sortable: true  },
     { key: 'plusMinus', label: '+/-',    sortable: true  },
   ]
 
