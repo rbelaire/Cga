@@ -6,7 +6,7 @@ import { formatDateLong } from '../utils/formatDate'
 import StandingsTable from '../components/ui/StandingsTable'
 
 const resultFiles = {
-  '2026-00': koasati,
+  '2026-01': koasati,
 }
 
 const scoreColumns = [
@@ -99,9 +99,12 @@ function FlightLeaderboards({ leaderboard }) {
   const flights = Object.keys(leaderboard)
 
   const scoreColumns = [
-    { key: 'rank', label: 'Rank', sortable: false },
-    { key: 'name', label: 'Player', sortable: true },
-    { key: 'points', label: 'Points', sortable: true },
+    { key: 'rank',      label: 'Rank',   sortable: false },
+    { key: 'name',      label: 'Player', sortable: true  },
+    { key: 'poy',       label: 'POY',    sortable: true  },
+    { key: 'points',    label: 'PTM',    sortable: true  },
+    { key: 'score',     label: 'Score',  sortable: true  },
+    { key: 'plusMinus', label: '+/-',    sortable: true  },
   ]
 
   return (
