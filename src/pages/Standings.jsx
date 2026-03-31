@@ -1,16 +1,31 @@
+import { useState } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import StandingsTable from '../components/ui/StandingsTable'
 import standings from '../data/standings.json'
 
+const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+
 const columns = [
-  { key: 'rank', label: 'Rank', sortable: false },
-  { key: 'name', label: 'Player', sortable: true },
-  { key: 'flight', label: 'Flight', sortable: true },
-  { key: 'points', label: 'Points', sortable: true },
-  { key: 'eventsPlayed', label: 'Events', sortable: true },
+  { key: 'rank',        label: 'Rank',   sortable: false },
+  { key: 'name',        label: 'Player', sortable: true  },
+  { key: 'points',      label: 'Score',  sortable: true  },
+  { key: 'eventsPlayed',label: 'Events', sortable: true  },
+  { key: 'trend',       label: '',       sortable: false  },
 ]
 
+const byFlight = Object.fromEntries(
+  FLIGHTS.map((flight) => {
+    const players = standings
+      .filter((p) => p.flight === flight)
+      .sort((a, b) => b.points - a.points)
+      .map((p, i) => ({ ...p, rank: i + 1 }))
+    return [flight, players]
+  })
+)
+
 export default function Standings() {
+  const [tab, setTab] = useState(0)
+
   return (
     <PageWrapper>
       <div className="mb-8">
@@ -21,9 +36,23 @@ export default function Standings() {
         </p>
       </div>
 
-      <div className="mb-3">
-        <StandingsTable data={standings} columns={columns} highlightTop={3} />
+      <div className="flex flex-wrap gap-2 mb-6">
+        {FLIGHTS.map((label, i) => (
+          <button
+            key={label}
+            onClick={() => setTab(i)}
+            className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
+              tab === i
+                ? 'bg-gold text-forest'
+                : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
+
+      <StandingsTable data={byFlight[FLIGHTS[tab]] || []} columns={columns} highlightTop={3} />
     </PageWrapper>
   )
 }

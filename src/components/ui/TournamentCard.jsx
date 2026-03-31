@@ -65,7 +65,8 @@ export default function TournamentCard({ tournament, compact = false }) {
 
         {status === 'completed' && (
           <Link
-            to={`/results/${id}`}
+            to="/results"
+            state={{ expand: id }}
             className="mt-3 inline-block text-forest text-sm font-sans font-medium hover:text-gold transition-colors"
           >
             View Results →

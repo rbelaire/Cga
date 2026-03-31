@@ -1,5 +1,5 @@
 export default function MemberCard({ member }) {
-  const { name, handicap, memberSince } = member
+  const { name, ptm, memberSince } = member
   const initials = name
     .split(' ')
     .map((n) => n[0])
@@ -14,7 +14,7 @@ export default function MemberCard({ member }) {
       <div className="min-w-0">
         <p className="text-darktext font-sans font-medium text-sm truncate">{name}</p>
         <div className="flex items-center gap-3 mt-0.5">
-          <span className="stat-number text-xs text-gold font-semibold">HCP {handicap?.toFixed(1) ?? 'N/A'}</span>
+          <span className="stat-number text-xs text-gold font-semibold">PTM {ptm ?? 'N/A'}</span>
           <span className="text-xs text-gray-400 font-sans">Since {memberSince}</span>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import koasati from '../data/results/2026-koasati-flow-control.json'
@@ -17,7 +18,8 @@ const scoreColumns = [
 
 export default function Results() {
   const completed = schedule.filter((t) => t.status === 'completed')
-  const [expanded, setExpanded] = useState(completed[0]?.id ?? null)
+  const { state } = useLocation()
+  const [expanded, setExpanded] = useState(state?.expand ?? completed[0]?.id ?? null)
 
   return (
     <PageWrapper>
