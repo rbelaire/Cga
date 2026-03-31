@@ -2,32 +2,57 @@ import HeroSection from '../components/sections/HeroSection'
 import NextTournament from '../components/sections/NextTournament'
 import QuickLinks from '../components/sections/QuickLinks'
 import SponsorBar from '../components/sections/SponsorBar'
-import StandingsTable from '../components/ui/StandingsTable'
 import { Link } from 'react-router-dom'
-import standings from '../data/standings.json'
+import poy from '../data/poy.json'
+
+const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 
 export default function Home() {
-  const top5 = standings.slice(0, 5)
-
   return (
     <>
       <HeroSection />
       <NextTournament />
       <QuickLinks />
 
-      {/* Mini standings preview */}
+      {/* Per-flight standings preview */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-6">
             <div>
-              <h2 className="section-title">2026 Standings</h2>
+              <h2 className="section-title">2026 Flight Standings</h2>
               <div className="gold-divider" />
             </div>
-            <Link to="/standings" className="text-forest text-sm font-sans hover:text-gold transition-colors mb-7">
+            <Link to="/poy" className="text-forest text-sm font-sans hover:text-gold transition-colors mb-7">
               Full standings →
             </Link>
           </div>
-          <StandingsTable data={top5} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {FLIGHTS.map((flight) => {
+              const top5 = (poy.flights[flight] || []).slice(0, 5)
+              return (
+                <div key={flight} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-forest px-4 py-3">
+                    <h3 className="text-white font-sans text-sm font-semibold uppercase tracking-widest">{flight}</h3>
+                  </div>
+                  <ul className="divide-y divide-gray-100">
+                    {top5.map((player, idx) => (
+                      <li key={player.name} className="flex items-center justify-between px-4 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <span className={`stat-number text-xs font-semibold w-5 text-right ${idx < 3 ? 'text-gold' : 'text-gray-400'}`}>
+                            {player.rank}
+                          </span>
+                          <span className={`font-sans text-sm ${idx < 3 ? 'text-darktext font-semibold' : 'text-darktext'}`}>
+                            {player.name}
+                          </span>
+                        </div>
+                        <span className="stat-number text-xs text-gray-500">{player.points} pts</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </section>
 
