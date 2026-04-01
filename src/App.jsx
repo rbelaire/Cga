@@ -1,4 +1,4 @@
-import { HashRouter as BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter as BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
 import Header from './components/layout/Header'
 import Footer from './components/layout/Footer'
 import Home from './pages/Home'
@@ -20,7 +20,7 @@ function NotFound() {
       <p className="text-gold font-mono text-5xl font-bold mb-4">404</p>
       <h1 className="text-darktext font-serif text-2xl font-bold mb-2">Page not found</h1>
       <p className="text-gray-500 font-sans text-sm mb-6">The page you're looking for doesn't exist.</p>
-      <a href="/" className="btn-primary">Back to Home</a>
+      <Link to="/" className="btn-primary">Back to Home</Link>
     </div>
   )
 }

@@ -26,7 +26,7 @@ export default function Home() {
               <div className="gold-divider" />
             </div>
             <Link
-              to="/poy"
+              to="/standings"
               className="mb-7 px-4 py-2 text-sm font-sans font-medium rounded-lg border border-forest text-forest hover:bg-forest hover:text-white transition-colors"
             >
               Full Standings →

@@ -22,7 +22,7 @@ const links = [
     ),
   },
   {
-    to: '/results',
+    to: '/schedule',
     label: 'Results',
     description: 'Past event scores',
     icon: (
@@ -32,7 +32,7 @@ const links = [
     ),
   },
   {
-    to: '/poy',
+    to: '/standings',
     label: 'Player of the Year',
     description: 'POY standings by flight',
     icon: (
