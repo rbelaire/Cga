@@ -3,6 +3,7 @@ import Header from './components/layout/Header'
 import Footer from './components/layout/Footer'
 import Home from './pages/Home'
 import Schedule from './pages/Schedule'
+import Results from './pages/Results'
 import PointsToMake from './pages/PointsToMake'
 import Standings from './pages/Standings'
 import PlayerOfTheYear from './pages/PlayerOfTheYear'
@@ -33,7 +34,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/schedule" element={<Schedule />} />
-          <Route path="/results" element={<Navigate to="/schedule" replace />} />
+          <Route path="/results" element={<Results />} />
           <Route path="/points-to-make" element={<PointsToMake />} />
           <Route path="/standings" element={<Standings />} />
           <Route path="/poy" element={<PlayerOfTheYear />} />
