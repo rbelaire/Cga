@@ -408,9 +408,9 @@ function PdfBtn({ onClick, children, disabled = false }) {
 
 // ── PIN gate ───────────────────────────────────────────────────────────────────
 export default function Admin() {
-  const [pin, setPin] = useState('')
+  const [pin,      setPin]      = useState('')
   const [unlocked, setUnlocked] = useState(false)
-  const [err, setErr] = useState(false)
+  const [err,      setErr]      = useState(false)
 
   const tryUnlock = () => {
     if (pin === PIN) { setUnlocked(true) }
@@ -796,8 +796,8 @@ function AdminPanel() {
     if (!tournament) return
     const flightWinners = [], leaderboard = {}
     for (const fl of FLIGHTS) {
-      const ps      = calcFlightPOY(data[tid]?.[fl] ?? [])
-      const ranked  = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
+      const ps     = calcFlightPOY(data[tid]?.[fl] ?? [])
+      const ranked = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
       const allRows = [...ranked, ...ps.filter(p => p.rank == null)]
       leaderboard[fl] = allRows.map(p => ({
         rank: p.rank ?? 0, name: p.name, poy: p.poy ?? 0,
