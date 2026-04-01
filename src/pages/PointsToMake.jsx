@@ -4,6 +4,12 @@ import ptmData from '../data/ptm.json'
 
 const HISTORY_LABELS = ['New', '2nd', '3rd', '4th', '5th', '6th', '7th']
 
+const TEE_STYLES = {
+  Back:  'bg-gray-800 text-white',
+  Front: 'bg-sky-600 text-white',
+  Sr:    'bg-amber-500 text-white',
+}
+
 // The "New" score was made at Flow Control Open and should be compared
 // against the pre-FC PTM (ptmAtFlowControl). Older scores are compared
 // against the same displayed PTM (best approximation available).
@@ -168,7 +174,14 @@ export default function PointsToMake() {
                     }`}
                   >
                     <td className="px-4 py-2.5">
-                      <span className="font-sans text-darktext font-medium">{player.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-sans text-darktext font-medium">{player.name}</span>
+                        {player.tee && (
+                          <span className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${TEE_STYLES[player.tee] ?? 'bg-gray-200 text-gray-600'}`}>
+                            {player.tee}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-2.5">
                       {displayPtm != null
