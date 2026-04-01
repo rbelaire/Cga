@@ -2,8 +2,21 @@ import { useState, useEffect } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import StandingsTable from '../components/ui/StandingsTable'
 import standings from '../data/standings.json'
+import ptmData from '../data/ptm.json'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+
+const roundsFromPtm = {}
+for (const player of ptmData) {
+  if (player.name && typeof player.rounds === 'number') {
+    roundsFromPtm[player.name] = player.rounds
+  }
+}
+
+function withRounds(row) {
+  const rounds = roundsFromPtm[row.name]
+  return rounds != null ? { ...row, rounds } : row
+}
 
 const columns = [
   { key: 'rank',        label: 'Rank',         sortable: false },
@@ -21,7 +34,7 @@ export default function Standings() {
   const [tab, setTab] = useState(0)
 
   const currentFlight = FLIGHTS[tab]
-  const flightData = standings.flights[currentFlight] || []
+  const flightData = (standings.flights[currentFlight] || []).map(withRounds)
 
   // Find latest tournament name from first player that has one
   const latestTournament = flightData.find(p => p.latestTournament)?.latestTournament ?? null

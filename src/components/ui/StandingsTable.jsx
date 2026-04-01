@@ -5,6 +5,10 @@ function isBubble(events) {
   return typeof events === 'number' && events >= 1 && events < 4
 }
 
+function isBubble(rounds) {
+  return typeof rounds === 'number' && rounds >= 1 && rounds < 4
+}
+
 const TREND_ICONS = {
   up: '↑',
   down: '↓',
