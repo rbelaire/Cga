@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import ptmData from '../data/ptm.json'
+import { formatName } from '../utils/formatName'
 
 const HISTORY_LABELS = ['New', '2nd', '3rd', '4th', '5th', '6th', '7th']
 
@@ -19,6 +20,22 @@ function ScoreCell({ value, ptm }) {
   const diff = value - ptm
   const color = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-500'
   return <span className={`stat-number font-medium ${color}`}>{value}</span>
+}
+
+function SortHeader({ label, colKey, sortKey, sortDir, onSort, className = '' }) {
+  return (
+    <th
+      className={`table-header text-white cursor-pointer select-none ${className}`}
+      onClick={() => onSort(colKey)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {sortKey === colKey && (
+          <span className="text-gold">{sortDir === 'asc' ? '↑' : '↓'}</span>
+        )}
+      </span>
+    </th>
+  )
 }
 
 export default function PointsToMake() {
@@ -56,7 +73,6 @@ export default function PointsToMake() {
         const cmp = (av ?? '').localeCompare(bv ?? '')
         return sortDir === 'asc' ? cmp : -cmp
       }
-      // For PTM sort, use the displayed PTM (pre-FC if available, else current)
       if (sortKey === 'ptm') {
         av = a.ptmAtFlowControl ?? a.ptm ?? -Infinity
         bv = b.ptmAtFlowControl ?? b.ptm ?? -Infinity
@@ -67,20 +83,6 @@ export default function PointsToMake() {
       return sortDir === 'asc' ? av - bv : bv - av
     })
   }, [active, sortKey, sortDir])
-
-  const SortHeader = ({ label, colKey, className = '' }) => (
-    <th
-      className={`table-header text-white cursor-pointer select-none ${className}`}
-      onClick={() => handleSort(colKey)}
-    >
-      <span className="flex items-center gap-1">
-        {label}
-        {sortKey === colKey && (
-          <span className="text-gold">{sortDir === 'asc' ? '↑' : '↓'}</span>
-        )}
-      </span>
-    </th>
-  )
 
   return (
     <PageWrapper>
@@ -142,8 +144,8 @@ export default function PointsToMake() {
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
             <tr className="bg-forest border-b border-forest">
-              <SortHeader label="Player" colKey="name" />
-              <SortHeader label="PTM" colKey="ptm" />
+              <SortHeader label="Player" colKey="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortHeader label="PTM" colKey="ptm" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
               {HISTORY_LABELS.map((lbl) => (
                 <th key={lbl} className="table-header text-white/70 font-normal">
                   {lbl}
@@ -175,7 +177,7 @@ export default function PointsToMake() {
                   >
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-sans text-darktext font-medium">{player.name}</span>
+                        <span className="font-sans text-darktext font-medium">{formatName(player.name)}</span>
                         {player.tee && (
                           <span className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${TEE_STYLES[player.tee] ?? 'bg-gray-200 text-gray-600'}`}>
                             {player.tee}

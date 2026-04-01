@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatName } from '../../utils/formatName'
 
 const TREND_ICONS = {
   up: '↑',
@@ -92,7 +93,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                   )}
                   {col.key === 'name' && (
                     <span className={`font-sans ${idx < highlightTop ? 'text-darktext font-semibold' : 'text-darktext'}`}>
-                      {row.name}
+                      {formatName(row.name)}
                     </span>
                   )}
                   {col.key === 'points' && (

@@ -3,6 +3,7 @@ import PageWrapper from '../components/layout/PageWrapper'
 import MemberCard from '../components/ui/MemberCard'
 import SearchBar from '../components/ui/SearchBar'
 import members from '../data/members.json'
+import { compareByLastName } from '../utils/formatName'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const TABS = ['All', ...FLIGHTS]
@@ -11,14 +12,14 @@ const byFlight = Object.fromEntries(
   FLIGHTS.map((flight) => {
     const players = members
       .filter((m) => m.flight === flight)
-      .sort((a, b) => (b.ptm ?? -1) - (a.ptm ?? -1))
+      .sort(compareByLastName)
     return [flight, players]
   })
 )
 
 const unassigned = members
   .filter((m) => !m.flight)
-  .sort((a, b) => a.name.localeCompare(b.name))
+  .sort(compareByLastName)
 
 export default function Members() {
   useEffect(() => { document.title = 'Members | CGA 2026' }, [])
@@ -32,7 +33,7 @@ export default function Members() {
 
   const baseList =
     tab === 'All'
-      ? [...members].sort((a, b) => a.name.localeCompare(b.name))
+      ? [...members].sort(compareByLastName)
       : byFlight[tab] ?? []
 
   const filtered = query
