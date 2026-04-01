@@ -4,15 +4,15 @@ const TEE_STYLES = {
   Sr:    'bg-amber-500 text-white',
 }
 
-function isBubble(events) {
-  return typeof events === 'number' && events >= 1 && events < 4
+function isBubble(rounds) {
+  return typeof rounds === 'number' && rounds >= 1 && rounds < 4
 }
 
 export default function MemberCard({ member }) {
-  const { name, ptm, memberSince, email, cell, homePhone, tee, events } = member
+  const { name, ptm, memberSince, email, cell, homePhone, tee, rounds } = member
   const hasData = ptm !== null
   const phone = cell || homePhone
-  const bubble = isBubble(events)
+  const bubble = isBubble(rounds)
   const initials = name
     .split(' ')
     .map((n) => n[0])

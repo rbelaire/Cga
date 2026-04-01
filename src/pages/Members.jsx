@@ -3,27 +3,25 @@ import PageWrapper from '../components/layout/PageWrapper'
 import MemberCard from '../components/ui/MemberCard'
 import SearchBar from '../components/ui/SearchBar'
 import members from '../data/members.json'
-import standings from '../data/standings.json'
+import ptmData from '../data/ptm.json'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const TABS = ['All', ...FLIGHTS]
 
-// Build a name → events lookup from standings so MemberCard can show Bubble tags
-const eventsFromStandings = {}
-for (const flight of FLIGHTS) {
-  for (const player of standings.flights[flight] ?? []) {
-    if (player.name && typeof player.events === 'number') {
-      eventsFromStandings[player.name] = player.events
-    }
+// Build a name → rounds lookup from ptm.json (covers full history, not just current season)
+const roundsFromPtm = {}
+for (const player of ptmData) {
+  if (player.name && typeof player.rounds === 'number') {
+    roundsFromPtm[player.name] = player.rounds
   }
 }
 
-function withEvents(m) {
-  const events = m.events ?? eventsFromStandings[m.name] ?? null
-  return events !== null ? { ...m, events } : m
+function withRounds(m) {
+  const rounds = roundsFromPtm[m.name] ?? null
+  return rounds !== null ? { ...m, rounds } : m
 }
 
-const enrichedMembers = members.map(withEvents)
+const enrichedMembers = members.map(withRounds)
 
 const byFlight = Object.fromEntries(
   FLIGHTS.map((flight) => {
