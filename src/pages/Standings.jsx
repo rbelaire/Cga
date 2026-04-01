@@ -10,6 +10,7 @@ const columns = [
   { key: 'name',        label: 'Player',        sortable: true  },
   { key: 'poy',         label: 'POY Pts',       sortable: true  },
   { key: 'ptm',         label: 'PTM',           sortable: true  },
+  { key: 'ptmDelta',    label: 'PTM Δ',         sortable: true  },
   { key: 'latestScore', label: 'Latest Score',  sortable: true  },
   { key: 'events',      label: 'Events',        sortable: true  },
   { key: 'trend',       label: '',              sortable: false  },
@@ -35,6 +36,11 @@ export default function Standings() {
           {latestTournament && (
             <span className="ml-1">Latest score from <span className="font-medium text-forest">{latestTournament}</span>.</span>
           )}
+          <span className="ml-1">
+            <span className="font-medium text-forest">PTM Δ</span> shows the change in Points to Make since the previous tournament
+            (<span className="text-green-600 font-medium">negative = improved</span>,{' '}
+            <span className="text-red-500 font-medium">positive = higher target</span>).
+          </span>
         </p>
       </div>
 

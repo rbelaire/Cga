@@ -106,6 +106,13 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                   {col.key === 'ptm' && (
                     <span className="stat-number text-gray-600">{row.ptm ?? '—'}</span>
                   )}
+                  {col.key === 'ptmDelta' && (() => {
+                    const d = row.ptmDelta
+                    if (d == null || d === 0) return <span className="stat-number text-gray-400">—</span>
+                    const color = d > 0 ? 'text-red-500' : 'text-green-600'
+                    const label = d > 0 ? `+${d}` : `${d}`
+                    return <span className={`stat-number font-semibold ${color}`}>{label}</span>
+                  })()}
                   {col.key === 'latestScore' && (
                     <span className="stat-number text-darktext font-medium">{row.latestScore ?? '—'}</span>
                   )}
@@ -125,7 +132,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                       {row.flight}
                     </span>
                   )}
-                  {!['rank', 'name', 'points', 'poy', 'ptm', 'latestScore', 'eventsPlayed', 'events', 'trend', 'flight'].includes(col.key) && (
+                  {!['rank', 'name', 'points', 'poy', 'ptm', 'ptmDelta', 'latestScore', 'eventsPlayed', 'events', 'trend', 'flight'].includes(col.key) && (
                     <span className="text-darktext font-sans">{row[col.key]}</span>
                   )}
                 </td>
