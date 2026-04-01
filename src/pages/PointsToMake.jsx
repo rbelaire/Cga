@@ -10,15 +10,47 @@ const TEE_STYLES = {
   Sr:    'bg-amber-500 text-white',
 }
 
-// The "New" score was made at Flow Control Open and should be compared
-// against the pre-FC PTM (ptmAtFlowControl). Older scores are compared
-// against the same displayed PTM (best approximation available).
+function roundPtm(val) {
+  if (val == null) return null
+  return Math.round(val)
+}
+
+function toLastFirst(fullName) {
+  if (!fullName) return fullName
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length < 2) return fullName
+  const last = parts[parts.length - 1]
+  const first = parts.slice(0, parts.length - 1).join(' ')
+  return `${last}, ${first}`
+}
+
 function ScoreCell({ value, ptm }) {
   if (value == null) return <span className="text-gray-300 stat-number">—</span>
   if (ptm == null) return <span className="stat-number text-gray-500">{value}</span>
   const diff = value - ptm
   const color = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-500'
   return <span className={`stat-number font-medium ${color}`}>{value}</span>
+}
+
+function TrendArrow({ ptm, ptmAtFlowControl }) {
+  if (ptmAtFlowControl == null || ptm == null) return null
+  const roundedCurrent = roundPtm(ptm)
+  const roundedPrev = roundPtm(ptmAtFlowControl)
+  if (roundedCurrent > roundedPrev) {
+    return (
+      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+      </svg>
+    )
+  }
+  if (roundedCurrent < roundedPrev) {
+    return (
+      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+      </svg>
+    )
+  }
+  return null
 }
 
 export default function PointsToMake() {
@@ -53,13 +85,14 @@ export default function PointsToMake() {
       let av = a[sortKey]
       let bv = b[sortKey]
       if (sortKey === 'name') {
-        const cmp = (av ?? '').localeCompare(bv ?? '')
+        const ca = toLastFirst(av ?? '')
+        const cb = toLastFirst(bv ?? '')
+        const cmp = ca.localeCompare(cb)
         return sortDir === 'asc' ? cmp : -cmp
       }
-      // For PTM sort, use the displayed PTM (pre-FC if available, else current)
       if (sortKey === 'ptm') {
-        av = a.ptmAtFlowControl ?? a.ptm ?? -Infinity
-        bv = b.ptmAtFlowControl ?? b.ptm ?? -Infinity
+        av = roundPtm(a.ptm) ?? -Infinity
+        bv = roundPtm(b.ptm) ?? -Infinity
         return sortDir === 'asc' ? av - bv : bv - av
       }
       av = av ?? -Infinity
@@ -161,10 +194,7 @@ export default function PointsToMake() {
               </tr>
             ) : (
               sorted.map((player, idx) => {
-                // Use pre-FC PTM (what they played against at Flow Control) as the
-                // displayed PTM. Fall back to current PTM for players who did not
-                // participate in the most recent tournament.
-                const displayPtm = player.ptmAtFlowControl ?? player.ptm
+                const displayPtm = roundPtm(player.ptm)
                 const noPtm = displayPtm == null
                 return (
                   <tr
@@ -175,7 +205,7 @@ export default function PointsToMake() {
                   >
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-sans text-darktext font-medium">{player.name}</span>
+                        <span className="font-sans text-darktext font-medium">{toLastFirst(player.name)}</span>
                         {player.tee && (
                           <span className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${TEE_STYLES[player.tee] ?? 'bg-gray-200 text-gray-600'}`}>
                             {player.tee}
@@ -185,7 +215,12 @@ export default function PointsToMake() {
                     </td>
                     <td className="px-4 py-2.5">
                       {displayPtm != null
-                        ? <span className="stat-number font-bold text-forest text-base">{displayPtm}</span>
+                        ? (
+                          <span className="flex items-center gap-1">
+                            <span className="stat-number font-bold text-forest text-base">{displayPtm}</span>
+                            <TrendArrow ptm={player.ptm} ptmAtFlowControl={player.ptmAtFlowControl} />
+                          </span>
+                        )
                         : <span className="text-gray-300 stat-number">—</span>
                       }
                     </td>

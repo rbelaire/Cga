@@ -36,11 +36,6 @@ export default function MemberCard({ member }) {
                 {tee}
               </span>
             )}
-            {hasData ? (
-              <span className="stat-number text-xs text-gold font-semibold">PTM {ptm}</span>
-            ) : (
-              <span className="text-xs text-gray-300 font-sans">PTM —</span>
-            )}
             {memberSince && (
               <span className="text-xs text-gray-400 font-sans">'{String(memberSince).slice(-2)}</span>
             )}
