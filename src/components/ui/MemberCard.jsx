@@ -1,7 +1,21 @@
+import { formatName } from '../../utils/formatName'
+
+const TEE_STYLES = {
+  Back:  'bg-gray-800 text-white',
+  Front: 'bg-sky-600 text-white',
+  Sr:    'bg-amber-500 text-white',
+}
+
+function isBubble(events) {
+  return typeof events === 'number' && events >= 1 && events < 4
+}
+
 export default function MemberCard({ member }) {
-  const { name, ptm, memberSince, email, cell, homePhone } = member
+  const { name, ptm, memberSince, email, cell, homePhone, tee, events } = member
   const hasData = ptm !== null
   const phone = cell || homePhone
+  const displayName = formatName(name)
+  const bubble = isBubble(events)
   const initials = name
     .split(' ')
     .map((n) => n[0])
@@ -22,13 +36,18 @@ export default function MemberCard({ member }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <p className={`font-sans font-medium text-sm truncate ${hasData ? 'text-darktext' : 'text-gray-500'}`}>
-            {name}
+            {displayName}
           </p>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {hasData ? (
-              <span className="stat-number text-xs text-gold font-semibold">PTM {ptm}</span>
-            ) : (
-              <span className="text-xs text-gray-300 font-sans">PTM —</span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {bubble && (
+              <span className="text-xs font-sans font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200">
+                Bubble
+              </span>
+            )}
+            {tee && (
+              <span className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded ${TEE_STYLES[tee] ?? 'bg-gray-200 text-gray-600'}`}>
+                {tee}
+              </span>
             )}
             {memberSince && (
               <span className="text-xs text-gray-400 font-sans">'{String(memberSince).slice(-2)}</span>

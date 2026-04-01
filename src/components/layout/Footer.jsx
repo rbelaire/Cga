@@ -33,10 +33,10 @@ export default function Footer() {
                 ['/', 'Home'],
                 ['/schedule', 'Tournament Schedule'],
                 ['/standings', 'Season Standings'],
-                ['/results', 'Results'],
+                ['/schedule', 'Results'],
                 ['/eligibility', 'Eligibility Rules'],
               ].map(([to, label]) => (
-                <li key={to}>
+                <li key={label}>
                   <Link
                     to={to}
                     className="text-sm text-gray-400 hover:text-gold transition-colors font-sans"

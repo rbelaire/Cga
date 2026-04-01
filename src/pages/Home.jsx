@@ -5,6 +5,7 @@ import QuickLinks from '../components/sections/QuickLinks'
 import SponsorBar from '../components/sections/SponsorBar'
 import { Link } from 'react-router-dom'
 import standings from '../data/standings.json'
+import { formatName } from '../utils/formatName'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 
@@ -26,7 +27,7 @@ export default function Home() {
               <div className="gold-divider" />
             </div>
             <Link
-              to="/poy"
+              to="/standings"
               className="mb-7 px-4 py-2 text-sm font-sans font-medium rounded-lg border border-forest text-forest hover:bg-forest hover:text-white transition-colors"
             >
               Full Standings →
@@ -48,7 +49,7 @@ export default function Home() {
                             {player.rank}
                           </span>
                           <span className={`font-sans text-sm ${idx < 3 ? 'text-darktext font-semibold' : 'text-darktext'}`}>
-                            {player.name}
+                            {formatName(player.name)}
                           </span>
                         </div>
                         <span className="stat-number text-xs text-gray-500">{player.poy} pts</span>
