@@ -1,15 +1,21 @@
 import { useState, useMemo, useEffect } from 'react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import membersData from '../data/members.json'
 import currentStandings from '../data/standings.json'
 import { formatName, compareByLastName } from '../utils/formatName'
 
-const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
-const STORAGE_KEY    = 'cga_admin_v1'
-const PAIRINGS_KEY   = 'cga_pairings_v1'
-const MEMBERS_KEY    = 'cga_members_v1'
-const PIN = 'cga2026'
+const FLIGHTS      = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+const STORAGE_KEY  = 'cga_admin_v1'
+const PAIRINGS_KEY = 'cga_pairings_v1'
+const MEMBERS_KEY  = 'cga_members_v1'
+const CREDITS_KEY  = 'cga_credits_v1'
+const PIN          = 'cga2026'
+
+const PDF_NAVY = [27,  59,  111]
+const PDF_GOLD = [201, 168, 76]
 
 const flightTagStyles = {
   Championship: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -59,6 +65,345 @@ function downloadJSON(obj, filename) {
     download: filename,
   })
   a.click()
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  })
+}
+
+function fmtDateShort(iso) {
+  if (!iso) return '—'
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  })
+}
+
+// ── PDF utilities ──────────────────────────────────────────────────────────────
+async function loadLogoBase64() {
+  try {
+    const res = await fetch('/cga-logo.jpg')
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return new Promise(resolve => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result)
+      reader.onerror   = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
+async function buildPdfHeader(doc, title, subtitle = '') {
+  const pw   = doc.internal.pageSize.getWidth()
+  const logo = await loadLogoBase64()
+
+  doc.setFillColor(...PDF_NAVY)
+  doc.rect(0, 0, pw, 38, 'F')
+
+  if (logo) doc.addImage(logo, 'JPEG', 10, 4, 30, 30)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.setTextColor(255, 255, 255)
+  doc.text('Carencro Golf Association', 46, 15)
+
+  doc.setDrawColor(...PDF_GOLD)
+  doc.setLineWidth(0.8)
+  doc.line(46, 18, pw - 10, 18)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(11)
+  doc.setTextColor(...PDF_GOLD)
+  doc.text(title, 46, 26)
+
+  if (subtitle) {
+    doc.setFontSize(8)
+    doc.setTextColor(180, 195, 220)
+    doc.text(subtitle, 46, 33)
+  }
+
+  doc.setDrawColor(...PDF_GOLD)
+  doc.setLineWidth(1)
+  doc.line(0, 38, pw, 38)
+
+  return 46
+}
+
+function addPdfFooter(doc, note = '') {
+  const pw    = doc.internal.pageSize.getWidth()
+  const ph    = doc.internal.pageSize.getHeight()
+  const total = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= total; i++) {
+    doc.setPage(i)
+    doc.setDrawColor(...PDF_GOLD)
+    doc.setLineWidth(0.4)
+    doc.line(14, ph - 15, pw - 14, ph - 15)
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(140, 140, 140)
+    doc.text(note || 'Carencro Golf Association · CGA 2026', 14, ph - 10)
+    doc.text(`Page ${i} of ${total}`, pw - 14, ph - 10, { align: 'right' })
+  }
+}
+
+// ── PDF: Tournament Info ───────────────────────────────────────────────────────
+async function exportTournamentInfoPDF(tournament) {
+  if (!tournament) return
+  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const pw  = doc.internal.pageSize.getWidth()
+  let y = await buildPdfHeader(doc, 'Tournament Information', 'CGA 2026 Season')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(20)
+  doc.setTextColor(...PDF_NAVY)
+  const nameLines = doc.splitTextToSize(tournament.name, pw - 28)
+  doc.text(nameLines, 14, y + 6)
+  y += 8 + nameLines.length * 9
+
+  doc.setDrawColor(...PDF_GOLD)
+  doc.setLineWidth(0.8)
+  doc.line(14, y, pw - 14, y)
+  y += 10
+
+  const fields = [
+    ['DATE',                  fmtDate(tournament.date)],
+    ['COURSE',                tournament.course || '—'],
+    ['TEE TIME',              tournament.teeTime || '—'],
+    ['FORMAT',                tournament.format || '—'],
+    ['ENTRY FEE',             tournament.entryFee || '—'],
+    ['REGISTRATION DEADLINE', fmtDateShort(tournament.dueDate)],
+  ]
+  fields.forEach(([label, value]) => {
+    doc.setFont('helvetica', 'bold');  doc.setFontSize(8);  doc.setTextColor(...PDF_NAVY)
+    doc.text(label, 14, y)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(13); doc.setTextColor(25, 25, 25)
+    doc.text(value, 14, y + 6)
+    y += 16
+  })
+
+  if (tournament.notes) {
+    doc.setDrawColor(210, 215, 225); doc.setLineWidth(0.3); doc.line(14, y, pw - 14, y); y += 8
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...PDF_NAVY)
+    doc.text('NOTES', 14, y); y += 5
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(60, 60, 60)
+    const noteLines = doc.splitTextToSize(tournament.notes, pw - 28)
+    doc.text(noteLines, 14, y)
+    y += noteLines.length * 5 + 6
+  }
+
+  doc.setDrawColor(210, 215, 225); doc.setLineWidth(0.3); doc.line(14, y, pw - 14, y); y += 8
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...PDF_NAVY)
+  doc.text('ADDITIONAL NOTES', 14, y); y += 6
+  for (let i = 0; i < 4; i++) {
+    doc.setDrawColor(190, 195, 205); doc.setLineWidth(0.2); doc.line(14, y, pw - 14, y); y += 8
+  }
+
+  addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
+  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-tournament-info.pdf`)
+}
+
+// ── PDF: Pairings ──────────────────────────────────────────────────────────────
+async function exportPairingsPDF(tournament, pairings) {
+  if (!tournament || !pairings.length) return
+  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const y = await buildPdfHeader(
+    doc, 'Pairings',
+    `${tournament.name} · ${fmtDate(tournament.date)} · ${tournament.course}`
+  )
+  const maxPlayers = Math.max(...pairings.map(c => c.players.length))
+  const playerCols = Array.from({ length: maxPlayers }, (_, i) => `Player ${i + 1}`)
+  const body = pairings.map((card, i) => {
+    const row = [i + 1]
+    for (let j = 0; j < maxPlayers; j++) {
+      const p = card.players[j]
+      row.push(p ? `${p.name}  (${p.flight})` : '')
+    }
+    return row
+  })
+  autoTable(doc, {
+    head: [['#', ...playerCols]], body, startY: y, theme: 'striped',
+    headStyles:      { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    alternateRowStyles: { fillColor: [245, 248, 252] },
+    styles:          { fontSize: 9, cellPadding: 3 },
+    columnStyles:    { 0: { halign: 'center', cellWidth: 12, fontStyle: 'bold' } },
+    margin:          { left: 14, right: 14 },
+  })
+  addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
+  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-pairings.pdf`)
+}
+
+// ── PDF: Points to Make ────────────────────────────────────────────────────────
+async function exportPtmPDF() {
+  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  let y = await buildPdfHeader(doc, 'Points to Make', 'CGA 2026 Season — Full Roster by Flight')
+
+  const grouped = FLIGHTS.reduce((acc, f) => ({ ...acc, [f]: [] }), {})
+  const unassigned = []
+  for (const m of membersData) {
+    if (m.active === false) continue
+    if (m.flight && grouped[m.flight]) grouped[m.flight].push(m)
+    else unassigned.push(m)
+  }
+  const flightColors = {
+    'Championship': [160, 110, 0], '1st Flight': [30, 80, 180],
+    '2nd Flight':   [55, 60, 165], '3rd Flight': [20, 120, 80],
+    '4th Flight':   [100, 40, 150], '5th Flight': [180, 50, 100],
+  }
+  for (const fl of FLIGHTS) {
+    const members = grouped[fl]
+    if (!members.length) continue
+    const color = flightColors[fl] ?? PDF_NAVY
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
+    doc.text(fl.toUpperCase(), 14, y + 4)
+    autoTable(doc, {
+      head: [['#', 'Player', 'PTM', 'Tee']],
+      body: members.slice().sort((a, b) => a.name.localeCompare(b.name))
+                   .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
+      startY: y + 6, theme: 'striped',
+      headStyles:      { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [245, 248, 252] },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 20, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 20 } },
+      margin: { left: 14, right: 14 },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+  if (unassigned.length) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(100, 100, 100)
+    doc.text('UNASSIGNED', 14, y + 4)
+    autoTable(doc, {
+      head: [['#', 'Player', 'PTM', 'Tee']],
+      body: unassigned.slice().sort((a, b) => a.name.localeCompare(b.name))
+                      .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
+      startY: y + 6, theme: 'striped',
+      headStyles:      { fillColor: [110, 110, 110], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [248, 248, 248] },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 20, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 20 } },
+      margin: { left: 14, right: 14 },
+    })
+  }
+  addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
+  doc.save('cga-2026-points-to-make.pdf')
+}
+
+// ── PDF: Tournament Results ────────────────────────────────────────────────────
+async function exportResultsPDF(tournament, flightData) {
+  if (!tournament) return
+  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  let y = await buildPdfHeader(
+    doc, 'Tournament Results',
+    `${tournament.name} · ${fmtDate(tournament.date)} · ${tournament.course}`
+  )
+  const flightColors = {
+    'Championship': [160, 110, 0], '1st Flight': [30, 80, 180],
+    '2nd Flight':   [55, 60, 165], '3rd Flight': [20, 120, 80],
+    '4th Flight':   [100, 40, 150], '5th Flight': [180, 50, 100],
+  }
+  for (const fl of FLIGHTS) {
+    const rawPs = flightData[fl] ?? []
+    const ps    = calcFlightPOY(rawPs)
+    if (!ps.length) continue
+    const ranked   = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
+    const unranked = ps.filter(p => p.rank == null)
+    const rows     = [...ranked, ...unranked]
+    const color = flightColors[fl] ?? PDF_NAVY
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
+    doc.text(fl.toUpperCase(), 14, y + 4)
+    autoTable(doc, {
+      head: [['Rank', 'Player', 'PTM', 'Score', '+/−', 'POY Pts']],
+      body: rows.map(p => [
+        p.rank ?? '—', p.name + (p.eligible === false ? ' *' : ''), p.ptm ?? '—', p.score ?? '—',
+        p.plusMinus == null ? '—' : p.plusMinus > 0 ? `+${p.plusMinus}` : String(p.plusMinus),
+        fmtPOY(p),
+      ]),
+      startY: y + 6, theme: 'striped',
+      headStyles:         { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [245, 248, 252] },
+      styles:             { fontSize: 8, cellPadding: 2 },
+      columnStyles: { 0: { halign: 'center', cellWidth: 14 }, 2: { halign: 'center', cellWidth: 14 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'center', cellWidth: 14 }, 5: { halign: 'center', cellWidth: 22 } },
+      margin: { left: 14, right: 14 },
+      didParseCell(data) {
+        if (data.section !== 'body') return
+        const p = rows[data.row.index]
+        if (!p) return
+        if (data.column.index === 0 && p.rank != null && p.rank <= 3) {
+          data.cell.styles.fontStyle = 'bold'
+          data.cell.styles.textColor = p.rank === 1 ? PDF_GOLD : color
+        }
+        if (data.column.index === 4 && p.plusMinus != null) {
+          data.cell.styles.textColor = p.plusMinus > 0 ? [0, 140, 60] : p.plusMinus < 0 ? [180, 30, 30] : [100, 100, 100]
+        }
+      },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+  addPdfFooter(doc, `* = ineligible for POY · Generated ${new Date().toLocaleDateString()} · CGA`)
+  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.pdf`)
+}
+
+// ── PDF: Credit on Books ───────────────────────────────────────────────────────
+async function exportCreditsPDF(credits) {
+  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  let y = await buildPdfHeader(doc, 'Credit on Books', `CGA 2026 · As of ${new Date().toLocaleDateString()}`)
+  const rows = membersData
+    .filter(m => m.active !== false)
+    .map(m => ({ name: m.name, flight: m.flight ?? 'Unassigned', balance: credits[m.name] ?? 0 }))
+    .sort((a, b) => {
+      if (a.balance !== 0 && b.balance === 0) return -1
+      if (a.balance === 0 && b.balance !== 0) return 1
+      if (a.balance !== b.balance) return b.balance - a.balance
+      return a.name.localeCompare(b.name)
+    })
+  const total        = rows.reduce((s, r) => s + r.balance, 0)
+  const nonZeroCount = rows.filter(r => r.balance !== 0).length
+  autoTable(doc, {
+    head: [['#', 'Player', 'Flight', 'Balance']],
+    body: rows.map((r, i) => [
+      i + 1, r.name, r.flight,
+      r.balance === 0 ? '$0.00' : `${r.balance < 0 ? '−' : ''}$${Math.abs(r.balance).toFixed(2)}`,
+    ]),
+    foot:   [['', '', 'TOTAL', `${total < 0 ? '−' : ''}$${Math.abs(total).toFixed(2)}`]],
+    startY: y, theme: 'striped',
+    headStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    footStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    alternateRowStyles: { fillColor: [245, 248, 252] },
+    styles:             { fontSize: 8, cellPadding: 2.5 },
+    columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'right', cellWidth: 30 } },
+    margin: { left: 14, right: 14 },
+    didParseCell(data) {
+      if (data.section !== 'body') return
+      const r = rows[data.row.index]
+      if (!r) return
+      if (data.column.index === 3) {
+        if (r.balance > 0)      data.cell.styles.textColor = [0, 140, 60]
+        else if (r.balance < 0) data.cell.styles.textColor = [180, 30, 30]
+        else                    data.cell.styles.textColor = [180, 180, 180]
+      }
+      if (r.balance !== 0) data.cell.styles.fontStyle = 'bold'
+    },
+  })
+  addPdfFooter(doc, `${nonZeroCount} member${nonZeroCount !== 1 ? 's' : ''} with balance · Total: $${total.toFixed(2)}`)
+  doc.save('cga-2026-credit-on-books.pdf')
+}
+
+// ── PDF button component ───────────────────────────────────────────────────────
+function PdfBtn({ onClick, children, disabled = false }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+      </svg>
+      {children}
+    </button>
+  )
 }
 
 // ── PIN gate ───────────────────────────────────────────────────────────────────
@@ -113,12 +458,18 @@ function AdminPanel() {
     return Object.fromEntries(membersData.map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
   })
 
-  const [saved,       setSaved]       = useState(false)
-  const [tid,         setTid]         = useState(schedule[0]?.id ?? '')
-  const [flight,      setFlight]      = useState(FLIGHTS[0])
-  const [poolSearch,  setPoolSearch]  = useState('')
-  const [exportNote,  setExportNote]  = useState('')
-  const [adminMode,   setAdminMode]   = useState('scores')  // 'scores' | 'pairings' | 'flights'
+  const [credits, setCredits] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CREDITS_KEY)) || {} } catch { return {} }
+  })
+
+  const [saved,        setSaved]        = useState(false)
+  const [tid,          setTid]          = useState(schedule[0]?.id ?? '')
+  const [flight,       setFlight]       = useState(FLIGHTS[0])
+  const [poolSearch,   setPoolSearch]   = useState('')
+  const [exportNote,   setExportNote]   = useState('')
+  const [adminMode,    setAdminMode]    = useState('scores')  // 'scores' | 'pairings' | 'flights' | 'credits'
+  const [creditSearch, setCreditSearch] = useState('')
+  const [creditInputs, setCreditInputs] = useState({})
 
   // pairings manual mode: unpaired pool → cards
   const [manualPairings,  setManualPairings]  = useState(false)
@@ -149,7 +500,13 @@ function AdminPanel() {
     localStorage.setItem(MEMBERS_KEY, JSON.stringify(membersOverride))
   }, [membersOverride])
 
-  const tournament   = schedule.find(t => t.id === tid)
+  // persist credits
+  useEffect(() => {
+    localStorage.setItem(CREDITS_KEY, JSON.stringify(credits))
+  }, [credits])
+
+  const tournament     = schedule.find(t => t.id === tid)
+  const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
   const rawPlayers   = data[tid]?.[flight] ?? []
   const players      = useMemo(() => calcFlightPOY(rawPlayers), [rawPlayers])
   const totalPlayers = FLIGHTS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
@@ -212,6 +569,26 @@ function AdminPanel() {
         .map(p => ({ name: p.name, flight: fl }))
     ),
     [data, tid, pairedNames]
+  )
+
+  // credits derived
+  const creditRoster = useMemo(() => {
+    const search = creditSearch.trim().toLowerCase()
+    return membersData
+      .filter(m => m.active !== false)
+      .filter(m => !search || m.name.toLowerCase().includes(search))
+      .slice()
+      .sort(compareByLastName)
+  }, [creditSearch])
+
+  const creditTotal = useMemo(
+    () => Object.values(credits).reduce((s, v) => s + v, 0),
+    [credits]
+  )
+
+  const creditNonZero = useMemo(
+    () => Object.values(credits).filter(v => v !== 0).length,
+    [credits]
   )
 
   // ── Score data mutations ──────────────────────────────────────────────────────
@@ -397,6 +774,23 @@ function AdminPanel() {
     downloadJSON(updated, 'members.json')
   }
 
+  // ── Credit mutations ──────────────────────────────────────────────────────────
+  function applyCredit(name, amount) {
+    const n = parseFloat(amount)
+    if (isNaN(n) || n === 0) return
+    setCredits(prev => ({ ...prev, [name]: +((prev[name] ?? 0) + n).toFixed(2) }))
+    setCreditInputs(prev => ({ ...prev, [name]: '' }))
+  }
+
+  function clearCredit(name) {
+    setCredits(prev => { const next = { ...prev }; delete next[name]; return next })
+  }
+
+  function clearAllCredits() {
+    if (!window.confirm('Clear ALL credit balances? This cannot be undone.')) return
+    setCredits({})
+  }
+
   // ── Results export ────────────────────────────────────────────────────────────
   function doExport() {
     if (!tournament) return
@@ -491,7 +885,12 @@ function AdminPanel() {
 
       {/* Mode tabs */}
       <div className="flex gap-2 mb-5 flex-wrap">
-        {[['scores', 'Score Entry'], ['pairings', 'Pairings Builder'], ['flights', 'Flight Management']].map(([mode, label]) => (
+        {[
+          ['scores',   'Score Entry'],
+          ['pairings', 'Pairings Builder'],
+          ['flights',  'Flight Management'],
+          ['credits',  'Credit on Books'],
+        ].map(([mode, label]) => (
           <button
             key={mode}
             onClick={() => setAdminMode(mode)}
@@ -502,6 +901,9 @@ function AdminPanel() {
             }`}
           >
             {label}
+            {mode === 'credits' && creditNonZero > 0 && (
+              <span className="ml-1.5 bg-gold text-forest rounded-full px-1.5 py-0.5 text-[10px] font-bold">{creditNonZero}</span>
+            )}
           </button>
         ))}
       </div>
@@ -534,6 +936,9 @@ function AdminPanel() {
           doExport={doExport}
           exportNote={exportNote}
           ptmLookup={ptmLookup}
+          tournament={tournament}
+          totalPlayers={totalPlayers}
+          onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
         />
       )}
 
@@ -556,6 +961,8 @@ function AdminPanel() {
           clearPairings={clearPairings}
           removePairedPlayer={removePairedPlayer}
           exportPairings={exportPairings}
+          onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}
+          tournament={tournament}
           flightTagStyles={flightTagStyles}
         />
       )}
@@ -576,6 +983,188 @@ function AdminPanel() {
           flightTagStyles={flightTagStyles}
         />
       )}
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          CREDIT ON BOOKS MODE
+      ════════════════════════════════════════════════════════════════════════ */}
+      {adminMode === 'credits' && (
+        <div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-48">
+              <input
+                type="text"
+                value={creditSearch}
+                onChange={e => setCreditSearch(e.target.value)}
+                placeholder="Search members…"
+                className="w-full border border-gray-200 rounded px-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
+              />
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <div className="text-xs font-sans text-gray-500">
+                <span className="font-semibold text-forest">{creditNonZero}</span> with balance ·{' '}
+                <span className={`font-semibold stat-number ${creditTotal > 0 ? 'text-green-600' : creditTotal < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                  {creditTotal < 0 ? '−' : ''}${Math.abs(creditTotal).toFixed(2)}
+                </span>{' '}
+                total
+              </div>
+              <PdfBtn onClick={() => exportCreditsPDF(credits)}>
+                Export Credits PDF
+              </PdfBtn>
+              {Object.keys(credits).length > 0 && (
+                <button
+                  onClick={clearAllCredits}
+                  className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
+              <span className="text-white font-sans text-sm font-semibold">Member Credit Balances</span>
+              <span className="text-white/50 font-sans text-xs">{creditRoster.length} members</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[540px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="table-header text-gray-400 text-left">Player</th>
+                    <th className="table-header text-gray-400 text-left">Flight</th>
+                    <th className="table-header text-gray-400 text-right">Balance</th>
+                    <th className="table-header text-gray-400 text-center">Add / Subtract</th>
+                    <th className="table-header text-gray-400 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {creditRoster.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
+                        No members match your search.
+                      </td>
+                    </tr>
+                  ) : (
+                    creditRoster.map((m, idx) => {
+                      const balance = credits[m.name] ?? 0
+                      const input   = creditInputs[m.name] ?? ''
+                      return (
+                        <tr
+                          key={m.name}
+                          className={`border-b border-gray-100 last:border-0 transition-colors ${
+                            balance !== 0 ? 'hover:bg-amber-50/30' : 'hover:bg-gray-50'
+                          } ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
+                        >
+                          <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
+                            {formatName(m.name)}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[m.flight] ?? flightTagStyles.Unassigned}`}>
+                              {m.flight ?? 'Unassigned'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <span className={`stat-number text-sm font-bold ${
+                              balance > 0 ? 'text-green-600' : balance < 0 ? 'text-red-500' : 'text-gray-300'
+                            }`}>
+                              {balance < 0 ? '−' : ''}${Math.abs(balance).toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={input}
+                                onChange={e => setCreditInputs(prev => ({ ...prev, [m.name]: e.target.value }))}
+                                onKeyDown={e => e.key === 'Enter' && applyCredit(m.name, input)}
+                                placeholder="+/− $"
+                                className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                              />
+                              <button
+                                onClick={() => applyCredit(m.name, input)}
+                                disabled={!input}
+                                title="Apply adjustment"
+                                className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
+                              >
+                                ✓
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            {balance !== 0 && (
+                              <button
+                                onClick={() => clearCredit(m.name)}
+                                title="Clear balance"
+                                className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+                {creditNonZero > 0 && (
+                  <tfoot>
+                    <tr className="bg-forest/5 border-t-2 border-forest/20">
+                      <td colSpan={2} className="px-4 py-2.5 font-sans text-xs font-semibold uppercase tracking-widest text-forest">
+                        Total on Books
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <span className={`stat-number text-sm font-bold ${
+                          creditTotal > 0 ? 'text-green-600' : creditTotal < 0 ? 'text-red-500' : 'text-gray-400'
+                        }`}>
+                          {creditTotal < 0 ? '−' : ''}${Math.abs(creditTotal).toFixed(2)}
+                        </span>
+                      </td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          PDF REPORTS  (always visible)
+      ════════════════════════════════════════════════════════════════════════ */}
+      <div className="mt-6 bg-white border border-gray-200 rounded-lg p-5">
+        <h2 className="text-forest font-sans text-xs font-semibold uppercase tracking-widest mb-1">PDF Reports</h2>
+        <p className="text-gray-500 font-sans text-xs mb-4 leading-relaxed">
+          Generate printable PDF documents for distribution.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <PdfBtn onClick={() => exportTournamentInfoPDF(nextTournament)} disabled={!nextTournament}>
+            Next Tournament Info
+          </PdfBtn>
+          <PdfBtn onClick={() => exportTournamentInfoPDF(tournament)} disabled={!tournament}>
+            Selected Tournament Info
+          </PdfBtn>
+          <PdfBtn onClick={() => exportPtmPDF()}>
+            Points to Make (Full Roster)
+          </PdfBtn>
+          {totalPlayers > 0 && (
+            <PdfBtn onClick={() => exportResultsPDF(tournament, data[tid] ?? {})} disabled={!tournament}>
+              Tournament Results
+            </PdfBtn>
+          )}
+          {currentPairings.length > 0 && (
+            <PdfBtn onClick={() => exportPairingsPDF(tournament, currentPairings)} disabled={!tournament}>
+              Pairings
+            </PdfBtn>
+          )}
+          {Object.keys(credits).length > 0 && (
+            <PdfBtn onClick={() => exportCreditsPDF(credits)}>
+              Credit on Books
+            </PdfBtn>
+          )}
+        </div>
+      </div>
     </PageWrapper>
   )
 }
@@ -586,6 +1175,7 @@ function ScoreEntryPanel({
   poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
   addPlayer, removePlayer, updatePlayer, clearFlight, movePlayerToFlight,
   prevFlight, nextFlight, fmtPM, fmtPOY, doExport, exportNote,
+  tournament, totalPlayers, onExportResultsPDF,
 }) {
   return (
     <>
@@ -756,13 +1346,27 @@ function ScoreEntryPanel({
         </div>
       </div>
 
-      {/* Export */}
+      {/* Export & Publish */}
       <div className="bg-white border border-gray-200 rounded-lg p-5">
         <h2 className="text-forest font-sans text-xs font-semibold uppercase tracking-widest mb-1">Export & Publish</h2>
         <p className="text-gray-500 font-sans text-xs mb-4 leading-relaxed">
-          Downloads 3 updated JSON files. Replace in <code className="bg-gray-100 px-1 rounded">src/data/</code> and commit to publish sitewide.
+          Downloads updated JSON files. Replace in <code className="bg-gray-100 px-1 rounded">src/data/</code> and commit to publish sitewide.
         </p>
-        <button onClick={doExport} className="btn-primary">Download All JSON Files</button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={doExport} className="btn-primary text-xs py-2 px-4">
+            Download All JSON Files
+          </button>
+          <button
+            onClick={onExportResultsPDF}
+            disabled={!tournament || totalPlayers === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+            </svg>
+            Export Results PDF
+          </button>
+        </div>
         {exportNote && (
           <pre className="mt-4 bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-600 whitespace-pre-wrap leading-relaxed">
             {exportNote}
@@ -883,6 +1487,7 @@ function PairingsPanel({
   selectedUnpaired, setSelectedUnpaired,
   generatePairings, startManualPairings, addGroupManual, removeGroupManual,
   assignUnpairedToGroup, clearPairings, removePairedPlayer, exportPairings,
+  onExportPairingsPDF, tournament,
   flightTagStyles,
 }) {
   return (
@@ -911,8 +1516,18 @@ function PairingsPanel({
           )}
           {currentPairings.length > 0 && (
             <>
-              <button onClick={exportPairings} className="btn-primary text-xs">
+              <button onClick={exportPairings} className="btn-primary text-xs py-1.5 px-3">
                 Export Pairings JSON
+              </button>
+              <button
+                onClick={onExportPairingsPDF}
+                disabled={!tournament}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                </svg>
+                Export Pairings PDF
               </button>
               <button
                 onClick={clearPairings}
