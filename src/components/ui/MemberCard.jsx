@@ -1,18 +1,21 @@
+import { formatName } from '../../utils/formatName'
+
 const TEE_STYLES = {
   Back:  'bg-gray-800 text-white',
   Front: 'bg-sky-600 text-white',
   Sr:    'bg-amber-500 text-white',
 }
 
-function isBubble(rounds) {
-  return typeof rounds === 'number' && rounds >= 1 && rounds < 4
+function isBubble(events) {
+  return typeof events === 'number' && events >= 1 && events < 4
 }
 
 export default function MemberCard({ member }) {
-  const { name, ptm, memberSince, email, cell, homePhone, tee, rounds } = member
+  const { name, ptm, memberSince, email, cell, homePhone, tee, events } = member
   const hasData = ptm !== null
   const phone = cell || homePhone
-  const bubble = isBubble(rounds)
+  const displayName = formatName(name)
+  const bubble = isBubble(events)
   const initials = name
     .split(' ')
     .map((n) => n[0])
@@ -33,7 +36,7 @@ export default function MemberCard({ member }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <p className={`font-sans font-medium text-sm truncate ${hasData ? 'text-darktext' : 'text-gray-500'}`}>
-            {name}
+            {displayName}
           </p>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {bubble && (

@@ -3,38 +3,41 @@ import PageWrapper from '../components/layout/PageWrapper'
 import MemberCard from '../components/ui/MemberCard'
 import SearchBar from '../components/ui/SearchBar'
 import members from '../data/members.json'
-import ptmData from '../data/ptm.json'
+import { compareByLastName } from '../utils/formatName'
+import standings from '../data/standings.json'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const TABS = ['All', ...FLIGHTS]
 
-// Build a name → rounds lookup from ptm.json (covers full history, not just current season)
-const roundsFromPtm = {}
-for (const player of ptmData) {
-  if (player.name && typeof player.rounds === 'number') {
-    roundsFromPtm[player.name] = player.rounds
+// Build a name → events lookup from standings so MemberCard can show Bubble tags
+const eventsFromStandings = {}
+for (const flight of FLIGHTS) {
+  for (const player of standings.flights[flight] ?? []) {
+    if (player.name && typeof player.events === 'number') {
+      eventsFromStandings[player.name] = player.events
+    }
   }
 }
 
-function withRounds(m) {
-  const rounds = roundsFromPtm[m.name] ?? null
-  return rounds !== null ? { ...m, rounds } : m
+function withEvents(m) {
+  const events = m.events ?? eventsFromStandings[m.name] ?? null
+  return events !== null ? { ...m, events } : m
 }
 
-const enrichedMembers = members.map(withRounds)
+const enrichedMembers = members.map(withEvents)
 
 const byFlight = Object.fromEntries(
   FLIGHTS.map((flight) => {
     const players = enrichedMembers
       .filter((m) => m.flight === flight)
-      .sort((a, b) => (b.ptm ?? -1) - (a.ptm ?? -1))
+      .sort(compareByLastName)
     return [flight, players]
   })
 )
 
 const unassigned = enrichedMembers
   .filter((m) => !m.flight)
-  .sort((a, b) => a.name.localeCompare(b.name))
+  .sort(compareByLastName)
 
 export default function Members() {
   useEffect(() => { document.title = 'Members | CGA 2026' }, [])
@@ -48,7 +51,7 @@ export default function Members() {
 
   const baseList =
     tab === 'All'
-      ? [...enrichedMembers].sort((a, b) => a.name.localeCompare(b.name))
+      ? [...enrichedMembers].sort(compareByLastName)
       : byFlight[tab] ?? []
 
   const filtered = query

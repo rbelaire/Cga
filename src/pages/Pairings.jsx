@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import flowControlPairings from '../data/pairings/2026-flow-control-pairings.json'
+import { formatName } from '../utils/formatName'
 
 const pairingsById = {
   '2026-01': flowControlPairings,
@@ -60,7 +61,7 @@ export default function Pairings() {
             <ul className="divide-y divide-gray-100">
               {group.players.map((player) => (
                 <li key={player.name} className="px-4 py-3 flex items-center justify-between gap-3">
-                  <span className="text-darktext font-sans text-sm font-medium">{player.name}</span>
+                  <span className="text-darktext font-sans text-sm font-medium">{formatName(player.name)}</span>
                   <span
                     className={`text-xs border px-2 py-0.5 rounded-full font-sans ${flightTagStyles[player.flight] || flightTagStyles.Unassigned}`}
                   >
