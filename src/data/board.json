@@ -1,38 +1,51 @@
 [
   {
-    "name": "James Guidry",
+    "name": "Jacob Hooper",
     "role": "President",
-    "since": 2022,
+    "email": "carencrogolfassociation@gmail.com",
+    "phone": "(225) 614-4667",
     "photo": null
   },
   {
-    "name": "Derek Broussard",
-    "role": "Vice President",
-    "since": 2022,
+    "name": "Scott Tabor",
+    "role": "Handicap Chairman",
+    "email": "scojon@cox.net",
+    "phone": "(337) 280-9407",
     "photo": null
   },
   {
-    "name": "Paul Hebert",
+    "name": "Ronnie Lajaunie",
     "role": "Treasurer",
-    "since": 2020,
+    "email": "42papalaj@gmail.com",
+    "phone": "(337) 258-6825",
     "photo": null
   },
   {
-    "name": "Antoine Fontenot",
+    "name": "Toby Guy",
+    "role": "Vice President / Out of Town Chairman",
+    "email": "tobyaguy@yahoo.com",
+    "phone": "(337) 212-3730",
+    "photo": null
+  },
+  {
+    "name": "Paul Guidry",
     "role": "Secretary",
-    "since": 2023,
+    "email": "paulhguidry@gmail.com",
+    "phone": "(337) 296-8688",
     "photo": null
   },
   {
-    "name": "Marcus Thibodaux",
-    "role": "Tournament Director",
-    "since": 2021,
+    "name": "Duane Menard",
+    "role": "Food Chairman",
+    "email": "wireline45@hotmail.com",
+    "phone": "(337) 278-7277",
     "photo": null
   },
   {
-    "name": "Kevin Arceneaux",
-    "role": "Membership Chair",
-    "since": 2022,
+    "name": "Allan Chasteen",
+    "role": "Venmo Chairman",
+    "email": "Alan.Chasteen@yahoo.com",
+    "phone": "(337) 303-5124",
     "photo": null
   }
 ]
