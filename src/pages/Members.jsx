@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import MemberCard from '../components/ui/MemberCard'
 import SearchBar from '../components/ui/SearchBar'
@@ -21,8 +21,14 @@ const unassigned = members
   .sort((a, b) => a.name.localeCompare(b.name))
 
 export default function Members() {
+  useEffect(() => { document.title = 'Members | CGA 2026' }, [])
   const [tab, setTab] = useState('All')
   const [query, setQuery] = useState('')
+
+  function switchTab(label) {
+    setTab(label)
+    setQuery('')
+  }
 
   const baseList =
     tab === 'All'
@@ -48,7 +54,7 @@ export default function Members() {
         {TABS.map((label) => (
           <button
             key={label}
-            onClick={() => setTab(label)}
+            onClick={() => switchTab(label)}
             className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
               tab === label
                 ? 'bg-gold text-forest'

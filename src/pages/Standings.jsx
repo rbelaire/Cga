@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import StandingsTable from '../components/ui/StandingsTable'
 import standings from '../data/standings.json'
@@ -6,11 +6,11 @@ import standings from '../data/standings.json'
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 
 const columns = [
-  { key: 'rank',        label: 'Rank',   sortable: false },
-  { key: 'name',        label: 'Player', sortable: true  },
-  { key: 'points',      label: 'Score',  sortable: true  },
-  { key: 'eventsPlayed',label: 'Events', sortable: true  },
-  { key: 'trend',       label: '',       sortable: false  },
+  { key: 'rank',         label: 'Rank',   sortable: false },
+  { key: 'name',         label: 'Player', sortable: true  },
+  { key: 'points',       label: 'Score',  sortable: true  },
+  { key: 'eventsPlayed', label: 'Events', sortable: true  },
+  { key: 'trend',        label: '',       sortable: false  },
 ]
 
 const byFlight = Object.fromEntries(
@@ -24,6 +24,7 @@ const byFlight = Object.fromEntries(
 )
 
 export default function Standings() {
+  useEffect(() => { document.title = 'Standings | CGA 2026' }, [])
   const [tab, setTab] = useState(0)
 
   return (
@@ -37,19 +38,23 @@ export default function Standings() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6">
-        {FLIGHTS.map((label, i) => (
-          <button
-            key={label}
-            onClick={() => setTab(i)}
-            className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
-              tab === i
-                ? 'bg-gold text-forest'
-                : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        {FLIGHTS.map((label, i) => {
+          const count = (byFlight[label] || []).length
+          return (
+            <button
+              key={label}
+              onClick={() => setTab(i)}
+              className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
+                tab === i
+                  ? 'bg-gold text-forest'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
+              }`}
+            >
+              {label}
+              <span className="ml-1.5 text-xs opacity-70">({count})</span>
+            </button>
+          )
+        })}
       </div>
 
       <StandingsTable data={byFlight[FLIGHTS[tab]] || []} columns={columns} highlightTop={3} />

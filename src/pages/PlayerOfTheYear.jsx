@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import StandingsTable from '../components/ui/StandingsTable'
 import poy from '../data/poy.json'
@@ -13,6 +13,7 @@ const eventsColumns = [
 ]
 
 export default function PlayerOfTheYear() {
+  useEffect(() => { document.title = 'Player of the Year | CGA 2026' }, [])
   const [tab, setTab] = useState(0)
 
   return (
@@ -25,30 +26,31 @@ export default function PlayerOfTheYear() {
         </p>
       </div>
 
-      {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {FLIGHTS.map((label, i) => (
-          <button
-            key={label}
-            onClick={() => setTab(i)}
-            className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
-              tab === i
-                ? 'bg-gold text-forest'
-                : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        {FLIGHTS.map((label, i) => {
+          const count = (poy.flights[label] || []).length
+          return (
+            <button
+              key={label}
+              onClick={() => setTab(i)}
+              className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
+                tab === i
+                  ? 'bg-gold text-forest'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
+              }`}
+            >
+              {label}
+              <span className="ml-1.5 text-xs opacity-70">({count})</span>
+            </button>
+          )
+        })}
       </div>
 
-      <div>
-        <StandingsTable
-          data={poy.flights[FLIGHTS[tab]] || []}
-          columns={eventsColumns}
-          highlightTop={3}
-        />
-      </div>
+      <StandingsTable
+        data={poy.flights[FLIGHTS[tab]] || []}
+        columns={eventsColumns}
+        highlightTop={3}
+      />
     </PageWrapper>
   )
 }

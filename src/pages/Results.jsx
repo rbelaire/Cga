@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
@@ -17,6 +17,7 @@ const scoreColumns = [
 ]
 
 export default function Results() {
+  useEffect(() => { document.title = 'Results | CGA 2026' }, [])
   const completed = schedule.filter((t) => t.status === 'completed')
   const { state } = useLocation()
   const [expanded, setExpanded] = useState(state?.expand ?? completed[0]?.id ?? null)
@@ -126,6 +127,7 @@ function FlightLeaderboards({ leaderboard }) {
             }`}
           >
             {f}
+            <span className="ml-1 opacity-60">({(leaderboard[f] || []).length})</span>
           </button>
         ))}
       </div>

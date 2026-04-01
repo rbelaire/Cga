@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 
 const rules = [
@@ -53,6 +54,7 @@ const rules = [
 ]
 
 export default function Rules() {
+  useEffect(() => { document.title = 'Rules | CGA 2026' }, [])
   return (
     <PageWrapper className="max-w-3xl">
       {/* Header */}

@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import board from '../data/board.json'
 
 export default function Board() {
+  useEffect(() => { document.title = 'Board | CGA 2026' }, [])
   return (
     <PageWrapper>
       <div className="mb-8">
