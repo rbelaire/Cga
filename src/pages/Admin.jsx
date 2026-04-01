@@ -252,7 +252,7 @@ function AdminPanel() {
         rank: i + 1,
         name: p.name,
         poy: p.poy ?? 0,
-        ptm: ptmLookup[p.name] ?? Number(p.ptm) || null,
+        ptm: ptmLookup[p.name] ?? (Number(p.ptm) || null),
         latestScore: Number(p.score) || null,
         latestTournament: tournament.name,
         events: 1,
