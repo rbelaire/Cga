@@ -4,6 +4,9 @@ import ptmData from '../data/ptm.json'
 
 const HISTORY_LABELS = ['New', '2nd', '3rd', '4th', '5th', '6th', '7th']
 
+// The "New" score was made at Flow Control Open and should be compared
+// against the pre-FC PTM (ptmAtFlowControl). Older scores are compared
+// against the same displayed PTM (best approximation available).
 function ScoreCell({ value, ptm }) {
   if (value == null) return <span className="text-gray-300 stat-number">—</span>
   if (ptm == null) return <span className="stat-number text-gray-500">{value}</span>
@@ -35,7 +38,7 @@ export default function PointsToMake() {
   }, [search])
 
   const active = useMemo(
-    () => showAll ? filtered : filtered.filter(p => p.ptm != null),
+    () => showAll ? filtered : filtered.filter(p => p.ptm != null || p.ptmAtFlowControl != null),
     [filtered, showAll]
   )
 
@@ -46,6 +49,12 @@ export default function PointsToMake() {
       if (sortKey === 'name') {
         const cmp = (av ?? '').localeCompare(bv ?? '')
         return sortDir === 'asc' ? cmp : -cmp
+      }
+      // For PTM sort, use the displayed PTM (pre-FC if available, else current)
+      if (sortKey === 'ptm') {
+        av = a.ptmAtFlowControl ?? a.ptm ?? -Infinity
+        bv = b.ptmAtFlowControl ?? b.ptm ?? -Infinity
+        return sortDir === 'asc' ? av - bv : bv - av
       }
       av = av ?? -Infinity
       bv = bv ?? -Infinity
@@ -74,9 +83,9 @@ export default function PointsToMake() {
         <h1 className="section-title text-3xl sm:text-4xl">Points to Make</h1>
         <div className="gold-divider" />
         <p className="text-gray-600 font-sans text-sm max-w-2xl leading-relaxed mt-3">
-          Each player's current PTM (handicap target) plus their last 7 rounds in order from
-          most recent (New) to oldest (7th). When a new score is added, all scores shift right
-          and the 7th drops off.
+          Each player's PTM (the target they were playing against at the Flow Control Open) plus
+          their last 7 rounds from most recent (New) to oldest (7th). When a new score is added,
+          all scores shift right and the 7th drops off.
         </p>
       </div>
 
@@ -129,7 +138,7 @@ export default function PointsToMake() {
             <tr className="bg-forest border-b border-forest">
               <SortHeader label="Player" colKey="name" />
               <SortHeader label="PTM" colKey="ptm" />
-              {HISTORY_LABELS.map((lbl, i) => (
+              {HISTORY_LABELS.map((lbl) => (
                 <th key={lbl} className="table-header text-white/70 font-normal">
                   {lbl}
                 </th>
@@ -146,7 +155,11 @@ export default function PointsToMake() {
               </tr>
             ) : (
               sorted.map((player, idx) => {
-                const noPtm = player.ptm == null
+                // Use pre-FC PTM (what they played against at Flow Control) as the
+                // displayed PTM. Fall back to current PTM for players who did not
+                // participate in the most recent tournament.
+                const displayPtm = player.ptmAtFlowControl ?? player.ptm
+                const noPtm = displayPtm == null
                 return (
                   <tr
                     key={player.name}
@@ -158,14 +171,14 @@ export default function PointsToMake() {
                       <span className="font-sans text-darktext font-medium">{player.name}</span>
                     </td>
                     <td className="px-4 py-2.5">
-                      {player.ptm != null
-                        ? <span className="stat-number font-bold text-forest text-base">{player.ptm}</span>
+                      {displayPtm != null
+                        ? <span className="stat-number font-bold text-forest text-base">{displayPtm}</span>
                         : <span className="text-gray-300 stat-number">—</span>
                       }
                     </td>
                     {player.history.map((score, hi) => (
                       <td key={hi} className="px-4 py-2.5">
-                        <ScoreCell value={score} ptm={player.ptm} />
+                        <ScoreCell value={score} ptm={displayPtm} />
                       </td>
                     ))}
                     <td className="px-4 py-2.5">

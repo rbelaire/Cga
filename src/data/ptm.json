@@ -2,6 +2,7 @@
   {
     "name": "Eric Adams",
     "ptm": 11,
+    "ptmAtFlowControl": null,
     "history": [
       11,
       6,
@@ -16,6 +17,7 @@
   {
     "name": "Brock Angelle",
     "ptm": 32,
+    "ptmAtFlowControl": null,
     "history": [
       31,
       28,
@@ -30,6 +32,7 @@
   {
     "name": "Gary Angelle",
     "ptm": 22,
+    "ptmAtFlowControl": 20.6,
     "history": [
       24,
       17,
@@ -44,6 +47,7 @@
   {
     "name": "John Angelle",
     "ptm": 18,
+    "ptmAtFlowControl": null,
     "history": [
       17,
       18,
@@ -58,6 +62,7 @@
   {
     "name": "Neal Angelle",
     "ptm": 13,
+    "ptmAtFlowControl": 12,
     "history": [
       7,
       17,
@@ -72,6 +77,7 @@
   {
     "name": "Randy Angelle",
     "ptm": 28,
+    "ptmAtFlowControl": null,
     "history": [
       30,
       28,
@@ -86,6 +92,7 @@
   {
     "name": "Chris Arceneaux",
     "ptm": 23,
+    "ptmAtFlowControl": null,
     "history": [
       24,
       24,
@@ -100,6 +107,7 @@
   {
     "name": "Jack Arceneaux",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       16,
       13,
@@ -114,6 +122,7 @@
   {
     "name": "Keith Arsement",
     "ptm": 18,
+    "ptmAtFlowControl": null,
     "history": [
       13,
       16,
@@ -128,6 +137,7 @@
   {
     "name": "Ken Auburn",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -142,6 +152,7 @@
   {
     "name": "Dexter Babineaux",
     "ptm": 25,
+    "ptmAtFlowControl": 23.2,
     "history": [
       23,
       18,
@@ -156,6 +167,7 @@
   {
     "name": "Joe Ballard",
     "ptm": 25,
+    "ptmAtFlowControl": 23.4,
     "history": [
       26,
       19,
@@ -170,6 +182,7 @@
   {
     "name": "David Bares",
     "ptm": 23,
+    "ptmAtFlowControl": null,
     "history": [
       20,
       22,
@@ -184,6 +197,7 @@
   {
     "name": "Dion Bearb",
     "ptm": 20,
+    "ptmAtFlowControl": 19,
     "history": [
       18,
       19,
@@ -198,6 +212,7 @@
   {
     "name": "Ryan Belaire",
     "ptm": 26,
+    "ptmAtFlowControl": 9,
     "history": [
       26,
       null,
@@ -212,6 +227,7 @@
   {
     "name": "Ernie Bennett",
     "ptm": 28,
+    "ptmAtFlowControl": 25.6,
     "history": [
       33,
       27,
@@ -226,6 +242,7 @@
   {
     "name": "Bryan Benoit",
     "ptm": 19,
+    "ptmAtFlowControl": 18,
     "history": [
       19,
       16,
@@ -240,6 +257,7 @@
   {
     "name": "Chip Benoit",
     "ptm": 18,
+    "ptmAtFlowControl": null,
     "history": [
       18,
       14,
@@ -254,6 +272,7 @@
   {
     "name": "Eric Benoit",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -268,6 +287,7 @@
   {
     "name": "Leonard Benoit",
     "ptm": 13,
+    "ptmAtFlowControl": null,
     "history": [
       10,
       11,
@@ -282,6 +302,7 @@
   {
     "name": "Bo Boleyn",
     "ptm": 16,
+    "ptmAtFlowControl": null,
     "history": [
       18,
       16,
@@ -296,6 +317,7 @@
   {
     "name": "Kyle Bolivar",
     "ptm": 18,
+    "ptmAtFlowControl": 17.2,
     "history": [
       16,
       20,
@@ -310,6 +332,7 @@
   {
     "name": "Brandon Borne",
     "ptm": 31,
+    "ptmAtFlowControl": 30.2,
     "history": [
       29,
       29,
@@ -324,6 +347,7 @@
   {
     "name": "Blake Boudreaux",
     "ptm": 16,
+    "ptmAtFlowControl": 14.6,
     "history": [
       20,
       15,
@@ -338,6 +362,7 @@
   {
     "name": "Brock Boudreaux",
     "ptm": 19,
+    "ptmAtFlowControl": 14.6,
     "history": [
       23,
       15,
@@ -352,6 +377,7 @@
   {
     "name": "Nick Boudreaux",
     "ptm": 14,
+    "ptmAtFlowControl": null,
     "history": [
       14,
       11,
@@ -366,6 +392,7 @@
   {
     "name": "Stephen Boudreaux",
     "ptm": 26,
+    "ptmAtFlowControl": 24.4,
     "history": [
       27,
       28,
@@ -380,6 +407,7 @@
   {
     "name": "Kurt Bourg",
     "ptm": 22,
+    "ptmAtFlowControl": 20.8,
     "history": [
       24,
       24,
@@ -394,6 +422,7 @@
   {
     "name": "Seth Bourg",
     "ptm": 19,
+    "ptmAtFlowControl": null,
     "history": [
       13,
       18,
@@ -408,6 +437,7 @@
   {
     "name": "Des Bourgeois",
     "ptm": 6,
+    "ptmAtFlowControl": 6,
     "history": [
       6,
       4,
@@ -422,6 +452,7 @@
   {
     "name": "Richard Bourgeois",
     "ptm": 36,
+    "ptmAtFlowControl": 33.8,
     "history": [
       37,
       35,
@@ -436,6 +467,7 @@
   {
     "name": "Brett Breaux",
     "ptm": 25.4,
+    "ptmAtFlowControl": 25.6,
     "history": [
       27,
       25,
@@ -450,6 +482,7 @@
   {
     "name": "Carter Breaux",
     "ptm": 29,
+    "ptmAtFlowControl": 29,
     "history": [
       29,
       19,
@@ -464,6 +497,7 @@
   {
     "name": "Cooper Breaux",
     "ptm": 26,
+    "ptmAtFlowControl": 27,
     "history": [
       25,
       8,
@@ -478,6 +512,7 @@
   {
     "name": "Jasper Breaux",
     "ptm": 18,
+    "ptmAtFlowControl": null,
     "history": [
       15,
       19,
@@ -492,6 +527,7 @@
   {
     "name": "Jeff Breaux",
     "ptm": 30,
+    "ptmAtFlowControl": null,
     "history": [
       30,
       36,
@@ -506,6 +542,7 @@
   {
     "name": "Roddy Breaux",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       12,
       25,
@@ -520,6 +557,7 @@
   {
     "name": "Seth Breaux",
     "ptm": 17,
+    "ptmAtFlowControl": 12.4,
     "history": [
       null,
       null,
@@ -534,6 +572,7 @@
   {
     "name": "Dale Broussard",
     "ptm": 26,
+    "ptmAtFlowControl": 25.8,
     "history": [
       28,
       29,
@@ -548,6 +587,7 @@
   {
     "name": "Phillip Broussard",
     "ptm": 13,
+    "ptmAtFlowControl": 14,
     "history": [
       9,
       13,
@@ -562,6 +602,7 @@
   {
     "name": "Kobie Brown",
     "ptm": 20,
+    "ptmAtFlowControl": null,
     "history": [
       13,
       20,
@@ -576,6 +617,7 @@
   {
     "name": "Ryan Brown",
     "ptm": 26,
+    "ptmAtFlowControl": 24.8,
     "history": [
       27,
       20,
@@ -590,6 +632,7 @@
   {
     "name": "Mark Bruno",
     "ptm": 29,
+    "ptmAtFlowControl": 27.2,
     "history": [
       32,
       33,
@@ -604,6 +647,7 @@
   {
     "name": "Luke Burbank",
     "ptm": 19,
+    "ptmAtFlowControl": null,
     "history": [
       16,
       17,
@@ -618,6 +662,7 @@
   {
     "name": "Alan Chasteen",
     "ptm": 34,
+    "ptmAtFlowControl": 33.4,
     "history": [
       33,
       29,
@@ -632,6 +677,7 @@
   {
     "name": "Alan Sr. Chasteen",
     "ptm": 29.8,
+    "ptmAtFlowControl": null,
     "history": [
       29,
       30,
@@ -646,6 +692,7 @@
   {
     "name": "Donald Chauvin",
     "ptm": 28,
+    "ptmAtFlowControl": 27.4,
     "history": [
       26,
       27,
@@ -660,6 +707,7 @@
   {
     "name": "Grant Citron",
     "ptm": 19,
+    "ptmAtFlowControl": 19.8,
     "history": [
       17,
       19,
@@ -674,6 +722,7 @@
   {
     "name": "Jonathan Citron",
     "ptm": 19,
+    "ptmAtFlowControl": null,
     "history": [
       21,
       19,
@@ -688,6 +737,7 @@
   {
     "name": "Herman Clause",
     "ptm": 18,
+    "ptmAtFlowControl": null,
     "history": [
       14,
       16,
@@ -702,6 +752,7 @@
   {
     "name": "Steve Clavelle",
     "ptm": 23,
+    "ptmAtFlowControl": null,
     "history": [
       25,
       22,
@@ -716,6 +767,7 @@
   {
     "name": "Colby Colomb",
     "ptm": 15,
+    "ptmAtFlowControl": 13.2,
     "history": [
       19,
       10,
@@ -730,6 +782,7 @@
   {
     "name": "Ben Conque",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -744,6 +797,7 @@
   {
     "name": "Marc Conque",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -758,6 +812,7 @@
   {
     "name": "Murray Conque",
     "ptm": 15,
+    "ptmAtFlowControl": null,
     "history": [
       14,
       6,
@@ -772,6 +827,7 @@
   {
     "name": "Trey Cormier",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -786,6 +842,7 @@
   {
     "name": "Perry Cotton",
     "ptm": 18,
+    "ptmAtFlowControl": null,
     "history": [
       13,
       22,
@@ -800,6 +857,7 @@
   {
     "name": "Aaron Courville",
     "ptm": 10,
+    "ptmAtFlowControl": null,
     "history": [
       10,
       null,
@@ -814,6 +872,7 @@
   {
     "name": "Joshua Courville",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -828,6 +887,7 @@
   {
     "name": "Rusty Credeur",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -842,6 +902,7 @@
   {
     "name": "Brady Dalfrey",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       17,
       18,
@@ -856,6 +917,7 @@
   {
     "name": "Damien Dalfrey",
     "ptm": 26,
+    "ptmAtFlowControl": null,
     "history": [
       20,
       24,
@@ -870,6 +932,7 @@
   {
     "name": "Paul Darbonne",
     "ptm": 15,
+    "ptmAtFlowControl": 14.4,
     "history": [
       17,
       19,
@@ -884,6 +947,7 @@
   {
     "name": "Cory Darby",
     "ptm": 12,
+    "ptmAtFlowControl": 11.8,
     "history": [
       12,
       12,
@@ -898,6 +962,7 @@
   {
     "name": "Wyatt Darby",
     "ptm": 6,
+    "ptmAtFlowControl": null,
     "history": [
       6,
       null,
@@ -912,6 +977,7 @@
   {
     "name": "Ryan Deboisblanc",
     "ptm": 10,
+    "ptmAtFlowControl": null,
     "history": [
       11,
       6,
@@ -926,6 +992,7 @@
   {
     "name": "Paul Domagalski",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       24,
       21,
@@ -940,6 +1007,7 @@
   {
     "name": "Jaxon Dugas",
     "ptm": 24,
+    "ptmAtFlowControl": null,
     "history": [
       28,
       17,
@@ -954,6 +1022,7 @@
   {
     "name": "Todd Dugas",
     "ptm": 27,
+    "ptmAtFlowControl": null,
     "history": [
       29,
       19,
@@ -968,6 +1037,7 @@
   {
     "name": "Cory Dupuis",
     "ptm": 29,
+    "ptmAtFlowControl": 28.2,
     "history": [
       29,
       20,
@@ -982,6 +1052,7 @@
   {
     "name": "Lucas Dupuis",
     "ptm": 13,
+    "ptmAtFlowControl": 12.6,
     "history": [
       14,
       5,
@@ -996,6 +1067,7 @@
   {
     "name": "Orrin Dupuis",
     "ptm": 10,
+    "ptmAtFlowControl": null,
     "history": [
       7,
       3,
@@ -1010,6 +1082,7 @@
   {
     "name": "Bryan Estes",
     "ptm": 27,
+    "ptmAtFlowControl": 26.4,
     "history": [
       28,
       26,
@@ -1024,6 +1097,7 @@
   {
     "name": "Mister Estes",
     "ptm": 24,
+    "ptmAtFlowControl": null,
     "history": [
       20,
       32,
@@ -1038,6 +1112,7 @@
   {
     "name": "Brett Faulk",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       27,
       19,
@@ -1052,6 +1127,7 @@
   {
     "name": "Dru Fisher",
     "ptm": 23,
+    "ptmAtFlowControl": null,
     "history": [
       22,
       24,
@@ -1066,6 +1142,7 @@
   {
     "name": "Chad Forestier",
     "ptm": 19,
+    "ptmAtFlowControl": null,
     "history": [
       15,
       16,
@@ -1080,6 +1157,7 @@
   {
     "name": "Garry Forestier",
     "ptm": 32,
+    "ptmAtFlowControl": 31.4,
     "history": [
       33,
       30,
@@ -1094,6 +1172,7 @@
   {
     "name": "Rodney Forestier",
     "ptm": 8,
+    "ptmAtFlowControl": null,
     "history": [
       5,
       14,
@@ -1108,6 +1187,7 @@
   {
     "name": "Skip Forsthoff",
     "ptm": 25,
+    "ptmAtFlowControl": null,
     "history": [
       22,
       26,
@@ -1122,6 +1202,7 @@
   {
     "name": "Tim Forsthoff",
     "ptm": 16,
+    "ptmAtFlowControl": null,
     "history": [
       19,
       12,
@@ -1136,6 +1217,7 @@
   {
     "name": "Cedric Gaspard",
     "ptm": 18,
+    "ptmAtFlowControl": 18.67,
     "history": [
       14,
       21,
@@ -1150,6 +1232,7 @@
   {
     "name": "David Gerard",
     "ptm": 19,
+    "ptmAtFlowControl": 18.8,
     "history": [
       9,
       16,
@@ -1164,6 +1247,7 @@
   {
     "name": "David Gleason",
     "ptm": 23,
+    "ptmAtFlowControl": 22.4,
     "history": [
       23,
       22,
@@ -1178,6 +1262,7 @@
   {
     "name": "Ryan Gravouia",
     "ptm": 24,
+    "ptmAtFlowControl": null,
     "history": [
       22,
       27,
@@ -1192,6 +1277,7 @@
   {
     "name": "Ashby Guidry",
     "ptm": 15,
+    "ptmAtFlowControl": null,
     "history": [
       16,
       15,
@@ -1206,6 +1292,7 @@
   {
     "name": "Don Guidry",
     "ptm": 24,
+    "ptmAtFlowControl": null,
     "history": [
       19,
       23,
@@ -1220,6 +1307,7 @@
   {
     "name": "Doug Guidry",
     "ptm": 31,
+    "ptmAtFlowControl": null,
     "history": [
       30,
       29,
@@ -1234,6 +1322,7 @@
   {
     "name": "Joe Don Guidry",
     "ptm": 23,
+    "ptmAtFlowControl": null,
     "history": [
       21,
       28,
@@ -1248,6 +1337,7 @@
   {
     "name": "Kale Guidry",
     "ptm": 17,
+    "ptmAtFlowControl": null,
     "history": [
       20,
       15,
@@ -1262,6 +1352,7 @@
   {
     "name": "Kyle Guidry",
     "ptm": 29.6,
+    "ptmAtFlowControl": null,
     "history": [
       27,
       28,
@@ -1276,6 +1367,7 @@
   {
     "name": "Paul Guidry",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       23,
       20,
@@ -1290,6 +1382,7 @@
   {
     "name": "Shannon Guidry",
     "ptm": 16,
+    "ptmAtFlowControl": null,
     "history": [
       13,
       14,
@@ -1304,6 +1397,7 @@
   {
     "name": "Tj Guilbeau",
     "ptm": 16,
+    "ptmAtFlowControl": null,
     "history": [
       16,
       14,
@@ -1318,6 +1412,7 @@
   {
     "name": "Tom Guilbeau",
     "ptm": 6,
+    "ptmAtFlowControl": null,
     "history": [
       5,
       6,
@@ -1332,6 +1427,7 @@
   {
     "name": "Justin Guy",
     "ptm": 29,
+    "ptmAtFlowControl": null,
     "history": [
       23,
       32,
@@ -1346,6 +1442,7 @@
   {
     "name": "Paul Guy",
     "ptm": 30,
+    "ptmAtFlowControl": null,
     "history": [
       30,
       21,
@@ -1360,6 +1457,7 @@
   {
     "name": "Toby Guy",
     "ptm": 32,
+    "ptmAtFlowControl": 32.4,
     "history": [
       27,
       26,
@@ -1374,6 +1472,7 @@
   {
     "name": "Bob Hammack",
     "ptm": 11,
+    "ptmAtFlowControl": null,
     "history": [
       8,
       4,
@@ -1388,6 +1487,7 @@
   {
     "name": "Nick Hebert",
     "ptm": 15,
+    "ptmAtFlowControl": null,
     "history": [
       15,
       17,
@@ -1402,6 +1502,7 @@
   {
     "name": "Jacob Hooper",
     "ptm": 29,
+    "ptmAtFlowControl": 28.8,
     "history": [
       30,
       26,
@@ -1416,6 +1517,7 @@
   {
     "name": "Ralph Jordan",
     "ptm": 34,
+    "ptmAtFlowControl": 33.4,
     "history": [
       35,
       33,
@@ -1430,6 +1532,7 @@
   {
     "name": "Dameyon Kelly",
     "ptm": 21,
+    "ptmAtFlowControl": 21,
     "history": [
       17,
       19,
@@ -1444,6 +1547,7 @@
   {
     "name": "Rusty Knight",
     "ptm": 33,
+    "ptmAtFlowControl": null,
     "history": [
       23,
       40,
@@ -1458,6 +1562,7 @@
   {
     "name": "Ricky Lail",
     "ptm": 17,
+    "ptmAtFlowControl": null,
     "history": [
       16,
       17,
@@ -1472,6 +1577,7 @@
   {
     "name": "Ronnie Lajaunie",
     "ptm": 16,
+    "ptmAtFlowControl": null,
     "history": [
       13,
       18,
@@ -1486,6 +1592,7 @@
   {
     "name": "Ronnie Lajaunie Jr.",
     "ptm": 20,
+    "ptmAtFlowControl": null,
     "history": [
       7,
       17,
@@ -1500,6 +1607,7 @@
   {
     "name": "Joe Landry",
     "ptm": 25,
+    "ptmAtFlowControl": null,
     "history": [
       22,
       22,
@@ -1514,6 +1622,7 @@
   {
     "name": "John Landry",
     "ptm": 11,
+    "ptmAtFlowControl": 9.2,
     "history": [
       15,
       10,
@@ -1528,6 +1637,7 @@
   {
     "name": "Ronnie Landry",
     "ptm": 22,
+    "ptmAtFlowControl": 22.4,
     "history": [
       18,
       21,
@@ -1542,6 +1652,7 @@
   {
     "name": "Jerome Lane",
     "ptm": 16,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -1556,6 +1667,7 @@
   {
     "name": "Myron Lane",
     "ptm": 37,
+    "ptmAtFlowControl": 36.4,
     "history": [
       37,
       31,
@@ -1570,6 +1682,7 @@
   {
     "name": "Buster Langston",
     "ptm": 17,
+    "ptmAtFlowControl": null,
     "history": [
       15,
       17,
@@ -1584,6 +1697,7 @@
   {
     "name": "Royce Laseter",
     "ptm": 6,
+    "ptmAtFlowControl": null,
     "history": [
       7,
       4,
@@ -1598,6 +1712,7 @@
   {
     "name": "Adam Latiolais",
     "ptm": 24,
+    "ptmAtFlowControl": 21,
     "history": [
       26,
       21,
@@ -1612,6 +1727,7 @@
   {
     "name": "Charles Latiolais",
     "ptm": 30,
+    "ptmAtFlowControl": null,
     "history": [
       29,
       27,
@@ -1626,6 +1742,7 @@
   {
     "name": "Corey Latiolais",
     "ptm": 29,
+    "ptmAtFlowControl": 31.5,
     "history": [
       24,
       31,
@@ -1640,6 +1757,7 @@
   {
     "name": "Lonnie Latiolais",
     "ptm": 20,
+    "ptmAtFlowControl": null,
     "history": [
       23,
       22,
@@ -1654,6 +1772,7 @@
   {
     "name": "Kade Lavergne",
     "ptm": 16,
+    "ptmAtFlowControl": null,
     "history": [
       12,
       19,
@@ -1668,6 +1787,7 @@
   {
     "name": "Rickey Lavergne",
     "ptm": 12.6,
+    "ptmAtFlowControl": 12.2,
     "history": [
       13,
       11,
@@ -1682,6 +1802,7 @@
   {
     "name": "Curtis Leblanc",
     "ptm": 17,
+    "ptmAtFlowControl": null,
     "history": [
       16,
       20,
@@ -1696,6 +1817,7 @@
   {
     "name": "Danny Leblanc",
     "ptm": 13.6,
+    "ptmAtFlowControl": 14.4,
     "history": [
       12,
       18,
@@ -1710,6 +1832,7 @@
   {
     "name": "Dutz Leblanc",
     "ptm": 19,
+    "ptmAtFlowControl": null,
     "history": [
       21,
       21,
@@ -1724,6 +1847,7 @@
   {
     "name": "Jack Leblanc",
     "ptm": 21,
+    "ptmAtFlowControl": null,
     "history": [
       19,
       14,
@@ -1738,6 +1862,7 @@
   {
     "name": "Kenneth Leblanc",
     "ptm": 28,
+    "ptmAtFlowControl": null,
     "history": [
       29,
       26,
@@ -1752,6 +1877,7 @@
   {
     "name": "Sellek Leblanc",
     "ptm": 23,
+    "ptmAtFlowControl": null,
     "history": [
       26,
       23,
@@ -1766,6 +1892,7 @@
   {
     "name": "Kyle Lebourgeois",
     "ptm": 24,
+    "ptmAtFlowControl": 23.8,
     "history": [
       19,
       21,
@@ -1780,6 +1907,7 @@
   {
     "name": "Trace Ledet",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -1794,6 +1922,7 @@
   {
     "name": "Tyler Ledet",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -1808,6 +1937,7 @@
   {
     "name": "Stephen Lemaire",
     "ptm": 12,
+    "ptmAtFlowControl": null,
     "history": [
       10,
       11,
@@ -1822,6 +1952,7 @@
   {
     "name": "Jp Lopez",
     "ptm": 15,
+    "ptmAtFlowControl": null,
     "history": [
       10,
       12,
@@ -1836,6 +1967,7 @@
   {
     "name": "E.J. Louviere",
     "ptm": 20,
+    "ptmAtFlowControl": 20,
     "history": [
       19,
       11,
@@ -1850,6 +1982,7 @@
   {
     "name": "Doug Luquette",
     "ptm": 33,
+    "ptmAtFlowControl": null,
     "history": [
       30,
       35,
@@ -1864,6 +1997,7 @@
   {
     "name": "Frank Malambri",
     "ptm": 28,
+    "ptmAtFlowControl": 27.8,
     "history": [
       27,
       27,
@@ -1878,6 +2012,7 @@
   {
     "name": "Brian Mccarley",
     "ptm": 25,
+    "ptmAtFlowControl": 26.4,
     "history": [
       23,
       23,
@@ -1892,6 +2027,7 @@
   {
     "name": "Seth Mccomic",
     "ptm": 14,
+    "ptmAtFlowControl": null,
     "history": [
       11,
       13,
@@ -1906,6 +2042,7 @@
   {
     "name": "Bill Mcfarlin",
     "ptm": 13,
+    "ptmAtFlowControl": null,
     "history": [
       12,
       9,
@@ -1920,6 +2057,7 @@
   {
     "name": "Eric Mcguire",
     "ptm": 14,
+    "ptmAtFlowControl": null,
     "history": [
       15,
       15,
@@ -1934,6 +2072,7 @@
   {
     "name": "Raleigh Mcguire",
     "ptm": 15,
+    "ptmAtFlowControl": null,
     "history": [
       10,
       17,
@@ -1948,6 +2087,7 @@
   {
     "name": "Brandon Mciver",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -1962,6 +2102,7 @@
   {
     "name": "Eddie Meche",
     "ptm": 26,
+    "ptmAtFlowControl": 24.4,
     "history": [
       31,
       24,
@@ -1976,6 +2117,7 @@
   {
     "name": "David Melancon",
     "ptm": 22,
+    "ptmAtFlowControl": 22.2,
     "history": [
       23,
       24,
@@ -1990,6 +2132,7 @@
   {
     "name": "Ronald Melancon",
     "ptm": 26,
+    "ptmAtFlowControl": null,
     "history": [
       25,
       20,
@@ -2004,6 +2147,7 @@
   {
     "name": "Drake Menard",
     "ptm": 27,
+    "ptmAtFlowControl": 26.2,
     "history": [
       27,
       26,
@@ -2018,6 +2162,7 @@
   {
     "name": "Duane Menard",
     "ptm": 15,
+    "ptmAtFlowControl": null,
     "history": [
       18,
       14,
@@ -2032,6 +2177,7 @@
   {
     "name": "Rocky Menard",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2046,6 +2192,7 @@
   {
     "name": "Scotty Menard",
     "ptm": 20,
+    "ptmAtFlowControl": null,
     "history": [
       17,
       25,
@@ -2060,6 +2207,7 @@
   {
     "name": "Ted Menard",
     "ptm": 17,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2074,6 +2222,7 @@
   {
     "name": "Teddy Menard",
     "ptm": 20,
+    "ptmAtFlowControl": 20.8,
     "history": [
       19,
       20,
@@ -2088,6 +2237,7 @@
   {
     "name": "L.J. Meynard",
     "ptm": 21,
+    "ptmAtFlowControl": null,
     "history": [
       25,
       19,
@@ -2102,6 +2252,7 @@
   {
     "name": "Drake Mier",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2116,6 +2267,7 @@
   {
     "name": "Corey Minzey",
     "ptm": 10.67,
+    "ptmAtFlowControl": null,
     "history": [
       8,
       3,
@@ -2130,6 +2282,7 @@
   {
     "name": "David Mouton",
     "ptm": 17,
+    "ptmAtFlowControl": 16.6,
     "history": [
       14,
       18,
@@ -2144,6 +2297,7 @@
   {
     "name": "Trae Mouton",
     "ptm": 22,
+    "ptmAtFlowControl": 23.6,
     "history": [
       18,
       27,
@@ -2158,6 +2312,7 @@
   {
     "name": "Brett Myhand",
     "ptm": 34,
+    "ptmAtFlowControl": 33.6,
     "history": [
       33,
       34,
@@ -2172,6 +2327,7 @@
   {
     "name": "Jessie Myhand",
     "ptm": 25,
+    "ptmAtFlowControl": null,
     "history": [
       26,
       24,
@@ -2186,6 +2342,7 @@
   {
     "name": "Joseph Myhand",
     "ptm": 29,
+    "ptmAtFlowControl": 30.2,
     "history": [
       26,
       30,
@@ -2200,6 +2357,7 @@
   {
     "name": "Brooke Nickel",
     "ptm": 16,
+    "ptmAtFlowControl": null,
     "history": [
       11,
       16,
@@ -2214,6 +2372,7 @@
   {
     "name": "Danny Nunez",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2228,6 +2387,7 @@
   {
     "name": "Jay O'Connor",
     "ptm": 33,
+    "ptmAtFlowControl": null,
     "history": [
       30,
       36,
@@ -2242,6 +2402,7 @@
   {
     "name": "Jessie Patin",
     "ptm": 6,
+    "ptmAtFlowControl": null,
     "history": [
       4,
       9,
@@ -2256,6 +2417,7 @@
   {
     "name": "Chris Payton",
     "ptm": 17,
+    "ptmAtFlowControl": null,
     "history": [
       20,
       11,
@@ -2270,6 +2432,7 @@
   {
     "name": "Timothy Pugh",
     "ptm": 13,
+    "ptmAtFlowControl": null,
     "history": [
       13,
       17,
@@ -2284,6 +2447,7 @@
   {
     "name": "Tyler Quirk",
     "ptm": 25.6,
+    "ptmAtFlowControl": null,
     "history": [
       23,
       25,
@@ -2298,6 +2462,7 @@
   {
     "name": "Jason Reed",
     "ptm": 17,
+    "ptmAtFlowControl": null,
     "history": [
       17,
       null,
@@ -2312,6 +2477,7 @@
   {
     "name": "John Reed",
     "ptm": 19,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2326,6 +2492,7 @@
   {
     "name": "Cory Richard",
     "ptm": 27,
+    "ptmAtFlowControl": null,
     "history": [
       29,
       25,
@@ -2340,6 +2507,7 @@
   {
     "name": "Danny Richard",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2354,6 +2522,7 @@
   {
     "name": "Jeff Richard",
     "ptm": 31.4,
+    "ptmAtFlowControl": 30.6,
     "history": [
       30,
       33,
@@ -2368,6 +2537,7 @@
   {
     "name": "Carroll Robichaux",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       15,
       17,
@@ -2382,6 +2552,7 @@
   {
     "name": "Brandon Savage",
     "ptm": 10,
+    "ptmAtFlowControl": null,
     "history": [
       11,
       14,
@@ -2396,6 +2567,7 @@
   {
     "name": "Colby Savoie",
     "ptm": 21,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2410,6 +2582,7 @@
   {
     "name": "Bobby Seaux",
     "ptm": 26,
+    "ptmAtFlowControl": null,
     "history": [
       29,
       21,
@@ -2424,6 +2597,7 @@
   {
     "name": "Tyler Seaux",
     "ptm": 24,
+    "ptmAtFlowControl": 22.8,
     "history": [
       24,
       13,
@@ -2438,6 +2612,7 @@
   {
     "name": "Jarrod Serrette",
     "ptm": 25,
+    "ptmAtFlowControl": null,
     "history": [
       27,
       25,
@@ -2452,6 +2627,7 @@
   {
     "name": "Wayne Shullaw",
     "ptm": 26,
+    "ptmAtFlowControl": 25,
     "history": [
       25,
       30,
@@ -2466,6 +2642,7 @@
   {
     "name": "Neil Simon",
     "ptm": 29,
+    "ptmAtFlowControl": null,
     "history": [
       27,
       27,
@@ -2480,6 +2657,7 @@
   {
     "name": "Ryan Simon",
     "ptm": 23,
+    "ptmAtFlowControl": null,
     "history": [
       23,
       null,
@@ -2494,6 +2672,7 @@
   {
     "name": "Gerald Sonnier",
     "ptm": 15,
+    "ptmAtFlowControl": null,
     "history": [
       14,
       16,
@@ -2508,6 +2687,7 @@
   {
     "name": "Dylan Stanford",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       15,
       25,
@@ -2522,6 +2702,7 @@
   {
     "name": "Nick Stelly",
     "ptm": 20,
+    "ptmAtFlowControl": null,
     "history": [
       17,
       19,
@@ -2536,6 +2717,7 @@
   {
     "name": "Cody Tabor",
     "ptm": 21,
+    "ptmAtFlowControl": null,
     "history": [
       18,
       21,
@@ -2550,6 +2732,7 @@
   {
     "name": "Eric Tabor",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2564,6 +2747,7 @@
   {
     "name": "Scott Tabor",
     "ptm": 24,
+    "ptmAtFlowControl": 24,
     "history": [
       21,
       21,
@@ -2578,6 +2762,7 @@
   {
     "name": "Layne Theriot",
     "ptm": 19,
+    "ptmAtFlowControl": null,
     "history": [
       16,
       16,
@@ -2592,6 +2777,7 @@
   {
     "name": "Cody Thomas",
     "ptm": 17,
+    "ptmAtFlowControl": null,
     "history": [
       18,
       15,
@@ -2606,6 +2792,7 @@
   {
     "name": "Dwain Thomas",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2620,6 +2807,7 @@
   {
     "name": "Jerry Thomas",
     "ptm": 25,
+    "ptmAtFlowControl": null,
     "history": [
       29,
       19,
@@ -2634,6 +2822,7 @@
   {
     "name": "Trevor Thomas",
     "ptm": 31,
+    "ptmAtFlowControl": null,
     "history": [
       25,
       30,
@@ -2648,6 +2837,7 @@
   {
     "name": "Cory Trahan",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2662,6 +2852,7 @@
   {
     "name": "Dave Tuttle",
     "ptm": 22.8,
+    "ptmAtFlowControl": 23.8,
     "history": [
       22,
       21,
@@ -2676,6 +2867,7 @@
   {
     "name": "Roy Vanhaverbeke",
     "ptm": 32,
+    "ptmAtFlowControl": 32.4,
     "history": [
       31,
       29,
@@ -2690,6 +2882,7 @@
   {
     "name": "Colby Vidrine",
     "ptm": 22,
+    "ptmAtFlowControl": null,
     "history": [
       19,
       23,
@@ -2704,6 +2897,7 @@
   {
     "name": "Phillip Vidrine",
     "ptm": 18,
+    "ptmAtFlowControl": null,
     "history": [
       17,
       18,
@@ -2718,6 +2912,7 @@
   {
     "name": "Mike Welborn",
     "ptm": null,
+    "ptmAtFlowControl": null,
     "history": [
       null,
       null,
@@ -2732,6 +2927,7 @@
   {
     "name": "Jeremy Whittington",
     "ptm": 26,
+    "ptmAtFlowControl": 26,
     "history": [
       25,
       28,
@@ -2746,6 +2942,7 @@
   {
     "name": "Matthew Whittington",
     "ptm": 17,
+    "ptmAtFlowControl": null,
     "history": [
       17,
       null,
@@ -2760,6 +2957,7 @@
   {
     "name": "Blaine Williams",
     "ptm": 10,
+    "ptmAtFlowControl": null,
     "history": [
       7,
       8,
@@ -2774,6 +2972,7 @@
   {
     "name": "Rusty Wilson",
     "ptm": 18,
+    "ptmAtFlowControl": null,
     "history": [
       12,
       21,
@@ -2788,6 +2987,7 @@
   {
     "name": "Joseph Zanetti",
     "ptm": 15,
+    "ptmAtFlowControl": 14.4,
     "history": [
       17,
       14,
