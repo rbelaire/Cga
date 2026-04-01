@@ -98,6 +98,17 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                   {col.key === 'points' && (
                     <span className="stat-number text-darktext font-medium">{row.points}</span>
                   )}
+                  {col.key === 'poy' && (
+                    <span className={`stat-number font-semibold ${row.poy > 0 ? 'text-gold' : 'text-gray-400'}`}>
+                      {row.poy}
+                    </span>
+                  )}
+                  {col.key === 'ptm' && (
+                    <span className="stat-number text-gray-600">{row.ptm ?? '—'}</span>
+                  )}
+                  {col.key === 'latestScore' && (
+                    <span className="stat-number text-darktext font-medium">{row.latestScore ?? '—'}</span>
+                  )}
                   {col.key === 'eventsPlayed' && (
                     <span className="stat-number text-gray-500">{row.eventsPlayed ?? row.events}</span>
                   )}
@@ -114,7 +125,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                       {row.flight}
                     </span>
                   )}
-                  {!['rank', 'name', 'points', 'eventsPlayed', 'events', 'trend', 'flight'].includes(col.key) && (
+                  {!['rank', 'name', 'points', 'poy', 'ptm', 'latestScore', 'eventsPlayed', 'events', 'trend', 'flight'].includes(col.key) && (
                     <span className="text-darktext font-sans">{row[col.key]}</span>
                   )}
                 </td>
