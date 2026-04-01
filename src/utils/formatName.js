@@ -24,8 +24,11 @@ export function formatName(fullName) {
 }
 
 /**
- * Sort comparator that sorts by last name (for "First Last" stored names)
+ * Sort comparator that sorts by last name (for "First Last" stored names).
+ * Accepts either plain name strings or objects with a .name property.
  */
 export function compareByLastName(a, b) {
-  return formatName(a).localeCompare(formatName(b))
+  const nameA = typeof a === 'string' ? a : (a?.name ?? '')
+  const nameB = typeof b === 'string' ? b : (b?.name ?? '')
+  return formatName(nameA).localeCompare(formatName(nameB))
 }
