@@ -1,10 +1,6 @@
 import { useState } from 'react'
 import { formatName } from '../../utils/formatName'
 
-function isBubble(events) {
-  return typeof events === 'number' && events >= 1 && events < 4
-}
-
 function isBubble(rounds) {
   return typeof rounds === 'number' && rounds >= 1 && rounds < 4
 }
