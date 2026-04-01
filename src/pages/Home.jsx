@@ -18,7 +18,7 @@ export default function Home() {
       <QuickLinks />
 
       {/* Per-flight standings preview */}
-      <section className="py-16 bg-white">
+      <section className="py-10 sm:py-14 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-6">
             <div>
@@ -36,7 +36,7 @@ export default function Home() {
             {FLIGHTS.map((flight) => {
               const top5 = (poy.flights[flight] || []).slice(0, 5)
               return (
-                <div key={flight} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <div key={flight} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                   <div className="bg-forest px-4 py-3">
                     <h3 className="text-white font-sans text-sm font-semibold uppercase tracking-widest">{flight}</h3>
                   </div>
@@ -63,17 +63,17 @@ export default function Home() {
       </section>
 
       {/* Dues CTA */}
-      <section className="py-16 bg-amber-50 border-y border-amber-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+      <section className="py-10 bg-amber-50 border-y border-amber-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
           <div>
-            <h2 className="text-darktext font-serif text-2xl font-bold mb-1">2026 Dues Now Open</h2>
+            <h2 className="text-darktext font-serif text-xl font-bold mb-1">2026 Dues Now Open</h2>
             <p className="text-gray-600 font-sans text-sm">Annual membership dues are $75. Pay via Venmo to stay active for the season.</p>
           </div>
           <a
             href="https://venmo.com/CGA-Pay"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-primary whitespace-nowrap"
+            className="btn-primary whitespace-nowrap shrink-0"
           >
             Pay Dues on Venmo
           </a>
