@@ -1,0 +1,448 @@
+{
+  "id": "2026-01",
+  "tournament": "Flow Control Companies Open",
+  "source": "cga.xlsx (Flow Control Pairing tab)",
+  "pairings": [
+    {
+      "pairing": "Pairing 1",
+      "players": [
+        {
+          "name": "Myron Lane",
+          "flight": "Championship"
+        },
+        {
+          "name": "Tyler Seaux",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "David Gleason",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Matthew Whittington",
+          "flight": "Unassigned"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 2",
+      "players": [
+        {
+          "name": "Richard Bourgeois",
+          "flight": "Championship"
+        },
+        {
+          "name": "Carroll Robichaux",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Ronnie Landry",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "John Reed",
+          "flight": "Unassigned"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 3",
+      "players": [
+        {
+          "name": "Brett Myhand",
+          "flight": "Championship"
+        },
+        {
+          "name": "Dexter Babineaux",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Coby Tabor",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Seth Breaux",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 4",
+      "players": [
+        {
+          "name": "Alan Chasteen",
+          "flight": "Championship"
+        },
+        {
+          "name": "Joe Ballard",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Drake Menard",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Colby Savoie",
+          "flight": "Unassigned"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 5",
+      "players": [
+        {
+          "name": "Ralph Jordan",
+          "flight": "Championship"
+        },
+        {
+          "name": "Trae Mouton",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Dameyon Kelly",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Teddy Menard",
+          "flight": "4th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 6",
+      "players": [
+        {
+          "name": "Jay O'Connor",
+          "flight": "Championship"
+        },
+        {
+          "name": "Jeremy Whittington",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Adam Latiolais",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Jerome Lane",
+          "flight": "Unassigned"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 7",
+      "players": [
+        {
+          "name": "Toby Guy",
+          "flight": "Championship"
+        },
+        {
+          "name": "Kyle Lebourgeois",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Kurt Bourg",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Wyatt Darby",
+          "flight": "Unassigned"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 8",
+      "players": [
+        {
+          "name": "Roy Vanhaverbeke",
+          "flight": "Championship"
+        },
+        {
+          "name": "Scott Tabor",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Teddy Menard",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Aaron Courville",
+          "flight": "Unassigned"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 9",
+      "players": [
+        {
+          "name": "Garry Forestier",
+          "flight": "Championship"
+        },
+        {
+          "name": "Eddie Meche",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Gary Angelle",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Des Bourgeois",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 10",
+      "players": [
+        {
+          "name": "Corey Latiolais",
+          "flight": "Championship"
+        },
+        {
+          "name": "Stephen Boudreaux",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "E.J. Louviere",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Ryan Belaire",
+          "flight": "Unassigned"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 11",
+      "players": [
+        {
+          "name": "Doug Guidry",
+          "flight": "Championship"
+        },
+        {
+          "name": "Wayne Shullaw",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Buster Langston",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "John Landry",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 12",
+      "players": [
+        {
+          "name": "Jeff Richard",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Ryan Brown",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Dion Bearb",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Cory Darby",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 13",
+      "players": [
+        {
+          "name": "Brandon Borne",
+          "flight": "Championship"
+        },
+        {
+          "name": "Jessie Myhand",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "David Gerard",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Neal Angelle",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 14",
+      "players": [
+        {
+          "name": "Joseph Myhand",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Brett Breaux",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Cedric Gaspard",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Rickey Lavergne",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 15",
+      "players": [
+        {
+          "name": "Alan Chasteen Sr.",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Ernie Bennett",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Bryan Benoit",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Ryan Simon",
+          "flight": "Unassigned"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 16",
+      "players": [
+        {
+          "name": "Carter Breaux",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Dale Broussard",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Grant Citron",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Lucas Dupuis",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 17",
+      "players": [
+        {
+          "name": "Jacob Hooper",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Dave Tuttle",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "Kyle Bolivar",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Colby Colomb",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 18",
+      "players": [
+        {
+          "name": "Cory Dupuis",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "David Melancon",
+          "flight": "3rd Flight"
+        },
+        {
+          "name": "David Mouton",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Eric McGuire",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 19",
+      "players": [
+        {
+          "name": "Frank Malambri",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Brian McCarley",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Blake Boudreaux",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Phillip Broussard",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 20",
+      "players": [
+        {
+          "name": "Donald Chauvin",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Bryan Estes",
+          "flight": "2nd Flight"
+        },
+        {
+          "name": "Brock Boudreaux",
+          "flight": "4th Flight"
+        },
+        {
+          "name": "Joseph Zanetti",
+          "flight": "5th Flight"
+        }
+      ]
+    },
+    {
+      "pairing": "Pairing 21",
+      "players": [
+        {
+          "name": "Mark Bruno",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Cooper Breaux",
+          "flight": "1st Flight"
+        },
+        {
+          "name": "Paul Darbonne",
+          "flight": "5th Flight"
+        },
+        {
+          "name": "Danny Leblanc",
+          "flight": "5th Flight"
+        }
+      ]
+    }
+  ]
+}
