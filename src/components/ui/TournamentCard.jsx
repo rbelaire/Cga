@@ -15,7 +15,7 @@ export default function TournamentCard({ tournament, compact = false }) {
     <div
       className={`rounded-lg overflow-hidden border transition-shadow duration-200 hover:shadow-md ${
         isPast
-          ? 'bg-white border-gray-200 opacity-75'
+          ? 'bg-gray-50 border-gray-200'
           : 'bg-white border-gray-200 hover:border-gold'
       }`}
     >

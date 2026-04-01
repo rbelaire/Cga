@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import SponsorLogo from '../components/ui/SponsorLogo'
 import sponsors from '../data/sponsors.json'
@@ -18,6 +19,7 @@ function SponsorTier({ title, description, sponsors: list }) {
 }
 
 export default function Sponsors() {
+  useEffect(() => { document.title = 'Sponsors | CGA 2026' }, [])
   return (
     <PageWrapper>
       <div className="mb-8">

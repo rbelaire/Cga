@@ -56,8 +56,8 @@ export default function Header() {
                 className={({ isActive }) =>
                   `px-3 py-2 text-sm font-sans font-medium rounded transition-colors duration-150 ${
                     isActive
-                      ? 'text-gold border-b-2 border-gold'
-                      : 'text-white/90 hover:text-gold'
+                      ? 'text-gold bg-white/10 border-b-2 border-gold'
+                      : 'text-white/90 hover:text-gold hover:bg-white/5'
                   }`
                 }
               >

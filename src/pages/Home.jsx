@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import HeroSection from '../components/sections/HeroSection'
 import NextTournament from '../components/sections/NextTournament'
 import QuickLinks from '../components/sections/QuickLinks'
@@ -8,6 +9,8 @@ import poy from '../data/poy.json'
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 
 export default function Home() {
+  useEffect(() => { document.title = 'Carencro Golf Association' }, [])
+
   return (
     <>
       <HeroSection />
@@ -22,8 +25,11 @@ export default function Home() {
               <h2 className="section-title">2026 Flight Standings</h2>
               <div className="gold-divider" />
             </div>
-            <Link to="/poy" className="text-forest text-sm font-sans hover:text-gold transition-colors mb-7">
-              Full standings →
+            <Link
+              to="/poy"
+              className="mb-7 px-4 py-2 text-sm font-sans font-medium rounded-lg border border-forest text-forest hover:bg-forest hover:text-white transition-colors"
+            >
+              Full Standings →
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

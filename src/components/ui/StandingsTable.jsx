@@ -41,9 +41,17 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
       })
     : data
 
+  if (!data || data.length === 0) {
+    return (
+      <div className="rounded-lg border border-gray-100 bg-gray-50 py-12 text-center">
+        <p className="text-gray-400 font-sans text-sm">No players in this flight yet.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="w-full text-left text-sm">
+      <table className="w-full min-w-[540px] text-left text-sm">
         <thead>
           <tr className="bg-forest border-b border-forest">
             {defaultColumns.map((col) => (
@@ -51,6 +59,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                 key={col.key}
                 className="table-header text-white"
                 onClick={() => col.sortable && handleSort(col.key)}
+                style={col.sortable ? { cursor: 'pointer' } : {}}
               >
                 <span className="flex items-center gap-1">
                   {col.label}
