@@ -4,10 +4,15 @@ const TEE_STYLES = {
   Sr:    'bg-amber-500 text-white',
 }
 
+function isBubble(events) {
+  return typeof events === 'number' && events >= 1 && events < 4
+}
+
 export default function MemberCard({ member }) {
-  const { name, ptm, memberSince, email, cell, homePhone, tee } = member
+  const { name, ptm, memberSince, email, cell, homePhone, tee, events } = member
   const hasData = ptm !== null
   const phone = cell || homePhone
+  const bubble = isBubble(events)
   const initials = name
     .split(' ')
     .map((n) => n[0])
@@ -31,6 +36,11 @@ export default function MemberCard({ member }) {
             {name}
           </p>
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            {bubble && (
+              <span className="text-xs font-sans font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200">
+                Bubble
+              </span>
+            )}
             {tee && (
               <span className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded ${TEE_STYLES[tee] ?? 'bg-gray-200 text-gray-600'}`}>
                 {tee}

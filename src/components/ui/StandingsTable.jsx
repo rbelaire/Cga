@@ -1,5 +1,9 @@
 import { useState } from 'react'
 
+function isBubble(events) {
+  return typeof events === 'number' && events >= 1 && events < 4
+}
+
 const TREND_ICONS = {
   up: '↑',
   down: '↓',
@@ -91,8 +95,15 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                     </span>
                   )}
                   {col.key === 'name' && (
-                    <span className={`font-sans ${idx < highlightTop ? 'text-darktext font-semibold' : 'text-darktext'}`}>
-                      {row.name}
+                    <span className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`font-sans ${idx < highlightTop ? 'text-darktext font-semibold' : 'text-darktext'}`}>
+                        {row.name}
+                      </span>
+                      {isBubble(row.events) && (
+                        <span className="text-xs font-sans font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200 whitespace-nowrap">
+                          Bubble
+                        </span>
+                      )}
                     </span>
                   )}
                   {col.key === 'points' && (
