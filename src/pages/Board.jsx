@@ -47,9 +47,19 @@ export default function Board() {
                   </p>
                 </div>
               </div>
-              <p className="text-gray-500 text-xs font-sans">
-                Serving since {member.since}
-              </p>
+              <div className="text-gray-600 text-sm font-sans space-y-1">
+                <p>
+                  <span className="font-semibold text-darktext">Email:</span>{' '}
+                  <a href={`mailto:${member.email}`} className="text-forest hover:underline">{member.email}</a>
+                </p>
+                <p>
+                  <span className="font-semibold text-darktext">Phone:</span>{' '}
+                  <a href={`tel:${member.phone}`} className="text-forest hover:underline">{member.phone}</a>
+                </p>
+                {member.since && (
+                  <p className="text-gray-500 text-xs">Serving since {member.since}</p>
+                )}
+              </div>
             </div>
           )
         })}
