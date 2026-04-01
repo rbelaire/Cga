@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import membersData from '../data/members.json'
+import currentStandings from '../data/standings.json'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const STORAGE_KEY = 'cga_admin_v1'
@@ -244,20 +245,35 @@ function AdminPanel() {
     }
 
     const ptmLookup = Object.fromEntries(membersData.map(m => [m.name, m.ptm]))
+
+    // Build a lookup of previous PTM values from the current standings data
+    const prevPtmLookup = {}
+    for (const fl of FLIGHTS) {
+      for (const p of (currentStandings.flights[fl] ?? [])) {
+        if (p.ptm != null) prevPtmLookup[p.name] = p.ptm
+      }
+    }
+
     const newStandings = { flights: {} }
     for (const fl of FLIGHTS) {
       const ps = calcFlightPOY(data[tid]?.[fl] ?? [])
       const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
-      newStandings.flights[fl] = sorted.map((p, i) => ({
-        rank: i + 1,
-        name: p.name,
-        poy: p.poy ?? 0,
-        ptm: ptmLookup[p.name] ?? (Number(p.ptm) || null),
-        latestScore: Number(p.score) || null,
-        latestTournament: tournament.name,
-        events: 1,
-        trend: 'up',
-      }))
+      newStandings.flights[fl] = sorted.map((p, i) => {
+        const newPtm = ptmLookup[p.name] ?? (Number(p.ptm) || null)
+        const oldPtm = prevPtmLookup[p.name] ?? null
+        const ptmDelta = (newPtm != null && oldPtm != null) ? +(newPtm - oldPtm).toFixed(2) : 0
+        return {
+          rank: i + 1,
+          name: p.name,
+          poy: p.poy ?? 0,
+          ptm: newPtm,
+          ptmDelta,
+          latestScore: Number(p.score) || null,
+          latestTournament: tournament.name,
+          events: 1,
+          trend: 'up',
+        }
+      })
     }
 
     const slug = tid.replace(/[^a-z0-9]/gi, '-').toLowerCase()
