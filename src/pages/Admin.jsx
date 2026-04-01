@@ -1,14 +1,16 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import membersData from '../data/members.json'
 import currentStandings from '../data/standings.json'
+import { formatName, compareByLastName } from '../utils/formatName'
 
 const FLIGHTS      = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const STORAGE_KEY  = 'cga_admin_v1'
 const PAIRINGS_KEY = 'cga_pairings_v1'
+const MEMBERS_KEY  = 'cga_members_v1'
 const CREDITS_KEY  = 'cga_credits_v1'
 const PIN          = 'cga2026'
 
@@ -25,7 +27,7 @@ const flightTagStyles = {
   Unassigned:   'bg-gray-100 text-gray-600 border-gray-200',
 }
 
-// ── POY calculation ───────────────────────────────────────────────────────────
+// ── POY calculation ────────────────────────────────────────────────────────────
 function calcFlightPOY(players) {
   if (!players.length) return players
   const n     = players.length
@@ -53,7 +55,7 @@ function calcFlightPOY(players) {
   return withPM.map((p, i) => ({ ...p, rank: rankMap[i]?.rank ?? null, poy: rankMap[i]?.poy ?? null }))
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 const fmtPM  = pm => pm == null ? '—' : pm > 0 ? `+${pm}` : `${pm}`
 const fmtPOY = p  => p.poy == null ? '—' : p.eligible === false ? 'X' : p.poy % 1 === 0 ? String(p.poy) : p.poy.toFixed(1)
 
@@ -79,7 +81,7 @@ function fmtDateShort(iso) {
   })
 }
 
-// ── PDF utilities ─────────────────────────────────────────────────────────────
+// ── PDF utilities ──────────────────────────────────────────────────────────────
 async function loadLogoBase64() {
   try {
     const res = await fetch('/cga-logo.jpg')
@@ -98,25 +100,20 @@ async function buildPdfHeader(doc, title, subtitle = '') {
   const pw   = doc.internal.pageSize.getWidth()
   const logo = await loadLogoBase64()
 
-  // Navy header bar
   doc.setFillColor(...PDF_NAVY)
   doc.rect(0, 0, pw, 38, 'F')
 
-  // Logo
   if (logo) doc.addImage(logo, 'JPEG', 10, 4, 30, 30)
 
-  // CGA name
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(16)
   doc.setTextColor(255, 255, 255)
   doc.text('Carencro Golf Association', 46, 15)
 
-  // Gold rule inside header
   doc.setDrawColor(...PDF_GOLD)
   doc.setLineWidth(0.8)
   doc.line(46, 18, pw - 10, 18)
 
-  // Document title
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(11)
   doc.setTextColor(...PDF_GOLD)
@@ -128,18 +125,17 @@ async function buildPdfHeader(doc, title, subtitle = '') {
     doc.text(subtitle, 46, 33)
   }
 
-  // Gold rule below header
   doc.setDrawColor(...PDF_GOLD)
   doc.setLineWidth(1)
   doc.line(0, 38, pw, 38)
 
-  return 46  // content startY
+  return 46
 }
 
 function addPdfFooter(doc, note = '') {
-  const pw      = doc.internal.pageSize.getWidth()
-  const ph      = doc.internal.pageSize.getHeight()
-  const total   = doc.internal.getNumberOfPages()
+  const pw    = doc.internal.pageSize.getWidth()
+  const ph    = doc.internal.pageSize.getHeight()
+  const total = doc.internal.getNumberOfPages()
   for (let i = 1; i <= total; i++) {
     doc.setPage(i)
     doc.setDrawColor(...PDF_GOLD)
@@ -148,21 +144,18 @@ function addPdfFooter(doc, note = '') {
     doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(140, 140, 140)
-    const left  = note || 'Carencro Golf Association · CGA 2026'
-    const right = `Page ${i} of ${total}`
-    doc.text(left,  14,       ph - 10)
-    doc.text(right, pw - 14,  ph - 10, { align: 'right' })
+    doc.text(note || 'Carencro Golf Association · CGA 2026', 14, ph - 10)
+    doc.text(`Page ${i} of ${total}`, pw - 14, ph - 10, { align: 'right' })
   }
 }
 
-// ── PDF: Tournament Info ──────────────────────────────────────────────────────
+// ── PDF: Tournament Info ───────────────────────────────────────────────────────
 async function exportTournamentInfoPDF(tournament) {
   if (!tournament) return
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   const pw  = doc.internal.pageSize.getWidth()
   let y = await buildPdfHeader(doc, 'Tournament Information', 'CGA 2026 Season')
 
-  // Big tournament name
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(20)
   doc.setTextColor(...PDF_NAVY)
@@ -183,75 +176,45 @@ async function exportTournamentInfoPDF(tournament) {
     ['ENTRY FEE',             tournament.entryFee || '—'],
     ['REGISTRATION DEADLINE', fmtDateShort(tournament.dueDate)],
   ]
-
   fields.forEach(([label, value]) => {
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(...PDF_NAVY)
+    doc.setFont('helvetica', 'bold');  doc.setFontSize(8);  doc.setTextColor(...PDF_NAVY)
     doc.text(label, 14, y)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(13)
-    doc.setTextColor(25, 25, 25)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(13); doc.setTextColor(25, 25, 25)
     doc.text(value, 14, y + 6)
     y += 16
   })
 
   if (tournament.notes) {
-    doc.setDrawColor(210, 215, 225)
-    doc.setLineWidth(0.3)
-    doc.line(14, y, pw - 14, y)
-    y += 8
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(...PDF_NAVY)
-    doc.text('NOTES', 14, y)
-    y += 5
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.setTextColor(60, 60, 60)
+    doc.setDrawColor(210, 215, 225); doc.setLineWidth(0.3); doc.line(14, y, pw - 14, y); y += 8
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...PDF_NAVY)
+    doc.text('NOTES', 14, y); y += 5
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(60, 60, 60)
     const noteLines = doc.splitTextToSize(tournament.notes, pw - 28)
     doc.text(noteLines, 14, y)
     y += noteLines.length * 5 + 6
   }
 
-  // Empty notes area with lines for handwritten additions
-  doc.setDrawColor(210, 215, 225)
-  doc.setLineWidth(0.3)
-  doc.line(14, y, pw - 14, y)
-  y += 8
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...PDF_NAVY)
-  doc.text('ADDITIONAL NOTES', 14, y)
-  y += 6
+  doc.setDrawColor(210, 215, 225); doc.setLineWidth(0.3); doc.line(14, y, pw - 14, y); y += 8
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...PDF_NAVY)
+  doc.text('ADDITIONAL NOTES', 14, y); y += 6
   for (let i = 0; i < 4; i++) {
-    doc.setDrawColor(190, 195, 205)
-    doc.setLineWidth(0.2)
-    doc.line(14, y, pw - 14, y)
-    y += 8
+    doc.setDrawColor(190, 195, 205); doc.setLineWidth(0.2); doc.line(14, y, pw - 14, y); y += 8
   }
 
   addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
-  const slug = tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-  doc.save(`${slug}-tournament-info.pdf`)
+  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-tournament-info.pdf`)
 }
 
-// ── PDF: Pairings ─────────────────────────────────────────────────────────────
+// ── PDF: Pairings ──────────────────────────────────────────────────────────────
 async function exportPairingsPDF(tournament, pairings) {
   if (!tournament || !pairings.length) return
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
-  const pw  = doc.internal.pageSize.getWidth()
   const y = await buildPdfHeader(
-    doc,
-    'Pairings',
+    doc, 'Pairings',
     `${tournament.name} · ${fmtDate(tournament.date)} · ${tournament.course}`
   )
-
   const maxPlayers = Math.max(...pairings.map(c => c.players.length))
   const playerCols = Array.from({ length: maxPlayers }, (_, i) => `Player ${i + 1}`)
-
   const body = pairings.map((card, i) => {
     const row = [i + 1]
     for (let j = 0; j < maxPlayers; j++) {
@@ -260,25 +223,19 @@ async function exportPairingsPDF(tournament, pairings) {
     }
     return row
   })
-
   autoTable(doc, {
-    head:            [['#', ...playerCols]],
-    body,
-    startY:          y,
-    theme:           'striped',
+    head: [['#', ...playerCols]], body, startY: y, theme: 'striped',
     headStyles:      { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
     alternateRowStyles: { fillColor: [245, 248, 252] },
     styles:          { fontSize: 9, cellPadding: 3 },
     columnStyles:    { 0: { halign: 'center', cellWidth: 12, fontStyle: 'bold' } },
     margin:          { left: 14, right: 14 },
   })
-
   addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
-  const slug = tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-  doc.save(`${slug}-pairings.pdf`)
+  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-pairings.pdf`)
 }
 
-// ── PDF: Points to Make ───────────────────────────────────────────────────────
+// ── PDF: Points to Make ────────────────────────────────────────────────────────
 async function exportPtmPDF() {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   let y = await buildPdfHeader(doc, 'Points to Make', 'CGA 2026 Season — Full Roster by Flight')
@@ -290,166 +247,108 @@ async function exportPtmPDF() {
     if (m.flight && grouped[m.flight]) grouped[m.flight].push(m)
     else unassigned.push(m)
   }
-
   const flightColors = {
-    'Championship': [160, 110, 0],
-    '1st Flight':   [30,  80,  180],
-    '2nd Flight':   [55,  60,  165],
-    '3rd Flight':   [20,  120, 80],
-    '4th Flight':   [100, 40,  150],
-    '5th Flight':   [180, 50,  100],
+    'Championship': [160, 110, 0], '1st Flight': [30, 80, 180],
+    '2nd Flight':   [55, 60, 165], '3rd Flight': [20, 120, 80],
+    '4th Flight':   [100, 40, 150], '5th Flight': [180, 50, 100],
   }
-
   for (const fl of FLIGHTS) {
     const members = grouped[fl]
     if (!members.length) continue
-
     const color = flightColors[fl] ?? PDF_NAVY
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(...color)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
     doc.text(fl.toUpperCase(), 14, y + 4)
-
     autoTable(doc, {
-      head:            [['#', 'Player', 'PTM', 'Tee']],
-      body:            members
-                         .slice().sort((a, b) => a.name.localeCompare(b.name))
-                         .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
-      startY:          y + 6,
-      theme:           'striped',
+      head: [['#', 'Player', 'PTM', 'Tee']],
+      body: members.slice().sort((a, b) => a.name.localeCompare(b.name))
+                   .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
+      startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [245, 248, 252] },
-      styles:          { fontSize: 8, cellPadding: 2 },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 10 },
-        2: { halign: 'center', cellWidth: 20, fontStyle: 'bold' },
-        3: { halign: 'center', cellWidth: 20 },
-      },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 20, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 20 } },
       margin: { left: 14, right: 14 },
     })
-
     y = doc.lastAutoTable.finalY + 8
   }
-
   if (unassigned.length) {
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(100, 100, 100)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(100, 100, 100)
     doc.text('UNASSIGNED', 14, y + 4)
-
     autoTable(doc, {
-      head:            [['#', 'Player', 'PTM', 'Tee']],
-      body:            unassigned
-                         .slice().sort((a, b) => a.name.localeCompare(b.name))
-                         .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
-      startY:          y + 6,
-      theme:           'striped',
+      head: [['#', 'Player', 'PTM', 'Tee']],
+      body: unassigned.slice().sort((a, b) => a.name.localeCompare(b.name))
+                      .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
+      startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: [110, 110, 110], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [248, 248, 248] },
-      styles:          { fontSize: 8, cellPadding: 2 },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 10 },
-        2: { halign: 'center', cellWidth: 20, fontStyle: 'bold' },
-        3: { halign: 'center', cellWidth: 20 },
-      },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 20, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 20 } },
       margin: { left: 14, right: 14 },
     })
   }
-
   addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
   doc.save('cga-2026-points-to-make.pdf')
 }
 
-// ── PDF: Tournament Results ───────────────────────────────────────────────────
+// ── PDF: Tournament Results ────────────────────────────────────────────────────
 async function exportResultsPDF(tournament, flightData) {
   if (!tournament) return
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   let y = await buildPdfHeader(
-    doc,
-    'Tournament Results',
+    doc, 'Tournament Results',
     `${tournament.name} · ${fmtDate(tournament.date)} · ${tournament.course}`
   )
-
   const flightColors = {
-    'Championship': [160, 110, 0],
-    '1st Flight':   [30,  80,  180],
-    '2nd Flight':   [55,  60,  165],
-    '3rd Flight':   [20,  120, 80],
-    '4th Flight':   [100, 40,  150],
-    '5th Flight':   [180, 50,  100],
+    'Championship': [160, 110, 0], '1st Flight': [30, 80, 180],
+    '2nd Flight':   [55, 60, 165], '3rd Flight': [20, 120, 80],
+    '4th Flight':   [100, 40, 150], '5th Flight': [180, 50, 100],
   }
-
   for (const fl of FLIGHTS) {
     const rawPs = flightData[fl] ?? []
     const ps    = calcFlightPOY(rawPs)
     if (!ps.length) continue
-
     const ranked   = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
     const unranked = ps.filter(p => p.rank == null)
     const rows     = [...ranked, ...unranked]
-
     const color = flightColors[fl] ?? PDF_NAVY
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(...color)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
     doc.text(fl.toUpperCase(), 14, y + 4)
-
     autoTable(doc, {
       head: [['Rank', 'Player', 'PTM', 'Score', '+/−', 'POY Pts']],
       body: rows.map(p => [
-        p.rank ?? '—',
-        p.name + (p.eligible === false ? ' *' : ''),
-        p.ptm  ?? '—',
-        p.score ?? '—',
+        p.rank ?? '—', p.name + (p.eligible === false ? ' *' : ''), p.ptm ?? '—', p.score ?? '—',
         p.plusMinus == null ? '—' : p.plusMinus > 0 ? `+${p.plusMinus}` : String(p.plusMinus),
         fmtPOY(p),
       ]),
-      startY: y + 6,
-      theme:  'striped',
+      startY: y + 6, theme: 'striped',
       headStyles:         { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [245, 248, 252] },
       styles:             { fontSize: 8, cellPadding: 2 },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 14 },
-        2: { halign: 'center', cellWidth: 14 },
-        3: { halign: 'center', cellWidth: 14 },
-        4: { halign: 'center', cellWidth: 14 },
-        5: { halign: 'center', cellWidth: 22 },
-      },
+      columnStyles: { 0: { halign: 'center', cellWidth: 14 }, 2: { halign: 'center', cellWidth: 14 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'center', cellWidth: 14 }, 5: { halign: 'center', cellWidth: 22 } },
       margin: { left: 14, right: 14 },
       didParseCell(data) {
         if (data.section !== 'body') return
         const p = rows[data.row.index]
         if (!p) return
         if (data.column.index === 0 && p.rank != null && p.rank <= 3) {
-          data.cell.styles.fontStyle   = 'bold'
-          data.cell.styles.textColor   = p.rank === 1 ? PDF_GOLD : color
+          data.cell.styles.fontStyle = 'bold'
+          data.cell.styles.textColor = p.rank === 1 ? PDF_GOLD : color
         }
         if (data.column.index === 4 && p.plusMinus != null) {
           data.cell.styles.textColor = p.plusMinus > 0 ? [0, 140, 60] : p.plusMinus < 0 ? [180, 30, 30] : [100, 100, 100]
         }
       },
     })
-
     y = doc.lastAutoTable.finalY + 8
   }
-
   addPdfFooter(doc, `* = ineligible for POY · Generated ${new Date().toLocaleDateString()} · CGA`)
-  const slug = tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-  doc.save(`${slug}-results.pdf`)
+  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.pdf`)
 }
 
-// ── PDF: Credit on Books ──────────────────────────────────────────────────────
+// ── PDF: Credit on Books ───────────────────────────────────────────────────────
 async function exportCreditsPDF(credits) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
-  let y = await buildPdfHeader(
-    doc,
-    'Credit on Books',
-    `CGA 2026 · As of ${new Date().toLocaleDateString()}`
-  )
-
+  let y = await buildPdfHeader(doc, 'Credit on Books', `CGA 2026 · As of ${new Date().toLocaleDateString()}`)
   const rows = membersData
     .filter(m => m.active !== false)
     .map(m => ({ name: m.name, flight: m.flight ?? 'Unassigned', balance: credits[m.name] ?? 0 }))
@@ -459,31 +358,21 @@ async function exportCreditsPDF(credits) {
       if (a.balance !== b.balance) return b.balance - a.balance
       return a.name.localeCompare(b.name)
     })
-
   const total        = rows.reduce((s, r) => s + r.balance, 0)
   const nonZeroCount = rows.filter(r => r.balance !== 0).length
-
   autoTable(doc, {
     head: [['#', 'Player', 'Flight', 'Balance']],
     body: rows.map((r, i) => [
-      i + 1,
-      r.name,
-      r.flight,
-      r.balance === 0
-        ? '$0.00'
-        : `${r.balance < 0 ? '−' : ''}$${Math.abs(r.balance).toFixed(2)}`,
+      i + 1, r.name, r.flight,
+      r.balance === 0 ? '$0.00' : `${r.balance < 0 ? '−' : ''}$${Math.abs(r.balance).toFixed(2)}`,
     ]),
     foot:   [['', '', 'TOTAL', `${total < 0 ? '−' : ''}$${Math.abs(total).toFixed(2)}`]],
-    startY: y,
-    theme:  'striped',
+    startY: y, theme: 'striped',
     headStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
     footStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
     alternateRowStyles: { fillColor: [245, 248, 252] },
     styles:             { fontSize: 8, cellPadding: 2.5 },
-    columnStyles: {
-      0: { halign: 'center', cellWidth: 10 },
-      3: { halign: 'right',  cellWidth: 30 },
-    },
+    columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'right', cellWidth: 30 } },
     margin: { left: 14, right: 14 },
     didParseCell(data) {
       if (data.section !== 'body') return
@@ -497,12 +386,27 @@ async function exportCreditsPDF(credits) {
       if (r.balance !== 0) data.cell.styles.fontStyle = 'bold'
     },
   })
-
   addPdfFooter(doc, `${nonZeroCount} member${nonZeroCount !== 1 ? 's' : ''} with balance · Total: $${total.toFixed(2)}`)
   doc.save('cga-2026-credit-on-books.pdf')
 }
 
-// ── PIN gate ──────────────────────────────────────────────────────────────────
+// ── PDF button component ───────────────────────────────────────────────────────
+function PdfBtn({ onClick, children, disabled = false }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+      </svg>
+      {children}
+    </button>
+  )
+}
+
+// ── PIN gate ───────────────────────────────────────────────────────────────────
 export default function Admin() {
   const [pin,      setPin]      = useState('')
   const [unlocked, setUnlocked] = useState(false)
@@ -534,14 +438,26 @@ export default function Admin() {
   return <AdminPanel />
 }
 
-// ── Admin panel ───────────────────────────────────────────────────────────────
+// ── Admin panel ────────────────────────────────────────────────────────────────
 function AdminPanel() {
+  // Tournament score entry data
   const [data, setData] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {} } catch { return {} }
   })
+  // Pairings data
   const [pairingsData, setPairingsData] = useState(() => {
     try { return JSON.parse(localStorage.getItem(PAIRINGS_KEY)) || {} } catch { return {} }
   })
+  // Flight/PTM overrides (flight management tab)
+  const [membersOverride, setMembersOverride] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(MEMBERS_KEY))
+      if (saved) return saved
+    } catch { /* ignore */ }
+    // Default: build from membersData
+    return Object.fromEntries(membersData.map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
+  })
+
   const [credits, setCredits] = useState(() => {
     try { return JSON.parse(localStorage.getItem(CREDITS_KEY)) || {} } catch { return {} }
   })
@@ -551,45 +467,51 @@ function AdminPanel() {
   const [flight,       setFlight]       = useState(FLIGHTS[0])
   const [poolSearch,   setPoolSearch]   = useState('')
   const [exportNote,   setExportNote]   = useState('')
-  const [adminMode,    setAdminMode]    = useState('scores')  // 'scores' | 'pairings' | 'credits'
-  const [groupSize,    setGroupSize]    = useState(4)
+  const [adminMode,    setAdminMode]    = useState('scores')  // 'scores' | 'pairings' | 'flights' | 'credits'
   const [creditSearch, setCreditSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
 
-  // score entry drag state
-  const dragRef        = useRef(null)
-  const [dragOverRow,  setDragOverRow]  = useState(null)
-  const [dragOverPool, setDragOverPool] = useState(false)
+  // pairings manual mode: unpaired pool → cards
+  const [manualPairings,  setManualPairings]  = useState(false)
+  const [selectedUnpaired, setSelectedUnpaired] = useState(null)  // name of selected player
 
-  // pairings drag state
-  const pDragRef    = useRef(null)
-  const [pDragOver, setPDragOver] = useState(null)
+  // flight management edit state
+  const [flightSearch, setFlightSearch] = useState('')
+  const [editingMember, setEditingMember] = useState(null) // name of member being edited inline
 
-  // persist score data
+  // persist score data and show saved indicator
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    setSaved(true)
-    const t = setTimeout(() => setSaved(false), 1200)
+    const t = setTimeout(() => {
+      setSaved(true)
+      const t2 = setTimeout(() => setSaved(false), 1200)
+      return () => clearTimeout(t2)
+    }, 0)
     return () => clearTimeout(t)
   }, [data])
 
-  // persist pairings data
+  // persist pairings
   useEffect(() => {
     localStorage.setItem(PAIRINGS_KEY, JSON.stringify(pairingsData))
   }, [pairingsData])
+
+  // persist member overrides
+  useEffect(() => {
+    localStorage.setItem(MEMBERS_KEY, JSON.stringify(membersOverride))
+  }, [membersOverride])
 
   // persist credits
   useEffect(() => {
     localStorage.setItem(CREDITS_KEY, JSON.stringify(credits))
   }, [credits])
 
-  const tournament   = schedule.find(t => t.id === tid)
+  const tournament     = schedule.find(t => t.id === tid)
   const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
   const rawPlayers   = data[tid]?.[flight] ?? []
   const players      = useMemo(() => calcFlightPOY(rawPlayers), [rawPlayers])
   const totalPlayers = FLIGHTS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
 
-  // all names entered for this tournament across all flights
+  // All names entered for this tournament across all flights
   const allAddedNames = useMemo(() => {
     const names = new Set()
     for (const fl of FLIGHTS) {
@@ -598,27 +520,43 @@ function AdminPanel() {
     return names
   }, [data, tid])
 
-  // pool members grouped by their season flight from members.json
+  // Effective members list (uses overrides for flight/ptm)
+  const effectiveMembers = useMemo(() => {
+    return membersData.map(m => ({
+      ...m,
+      flight: membersOverride[m.name]?.flight ?? m.flight,
+      ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
+    }))
+  }, [membersOverride])
+
+  const ptmLookup = useMemo(
+    () => Object.fromEntries(effectiveMembers.map(m => [m.name, m.ptm])),
+    [effectiveMembers]
+  )
+
+  // Pool members (not yet in this tournament), grouped by season flight
   const poolMembersGrouped = useMemo(() => {
-    const search = poolSearch.trim().toLowerCase()
-    const filtered = membersData.filter(m =>
+    const search   = poolSearch.trim().toLowerCase()
+    const filtered = effectiveMembers.filter(m =>
       !allAddedNames.has(m.name) &&
-      (search === '' || m.name.toLowerCase().includes(search))
+      (search === '' || m.name.toLowerCase().includes(search) || formatName(m.name).toLowerCase().includes(search))
     )
     const groups = {}
     for (const f of [...FLIGHTS, null]) {
       const key = f ?? '__unassigned__'
-      groups[key] = filtered.filter(m => f === null ? m.flight == null : m.flight === f)
+      groups[key] = filtered
+        .filter(m => f === null ? m.flight == null : m.flight === f)
+        .sort(compareByLastName)
     }
     return groups
-  }, [allAddedNames, poolSearch])
+  }, [allAddedNames, poolSearch, effectiveMembers])
 
   const poolTotalCount = useMemo(
     () => Object.values(poolMembersGrouped).reduce((s, g) => s + g.length, 0),
     [poolMembersGrouped]
   )
 
-  // pairings derived
+  // Pairings derived state
   const currentPairings = pairingsData[tid] ?? []
   const pairedNames     = useMemo(
     () => new Set(currentPairings.flatMap(c => c.players.map(p => p.name))),
@@ -640,7 +578,7 @@ function AdminPanel() {
       .filter(m => m.active !== false)
       .filter(m => !search || m.name.toLowerCase().includes(search))
       .slice()
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .sort(compareByLastName)
   }, [creditSearch])
 
   const creditTotal = useMemo(
@@ -653,33 +591,19 @@ function AdminPanel() {
     [credits]
   )
 
-  // ── Score data mutations ────────────────────────────────────────────────────
+  // ── Score data mutations ──────────────────────────────────────────────────────
   function flightSet(newList) {
     setData(prev => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [flight]: newList } }))
   }
 
-  function insertPlayer(name, atIdx) {
-    if (allAddedNames.has(name)) return
-    const fl = [...rawPlayers]
-    fl.splice(atIdx, 0, { name, ptm: '', score: '', eligible: true })
-    flightSet(fl)
-  }
-
   function addPlayer(name) {
     if (allAddedNames.has(name)) return
-    flightSet([...rawPlayers, { name, ptm: '', score: '', eligible: true }])
+    const ptm = ptmLookup[name] ?? ''
+    flightSet([...rawPlayers, { name, ptm: ptm !== null && ptm !== undefined ? ptm : '', score: '', eligible: true }])
   }
 
   function removePlayer(idx) {
     const fl = [...rawPlayers]; fl.splice(idx, 1); flightSet(fl)
-  }
-
-  function reorderPlayer(fromIdx, toIdx) {
-    if (fromIdx === toIdx) return
-    const fl     = [...rawPlayers]
-    const [item] = fl.splice(fromIdx, 1)
-    fl.splice(toIdx <= fromIdx ? toIdx : toIdx - 1, 0, item)
-    flightSet(fl)
   }
 
   function updatePlayer(idx, field, val) {
@@ -693,6 +617,7 @@ function AdminPanel() {
     flightSet([])
   }
 
+  // Move player to a different flight
   function movePlayerToFlight(playerIdx, targetFlight) {
     const player = rawPlayers[playerIdx]
     if (!player) return
@@ -708,7 +633,148 @@ function AdminPanel() {
     })
   }
 
-  // ── Credit mutations ────────────────────────────────────────────────────────
+  const flightIdx  = FLIGHTS.indexOf(flight)
+  const prevFlight = flightIdx > 0                  ? FLIGHTS[flightIdx - 1] : null
+  const nextFlight = flightIdx < FLIGHTS.length - 1 ? FLIGHTS[flightIdx + 1] : null
+
+  // ── Pairings functions ────────────────────────────────────────────────────────
+  function generatePairings() {
+    const allPlayers = FLIGHTS.flatMap(fl =>
+      (data[tid]?.[fl] ?? []).map(p => ({ name: p.name, flight: fl }))
+    )
+    if (!allPlayers.length) return
+
+    // Distribute players from different flights into each group of 4
+    // Strategy: interleave by flight so each group has players from 4 different flights
+    const byFlight = {}
+    for (const fl of FLIGHTS) {
+      const ps = allPlayers.filter(p => p.flight === fl)
+      if (ps.length) byFlight[fl] = ps
+    }
+    const flightQueues = Object.values(byFlight)
+    const numGroups    = Math.ceil(allPlayers.length / 4)
+    const groups       = Array.from({ length: numGroups }, () => [])
+
+    // Round-robin assignment across flights to maximize flight diversity
+    let groupIdx = 0
+    let safetyCounter = 0
+    const maxIterations = allPlayers.length * 2 + 10
+
+    while (flightQueues.some(q => q.length > 0) && safetyCounter < maxIterations) {
+      safetyCounter++
+      // Find the non-empty flight queue whose flight is least represented in current group
+      const currentGroup = groups[groupIdx]
+      const representedFlights = new Set(currentGroup.map(p => p.flight))
+      // Prioritize queues not yet in this group
+      const candidates = flightQueues.filter(q => q.length > 0 && !representedFlights.has(q[0].flight))
+      const pick = candidates.length > 0 ? candidates[0] : flightQueues.find(q => q.length > 0)
+      if (!pick) break
+      currentGroup.push(pick.shift())
+      if (currentGroup.length >= 4) {
+        groupIdx++
+        if (groupIdx >= numGroups) groupIdx = numGroups - 1
+      }
+    }
+
+    const newPairings = groups
+      .filter(g => g.length > 0)
+      .map((ps, i) => ({ pairing: `Pairing ${i + 1}`, players: ps }))
+    setPairingsData(prev => ({ ...prev, [tid]: newPairings }))
+    setManualPairings(false)
+    setSelectedUnpaired(null)
+  }
+
+  function startManualPairings() {
+    // Initialize with empty groups if none exist
+    if (!currentPairings.length) {
+      const numGroups = Math.ceil(totalPlayers / 4) || 1
+      const empty = Array.from({ length: numGroups }, (_, i) => ({ pairing: `Pairing ${i + 1}`, players: [] }))
+      setPairingsData(prev => ({ ...prev, [tid]: empty }))
+    }
+    setManualPairings(true)
+    setSelectedUnpaired(null)
+  }
+
+  function addGroupManual() {
+    const idx = currentPairings.length + 1
+    setPairingsData(prev => ({
+      ...prev,
+      [tid]: [...(prev[tid] ?? []), { pairing: `Pairing ${idx}`, players: [] }]
+    }))
+  }
+
+  function removeGroupManual(cardIdx) {
+    const updated = currentPairings.map(c => ({ ...c, players: [...c.players] }))
+    // Move players back to unpaired (just remove the group)
+    updated.splice(cardIdx, 1)
+    // Re-label
+    updated.forEach((c, i) => { c.pairing = `Pairing ${i + 1}` })
+    setPairingsData(prev => ({ ...prev, [tid]: updated }))
+  }
+
+  function assignUnpairedToGroup(cardIdx) {
+    if (!selectedUnpaired) return
+    const player = unpairedPlayers.find(p => p.name === selectedUnpaired)
+    if (!player) return
+    const updated = currentPairings.map((c, ci) =>
+      ci === cardIdx
+        ? { ...c, players: [...c.players, { name: player.name, flight: player.flight }] }
+        : c
+    )
+    setPairingsData(prev => ({ ...prev, [tid]: updated }))
+    setSelectedUnpaired(null)
+  }
+
+  function clearPairings() {
+    if (!window.confirm('Clear all pairings for this tournament?')) return
+    setPairingsData(prev => ({ ...prev, [tid]: [] }))
+    setManualPairings(false)
+    setSelectedUnpaired(null)
+  }
+
+  function removePairedPlayer(cardIdx, playerIdx) {
+    const updated = currentPairings.map((c, ci) =>
+      ci === cardIdx
+        ? { ...c, players: c.players.filter((_, pi) => pi !== playerIdx) }
+        : c
+    )
+    setPairingsData(prev => ({ ...prev, [tid]: updated }))
+  }
+
+  function exportPairings() {
+    if (!tournament || !currentPairings.length) return
+    const slug = tid.replace(/[^a-z0-9]/gi, '-').toLowerCase()
+    downloadJSON(
+      { id: tid, tournament: tournament.name, source: 'CGA Admin', pairings: currentPairings },
+      `${slug}-pairings.json`
+    )
+  }
+
+  // ── Flight management mutations ───────────────────────────────────────────────
+  function updateMemberFlight(name, newFlight) {
+    setMembersOverride(prev => ({
+      ...prev,
+      [name]: { ...(prev[name] ?? {}), flight: newFlight || null }
+    }))
+  }
+
+  function updateMemberPtm(name, newPtm) {
+    setMembersOverride(prev => ({
+      ...prev,
+      [name]: { ...(prev[name] ?? {}), ptm: newPtm === '' ? null : Number(newPtm) }
+    }))
+  }
+
+  function exportMembersJson() {
+    const updated = membersData.map(m => ({
+      ...m,
+      flight: membersOverride[m.name]?.flight ?? m.flight,
+      ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
+    }))
+    downloadJSON(updated, 'members.json')
+  }
+
+  // ── Credit mutations ──────────────────────────────────────────────────────────
   function applyCredit(name, amount) {
     const n = parseFloat(amount)
     if (isNaN(n) || n === 0) return
@@ -725,129 +791,7 @@ function AdminPanel() {
     setCredits({})
   }
 
-  // ── Score drag handlers ─────────────────────────────────────────────────────
-  function onDragStartPool(e, name) {
-    dragRef.current = { source: 'pool', name }
-    e.dataTransfer.effectAllowed = 'copy'
-  }
-
-  function onDragStartRow(e, idx) {
-    dragRef.current = { source: 'flight', fromIdx: idx }
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  function onDragOverRow(e, rowIdx) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = dragRef.current?.source === 'pool' ? 'copy' : 'move'
-    setDragOverRow(rowIdx)
-    setDragOverPool(false)
-  }
-
-  function onDragOverZone(e) {
-    e.preventDefault()
-    setDragOverRow('zone')
-    setDragOverPool(false)
-  }
-
-  function onDragOverPool(e) {
-    e.preventDefault()
-    if (dragRef.current?.source === 'flight') {
-      setDragOverPool(true)
-      setDragOverRow(null)
-    }
-  }
-
-  function onDropRow(e, rowIdx) {
-    e.preventDefault()
-    const d = dragRef.current
-    if (!d) return
-    if (d.source === 'pool')   insertPlayer(d.name, rowIdx)
-    if (d.source === 'flight') reorderPlayer(d.fromIdx, rowIdx)
-    resetDrag()
-  }
-
-  function onDropZone(e) {
-    e.preventDefault()
-    const d = dragRef.current
-    if (!d) return
-    if (d.source === 'pool')   addPlayer(d.name)
-    if (d.source === 'flight') reorderPlayer(d.fromIdx, rawPlayers.length)
-    resetDrag()
-  }
-
-  function onDropPool(e) {
-    e.preventDefault()
-    const d = dragRef.current
-    if (d?.source === 'flight') removePlayer(d.fromIdx)
-    resetDrag()
-  }
-
-  function resetDrag() {
-    dragRef.current = null
-    setDragOverRow(null)
-    setDragOverPool(false)
-  }
-
-  // ── Pairings functions ──────────────────────────────────────────────────────
-  function generatePairings() {
-    const allPlayers = FLIGHTS.flatMap(fl =>
-      (data[tid]?.[fl] ?? []).map(p => ({ name: p.name, flight: fl }))
-    )
-    if (!allPlayers.length) return
-    allPlayers.sort((a, b) => FLIGHTS.indexOf(a.flight) - FLIGHTS.indexOf(b.flight))
-    const numGroups  = Math.ceil(allPlayers.length / groupSize)
-    const groups     = Array.from({ length: numGroups }, () => [])
-    allPlayers.forEach((p, i) => groups[i % numGroups].push(p))
-    const newPairings = groups.map((ps, i) => ({ pairing: `Pairing ${i + 1}`, players: ps }))
-    setPairingsData(prev => ({ ...prev, [tid]: newPairings }))
-  }
-
-  function clearPairings() {
-    if (!window.confirm('Clear all pairings for this tournament?')) return
-    setPairingsData(prev => ({ ...prev, [tid]: [] }))
-  }
-
-  function removePairedPlayer(cardIdx, playerIdx) {
-    const updated = currentPairings.map((c, ci) =>
-      ci === cardIdx
-        ? { ...c, players: c.players.filter((_, pi) => pi !== playerIdx) }
-        : c
-    )
-    setPairingsData(prev => ({ ...prev, [tid]: updated }))
-  }
-
-  function onPDragStart(e, cardIdx, playerIdx) {
-    pDragRef.current = { cardIdx, playerIdx }
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  function onPDragOver(e, cardIdx) {
-    e.preventDefault()
-    setPDragOver(cardIdx)
-  }
-
-  function onPDrop(e, targetCardIdx) {
-    e.preventDefault()
-    const d = pDragRef.current
-    if (!d || d.cardIdx === targetCardIdx) { pDragRef.current = null; setPDragOver(null); return }
-    const updated = currentPairings.map(c => ({ ...c, players: [...c.players] }))
-    const [player] = updated[d.cardIdx].players.splice(d.playerIdx, 1)
-    updated[targetCardIdx].players.push(player)
-    setPairingsData(prev => ({ ...prev, [tid]: updated }))
-    pDragRef.current = null
-    setPDragOver(null)
-  }
-
-  function exportPairingsJSON() {
-    if (!tournament || !currentPairings.length) return
-    const slug = tid.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-    downloadJSON(
-      { id: tid, tournament: tournament.name, source: 'CGA Admin', pairings: currentPairings },
-      `${slug}-pairings.json`
-    )
-  }
-
-  // ── Results export (JSON) ───────────────────────────────────────────────────
+  // ── Results export ────────────────────────────────────────────────────────────
   function doExport() {
     if (!tournament) return
     const flightWinners = [], leaderboard = {}
@@ -874,7 +818,6 @@ function AdminPanel() {
         .map((p, i) => ({ rank: i + 1, name: p.name, points: p.poy ?? 0, events: 1 }))
     }
 
-    const ptmLookup     = Object.fromEntries(membersData.map(m => [m.name, m.ptm]))
     const prevPtmLookup = {}
     for (const fl of FLIGHTS) {
       for (const p of (currentStandings.flights[fl] ?? [])) {
@@ -898,7 +841,7 @@ function AdminPanel() {
     }
 
     const slug = tid.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-    downloadJSON(resultFile, `${slug}-results.json`)
+    downloadJSON(resultFile,  `${slug}-results.json`)
     setTimeout(() => downloadJSON(newPoy,       'poy.json'),       200)
     setTimeout(() => downloadJSON(newStandings, 'standings.json'), 400)
     setExportNote(
@@ -911,26 +854,7 @@ function AdminPanel() {
     )
   }
 
-  // ── Derived for promote/relegate ────────────────────────────────────────────
-  const flightIdx  = FLIGHTS.indexOf(flight)
-  const prevFlight = flightIdx > 0                  ? FLIGHTS[flightIdx - 1] : null
-  const nextFlight = flightIdx < FLIGHTS.length - 1 ? FLIGHTS[flightIdx + 1] : null
-
-  // ── Shared PDF button helper ────────────────────────────────────────────────
-  const PdfBtn = ({ onClick, children, disabled = false }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-    >
-      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-      </svg>
-      {children}
-    </button>
-  )
-
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <PageWrapper>
       {/* Header */}
@@ -960,10 +884,11 @@ function AdminPanel() {
       </div>
 
       {/* Mode tabs */}
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="flex gap-2 mb-5 flex-wrap">
         {[
           ['scores',   'Score Entry'],
           ['pairings', 'Pairings Builder'],
+          ['flights',  'Flight Management'],
           ['credits',  'Credit on Books'],
         ].map(([mode, label]) => (
           <button
@@ -983,415 +908,80 @@ function AdminPanel() {
         ))}
       </div>
 
-      {/* ════════════════════════════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════════════════════════════════
           SCORE ENTRY MODE
-      ════════════════════════════════════════════════════════════════════════ */}
+      ══════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'scores' && (
-        <>
-          {/* Flight tabs */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {FLIGHTS.map(f => {
-              const cnt = data[tid]?.[f]?.length ?? 0
-              return (
-                <button key={f} onClick={() => { setFlight(f); setPoolSearch('') }}
-                  className={`px-3 py-1.5 text-xs font-sans font-medium rounded transition-colors ${
-                    flight === f ? 'bg-gold text-forest' : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
-                  }`}
-                >
-                  {f}{cnt > 0 && <span className="ml-1 opacity-60">({cnt})</span>}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Two-panel drag-and-drop layout */}
-          <div className="flex flex-col lg:flex-row gap-4 mb-6" onDragEnd={resetDrag}>
-
-            {/* ── Left: Member pool ── */}
-            <div className="lg:w-64 flex-shrink-0">
-              <div
-                className={`bg-white border rounded-lg overflow-hidden h-full transition-colors ${
-                  dragOverPool ? 'border-red-300 bg-red-50' : 'border-gray-200'
-                }`}
-                onDragOver={onDragOverPool}
-                onDrop={onDropPool}
-                onDragLeave={() => setDragOverPool(false)}
-              >
-                <div className="bg-forest px-4 py-2.5">
-                  <p className="text-white font-sans text-sm font-semibold">Members</p>
-                  <p className="text-white/50 text-xs font-sans mt-0.5">Drag into flight →</p>
-                </div>
-
-                {dragOverPool && (
-                  <div className="px-4 py-2 bg-red-50 border-b border-red-100">
-                    <p className="text-red-500 text-xs font-sans text-center">Drop to remove from flight</p>
-                  </div>
-                )}
-
-                <div className="px-3 py-2 border-b border-gray-100">
-                  <input
-                    type="text"
-                    value={poolSearch}
-                    onChange={e => setPoolSearch(e.target.value)}
-                    placeholder="Filter members…"
-                    className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
-                  />
-                </div>
-
-                <div className="overflow-y-auto" style={{ maxHeight: '460px' }}>
-                  {poolTotalCount === 0 && !poolSearch.trim() ? (
-                    <p className="text-gray-400 text-xs font-sans text-center py-6">All members added.</p>
-                  ) : poolTotalCount === 0 && poolSearch.trim() ? (
-                    <p className="text-gray-400 text-xs font-sans text-center py-6">No matches.</p>
-                  ) : (
-                    <div className="p-2">
-                      {[...FLIGHTS, null].map(f => {
-                        const key   = f ?? '__unassigned__'
-                        const group = poolMembersGrouped[key] ?? []
-                        if (!group.length) return null
-                        return (
-                          <div key={key} className="mb-2">
-                            <p className="px-1 pt-1 pb-0.5 text-[10px] font-sans font-semibold uppercase tracking-widest text-gray-400">
-                              {f ?? 'Unassigned'}
-                            </p>
-                            <ul className="space-y-0.5">
-                              {group.map(m => (
-                                <li
-                                  key={m.name}
-                                  draggable
-                                  onDragStart={e => onDragStartPool(e, m.name)}
-                                  className="flex items-center gap-2 px-2 py-1.5 rounded cursor-grab active:cursor-grabbing bg-gray-50 hover:bg-blue-50 hover:border-gold border border-transparent transition-colors select-none"
-                                >
-                                  <span className="text-gray-300 text-sm leading-none flex-shrink-0">⠿</span>
-                                  <span className="font-sans text-xs text-darktext truncate">{m.name}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )
-                      })}
-                      {poolSearch.trim() && !membersData.some(m => m.name.toLowerCase() === poolSearch.toLowerCase()) && (
-                        <li
-                          onClick={() => { addPlayer(poolSearch.trim()); setPoolSearch('') }}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer border border-dashed border-gold text-gold hover:bg-amber-50 transition-colors mt-1"
-                        >
-                          <span className="text-sm leading-none">+</span>
-                          <span className="font-sans text-xs truncate">Add "{poolSearch.trim()}"</span>
-                        </li>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ── Right: Flight panel ── */}
-            <div className="flex-1 min-w-0">
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-white font-sans text-sm font-semibold">{flight}</span>
-                    {(prevFlight || nextFlight) && (
-                      <span className="text-white/40 font-sans text-xs">
-                        {prevFlight && <span>▲ promotes → {prevFlight}</span>}
-                        {prevFlight && nextFlight && <span className="mx-1.5">·</span>}
-                        {nextFlight && <span>▼ relegates → {nextFlight}</span>}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-gold font-mono text-xs">{rawPlayers.length} players</span>
-                    {rawPlayers.length > 0 && (
-                      <button onClick={clearFlight} className="text-gray-300 hover:text-red-300 text-xs font-sans transition-colors">
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {players.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100">
-                          <th className="table-header text-gray-300 w-6 px-2"></th>
-                          <th className="table-header text-gray-400 text-left w-10">Rank</th>
-                          <th className="table-header text-gray-400 text-left">Player</th>
-                          <th className="table-header text-gray-400 text-center">PTM</th>
-                          <th className="table-header text-gray-400 text-center">Score</th>
-                          <th className="table-header text-gray-400 text-center">+/-</th>
-                          <th className="table-header text-gray-400 text-center">POY</th>
-                          <th className="table-header text-gray-400 text-center">Elig.</th>
-                          <th className="table-header text-gray-400 text-center w-16">Move</th>
-                          <th className="table-header text-gray-400 w-8"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {players.map((p, idx) => (
-                          <tr
-                            key={p.name}
-                            draggable
-                            onDragStart={e => onDragStartRow(e, idx)}
-                            onDragOver={e => onDragOverRow(e, idx)}
-                            onDrop={e => onDropRow(e, idx)}
-                            className={`border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50 ${
-                              idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                            } ${dragOverRow === idx ? 'border-t-2 border-t-gold' : ''}`}
-                          >
-                            <td className="px-2 py-2 text-center cursor-grab active:cursor-grabbing">
-                              <span className="text-gray-300 text-sm select-none">⠿</span>
-                            </td>
-                            <td className="px-3 py-2">
-                              <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
-                                {p.rank ?? '—'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 font-sans text-sm text-darktext whitespace-nowrap">{p.name}</td>
-                            <td className="px-2 py-1.5 text-center">
-                              <input type="number" value={p.ptm} onChange={e => updatePlayer(idx, 'ptm', e.target.value)}
-                                className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                              />
-                            </td>
-                            <td className="px-2 py-1.5 text-center">
-                              <input type="number" value={p.score} onChange={e => updatePlayer(idx, 'score', e.target.value)}
-                                className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <span className={`stat-number text-xs font-semibold ${
-                                p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
-                              }`}>
-                                {fmtPM(p.plusMinus)}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <span className={`stat-number text-xs font-semibold ${
-                                p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
-                              }`}>
-                                {fmtPOY(p)}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <input type="checkbox" checked={p.eligible !== false}
-                                onChange={e => updatePlayer(idx, 'eligible', e.target.checked)}
-                                className="accent-forest cursor-pointer w-4 h-4"
-                              />
-                            </td>
-                            <td className="px-1 py-2 text-center">
-                              <div className="flex items-center justify-center gap-0.5">
-                                <button
-                                  title={prevFlight ? `Promote to ${prevFlight}` : 'Already top flight'}
-                                  disabled={!prevFlight}
-                                  onClick={() => prevFlight && movePlayerToFlight(idx, prevFlight)}
-                                  className="w-6 h-6 flex items-center justify-center rounded text-xs transition-colors disabled:opacity-20 disabled:cursor-not-allowed text-blue-400 hover:text-blue-600 hover:bg-blue-50"
-                                >▲</button>
-                                <button
-                                  title={nextFlight ? `Relegate to ${nextFlight}` : 'Already bottom flight'}
-                                  disabled={!nextFlight}
-                                  onClick={() => nextFlight && movePlayerToFlight(idx, nextFlight)}
-                                  className="w-6 h-6 flex items-center justify-center rounded text-xs transition-colors disabled:opacity-20 disabled:cursor-not-allowed text-orange-400 hover:text-orange-600 hover:bg-orange-50"
-                                >▼</button>
-                              </div>
-                            </td>
-                            <td className="px-2 py-2 text-center">
-                              <button onClick={() => removePlayer(idx)} className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors">×</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div
-                      onDragOver={onDragOverZone}
-                      onDrop={onDropZone}
-                      className={`h-8 transition-colors ${dragOverRow === 'zone' ? 'bg-amber-50 border-t-2 border-t-gold' : ''}`}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    onDragOver={onDragOverZone}
-                    onDrop={onDropZone}
-                    className={`flex flex-col items-center justify-center py-16 border-2 border-dashed m-4 rounded-lg transition-colors ${
-                      dragOverRow === 'zone' ? 'border-gold bg-amber-50' : 'border-gray-200'
-                    }`}
-                  >
-                    <span className="text-3xl mb-2 text-gray-300">⠿</span>
-                    <p className="text-gray-400 font-sans text-sm">Drag players here from the list</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Export & Publish */}
-          <div className="bg-white border border-gray-200 rounded-lg p-5">
-            <h2 className="text-forest font-sans text-xs font-semibold uppercase tracking-widest mb-1">Export & Publish</h2>
-            <p className="text-gray-500 font-sans text-xs mb-4 leading-relaxed">
-              Downloads updated JSON files. Replace in <code className="bg-gray-100 px-1 rounded">src/data/</code> and commit to publish sitewide.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={doExport} className="btn-primary text-xs py-2 px-4">
-                Download All JSON Files
-              </button>
-              <PdfBtn onClick={() => exportResultsPDF(tournament, data[tid] ?? {})} disabled={!tournament || totalPlayers === 0}>
-                Export Results PDF
-              </PdfBtn>
-            </div>
-            {exportNote && (
-              <pre className="mt-4 bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-600 whitespace-pre-wrap leading-relaxed">
-                {exportNote}
-              </pre>
-            )}
-          </div>
-        </>
+        <ScoreEntryPanel
+          flights={FLIGHTS}
+          flight={flight}
+          setFlight={f => { setFlight(f); setPoolSearch('') }}
+          data={data}
+          tid={tid}
+          players={players}
+          rawPlayers={rawPlayers}
+          poolMembersGrouped={poolMembersGrouped}
+          poolTotalCount={poolTotalCount}
+          poolSearch={poolSearch}
+          setPoolSearch={setPoolSearch}
+          addPlayer={addPlayer}
+          removePlayer={removePlayer}
+          updatePlayer={updatePlayer}
+          clearFlight={clearFlight}
+          movePlayerToFlight={movePlayerToFlight}
+          prevFlight={prevFlight}
+          nextFlight={nextFlight}
+          fmtPM={fmtPM}
+          fmtPOY={fmtPOY}
+          doExport={doExport}
+          exportNote={exportNote}
+          ptmLookup={ptmLookup}
+          tournament={tournament}
+          totalPlayers={totalPlayers}
+          onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
+        />
       )}
 
-      {/* ════════════════════════════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════════════════════════════════
           PAIRINGS BUILDER MODE
-      ════════════════════════════════════════════════════════════════════════ */}
+      ══════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'pairings' && (
-        <div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-sans font-semibold text-gray-500 uppercase tracking-widest">Group size</span>
-              {[3, 4, 5].map(n => (
-                <button
-                  key={n}
-                  onClick={() => setGroupSize(n)}
-                  className={`w-8 h-8 rounded text-xs font-mono font-bold transition-colors ${
-                    groupSize === n ? 'bg-gold text-forest' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
+        <PairingsPanel
+          totalPlayers={totalPlayers}
+          currentPairings={currentPairings}
+          unpairedPlayers={unpairedPlayers}
+          manualPairings={manualPairings}
+          selectedUnpaired={selectedUnpaired}
+          setSelectedUnpaired={setSelectedUnpaired}
+          generatePairings={generatePairings}
+          startManualPairings={startManualPairings}
+          addGroupManual={addGroupManual}
+          removeGroupManual={removeGroupManual}
+          assignUnpairedToGroup={assignUnpairedToGroup}
+          clearPairings={clearPairings}
+          removePairedPlayer={removePairedPlayer}
+          exportPairings={exportPairings}
+          onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}
+          tournament={tournament}
+          flightTagStyles={flightTagStyles}
+        />
+      )}
 
-            <div className="flex flex-wrap items-center gap-2 ml-auto">
-              {currentPairings.length > 0 && (
-                <>
-                  <button
-                    onClick={generatePairings}
-                    className="px-3 py-1.5 text-xs font-sans font-semibold rounded border border-forest text-forest hover:bg-forest hover:text-white transition-colors"
-                  >
-                    Regenerate
-                  </button>
-                  <button onClick={exportPairingsJSON} className="btn-primary text-xs py-1.5 px-3">
-                    Export Pairings JSON
-                  </button>
-                  <PdfBtn onClick={() => exportPairingsPDF(tournament, currentPairings)} disabled={!tournament}>
-                    Export Pairings PDF
-                  </PdfBtn>
-                  <button
-                    onClick={clearPairings}
-                    className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
-                  >
-                    Clear
-                  </button>
-                </>
-              )}
-              {currentPairings.length === 0 && totalPlayers > 0 && (
-                <button onClick={generatePairings} className="btn-primary text-xs">
-                  Generate Pairings
-                </button>
-              )}
-            </div>
-          </div>
-
-          {totalPlayers === 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center">
-              <p className="text-amber-700 font-sans text-sm font-medium mb-1">No players entered yet</p>
-              <p className="text-amber-600 font-sans text-xs">Switch to Score Entry to add players to flights first.</p>
-            </div>
-          )}
-
-          {unpairedPlayers.length > 0 && currentPairings.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex flex-wrap items-center gap-3">
-              <span className="text-amber-700 font-sans text-xs font-semibold uppercase tracking-widest flex-shrink-0">
-                Not yet paired ({unpairedPlayers.length})
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {unpairedPlayers.map(p => (
-                  <span key={p.name} className={`text-xs border px-2 py-0.5 rounded-full font-sans ${flightTagStyles[p.flight] ?? flightTagStyles.Unassigned}`}>
-                    {p.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {currentPairings.length === 0 && totalPlayers > 0 && (
-            <div className="border-2 border-dashed border-gray-200 rounded-lg py-16 flex flex-col items-center justify-center">
-              <p className="text-gray-400 font-sans text-sm mb-4">No pairings generated yet.</p>
-              <button onClick={generatePairings} className="btn-primary text-xs">
-                Generate Pairings
-              </button>
-            </div>
-          )}
-
-          {currentPairings.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {currentPairings.map((card, cardIdx) => (
-                <div
-                  key={cardIdx}
-                  onDragOver={e => onPDragOver(e, cardIdx)}
-                  onDrop={e => onPDrop(e, cardIdx)}
-                  onDragLeave={() => setPDragOver(null)}
-                  className={`bg-white border rounded-lg overflow-hidden transition-colors ${
-                    pDragOver === cardIdx ? 'border-gold ring-2 ring-gold/30' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="bg-forest px-4 py-2 flex items-center justify-between">
-                    <span className="text-white font-sans text-xs font-semibold uppercase tracking-widest">
-                      {card.pairing}
-                    </span>
-                    <span className="text-white/50 font-mono text-xs">{card.players.length}</span>
-                  </div>
-                  <ul className="divide-y divide-gray-100 min-h-[60px]">
-                    {card.players.map((player, playerIdx) => (
-                      <li
-                        key={player.name}
-                        draggable
-                        onDragStart={e => onPDragStart(e, cardIdx, playerIdx)}
-                        className="px-3 py-2.5 flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing hover:bg-blue-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-gray-300 text-xs leading-none flex-shrink-0">⠿</span>
-                          <span className="font-sans text-sm text-darktext truncate">{player.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[player.flight] ?? flightTagStyles.Unassigned}`}>
-                            {player.flight}
-                          </span>
-                          <button
-                            onClick={() => removePairedPlayer(cardIdx, playerIdx)}
-                            className="text-gray-300 hover:text-red-400 text-base leading-none transition-colors ml-0.5"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                    {card.players.length === 0 && (
-                      <li className="px-3 py-4 text-center text-gray-300 font-sans text-xs italic">
-                        Drag players here
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {currentPairings.length > 0 && (
-            <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-gray-500 font-sans text-xs leading-relaxed">
-                Export the pairings JSON and place it in <code className="bg-gray-100 px-1 rounded">src/data/pairings/</code>, then
-                import it in <code className="bg-gray-100 px-1 rounded">src/pages/Pairings.jsx</code> and add the entry to the{' '}
-                <code className="bg-gray-100 px-1 rounded">pairingsById</code> map.
-              </p>
-            </div>
-          )}
-        </div>
+      {/* ══════════════════════════════════════════════════════════════════════════
+          FLIGHT MANAGEMENT MODE
+      ══════════════════════════════════════════════════════════════════════════ */}
+      {adminMode === 'flights' && (
+        <FlightManagementPanel
+          effectiveMembers={effectiveMembers}
+          flightSearch={flightSearch}
+          setFlightSearch={setFlightSearch}
+          editingMember={editingMember}
+          setEditingMember={setEditingMember}
+          updateMemberFlight={updateMemberFlight}
+          updateMemberPtm={updateMemberPtm}
+          exportMembersJson={exportMembersJson}
+          flightTagStyles={flightTagStyles}
+        />
       )}
 
       {/* ════════════════════════════════════════════════════════════════════════
@@ -1399,7 +989,6 @@ function AdminPanel() {
       ════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'credits' && (
         <div>
-          {/* Controls bar */}
           <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-48">
               <input
@@ -1432,13 +1021,11 @@ function AdminPanel() {
             </div>
           </div>
 
-          {/* Credit table */}
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
               <span className="text-white font-sans text-sm font-semibold">Member Credit Balances</span>
               <span className="text-white/50 font-sans text-xs">{creditRoster.length} members</span>
             </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[540px]">
                 <thead>
@@ -1468,7 +1055,9 @@ function AdminPanel() {
                             balance !== 0 ? 'hover:bg-amber-50/30' : 'hover:bg-gray-50'
                           } ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
                         >
-                          <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">{m.name}</td>
+                          <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
+                            {formatName(m.name)}
+                          </td>
                           <td className="px-3 py-2.5">
                             <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[m.flight] ?? flightTagStyles.Unassigned}`}>
                               {m.flight ?? 'Unassigned'}
@@ -1496,7 +1085,7 @@ function AdminPanel() {
                                 onClick={() => applyCredit(m.name, input)}
                                 disabled={!input}
                                 title="Apply adjustment"
-                                className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest-dark transition-colors"
+                                className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
                               >
                                 ✓
                               </button>
@@ -1577,5 +1166,658 @@ function AdminPanel() {
         </div>
       </div>
     </PageWrapper>
+  )
+}
+
+// ── Score Entry Panel ─────────────────────────────────────────────────────────
+function ScoreEntryPanel({
+  flights, flight, setFlight, data, tid, players, rawPlayers,
+  poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
+  addPlayer, removePlayer, updatePlayer, clearFlight, movePlayerToFlight,
+  prevFlight, nextFlight, fmtPM, fmtPOY, doExport, exportNote,
+  tournament, totalPlayers, onExportResultsPDF,
+}) {
+  return (
+    <>
+      {/* Flight tabs */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {flights.map(f => {
+          const cnt = data[tid]?.[f]?.length ?? 0
+          return (
+            <button key={f} onClick={() => setFlight(f)}
+              className={`px-3 py-1.5 text-xs font-sans font-medium rounded transition-colors ${
+                flight === f ? 'bg-gold text-forest' : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
+              }`}
+            >
+              {f}{cnt > 0 && <span className="ml-1 opacity-60">({cnt})</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Two-panel layout */}
+      <div className="flex flex-col lg:flex-row gap-4 mb-6">
+
+        {/* Left: Member pool */}
+        <div className="lg:w-72 flex-shrink-0">
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-forest px-4 py-2.5">
+              <p className="text-white font-sans text-sm font-semibold">Members</p>
+              <p className="text-white/50 text-xs font-sans mt-0.5">Tap a name, then tap "Add to Flight"</p>
+            </div>
+
+            <div className="px-3 py-2 border-b border-gray-100">
+              <input
+                type="text"
+                value={poolSearch}
+                onChange={e => setPoolSearch(e.target.value)}
+                placeholder="Filter members…"
+                className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
+              />
+            </div>
+
+            <MemberPool
+              poolMembersGrouped={poolMembersGrouped}
+              poolTotalCount={poolTotalCount}
+              poolSearch={poolSearch}
+              onAdd={addPlayer}
+              currentFlight={flight}
+            />
+          </div>
+        </div>
+
+        {/* Right: Flight panel */}
+        <div className="flex-1 min-w-0">
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
+              <span className="text-white font-sans text-sm font-semibold">{flight}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-gold font-mono text-xs">{rawPlayers.length} players</span>
+                {rawPlayers.length > 0 && (
+                  <button onClick={clearFlight} className="text-gray-300 hover:text-red-300 text-xs font-sans transition-colors">
+                    Clear All
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {players.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="table-header text-gray-400 text-left">Rank</th>
+                      <th className="table-header text-gray-400 text-left">Player</th>
+                      <th className="table-header text-gray-400 text-center">PTM</th>
+                      <th className="table-header text-gray-400 text-center">Score</th>
+                      <th className="table-header text-gray-400 text-center">+/-</th>
+                      <th className="table-header text-gray-400 text-center">POY</th>
+                      <th className="table-header text-gray-400 text-center">Elig.</th>
+                      <th className="table-header text-gray-400 text-center">Move to Flight</th>
+                      <th className="table-header text-gray-400 w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players.map((p, idx) => (
+                      <tr
+                        key={p.name}
+                        className={`border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50 ${
+                          idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                        }`}
+                      >
+                        {/* Rank */}
+                        <td className="px-3 py-2">
+                          <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
+                            {p.rank ?? '—'}
+                          </span>
+                        </td>
+                        {/* Name */}
+                        <td className="px-3 py-2 font-sans text-sm text-darktext whitespace-nowrap">
+                          {formatName(p.name)}
+                        </td>
+                        {/* PTM */}
+                        <td className="px-2 py-1.5 text-center">
+                          <input type="number" value={p.ptm} onChange={e => updatePlayer(idx, 'ptm', e.target.value)}
+                            className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                          />
+                        </td>
+                        {/* Score */}
+                        <td className="px-2 py-1.5 text-center">
+                          <input type="number" value={p.score} onChange={e => updatePlayer(idx, 'score', e.target.value)}
+                            className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                          />
+                        </td>
+                        {/* +/- */}
+                        <td className="px-3 py-2 text-center">
+                          <span className={`stat-number text-xs font-semibold ${
+                            p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
+                          }`}>
+                            {fmtPM(p.plusMinus)}
+                          </span>
+                        </td>
+                        {/* POY */}
+                        <td className="px-3 py-2 text-center">
+                          <span className={`stat-number text-xs font-semibold ${
+                            p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
+                          }`}>
+                            {fmtPOY(p)}
+                          </span>
+                        </td>
+                        {/* Eligible */}
+                        <td className="px-3 py-2 text-center">
+                          <input type="checkbox" checked={p.eligible !== false}
+                            onChange={e => updatePlayer(idx, 'eligible', e.target.checked)}
+                            className="accent-forest cursor-pointer w-4 h-4"
+                          />
+                        </td>
+                        {/* Move to flight */}
+                        <td className="px-2 py-1.5 text-center">
+                          <MoveToFlightSelect
+                            currentFlight={flight}
+                            allFlights={flights}
+                            prevFlight={prevFlight}
+                            nextFlight={nextFlight}
+                            onMove={targetFlight => movePlayerToFlight(idx, targetFlight)}
+                          />
+                        </td>
+                        {/* Remove */}
+                        <td className="px-2 py-2 text-center">
+                          <button
+                            onClick={() => removePlayer(idx)}
+                            title="Remove player from this tournament"
+                            className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors"
+                          >
+                            ×
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed m-4 rounded-lg border-gray-200">
+                <span className="text-3xl mb-2 text-gray-300">⛳</span>
+                <p className="text-gray-400 font-sans text-sm">No players added yet.</p>
+                <p className="text-gray-400 font-sans text-xs mt-1">Select a player from the list on the left.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Export & Publish */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5">
+        <h2 className="text-forest font-sans text-xs font-semibold uppercase tracking-widest mb-1">Export & Publish</h2>
+        <p className="text-gray-500 font-sans text-xs mb-4 leading-relaxed">
+          Downloads updated JSON files. Replace in <code className="bg-gray-100 px-1 rounded">src/data/</code> and commit to publish sitewide.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={doExport} className="btn-primary text-xs py-2 px-4">
+            Download All JSON Files
+          </button>
+          <button
+            onClick={onExportResultsPDF}
+            disabled={!tournament || totalPlayers === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+            </svg>
+            Export Results PDF
+          </button>
+        </div>
+        {exportNote && (
+          <pre className="mt-4 bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-600 whitespace-pre-wrap leading-relaxed">
+            {exportNote}
+          </pre>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ── Member Pool (click-to-add) ────────────────────────────────────────────────
+function MemberPool({ poolMembersGrouped, poolTotalCount, poolSearch, onAdd, currentFlight }) {
+  const [selected, setSelected] = useState(null)
+
+  function handleSelect(name) {
+    setSelected(prev => prev === name ? null : name)
+  }
+
+  function handleAdd() {
+    if (!selected) return
+    onAdd(selected)
+    setSelected(null)
+  }
+
+  return (
+    <div>
+      {/* Sticky add bar */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-3 py-2">
+        <button
+          onClick={handleAdd}
+          disabled={!selected}
+          className={`w-full py-2 rounded text-xs font-sans font-semibold transition-colors ${
+            selected
+              ? 'bg-gold text-forest hover:bg-amber-400'
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {selected ? `Add ${formatName(selected)} → ${currentFlight}` : 'Select a player below'}
+        </button>
+      </div>
+
+      <div className="overflow-y-auto" style={{ maxHeight: '440px' }}>
+        {poolTotalCount === 0 && !poolSearch.trim() ? (
+          <p className="text-gray-400 text-xs font-sans text-center py-6">All members added.</p>
+        ) : poolTotalCount === 0 && poolSearch.trim() ? (
+          <p className="text-gray-400 text-xs font-sans text-center py-6">No matches.</p>
+        ) : (
+          <div className="p-2">
+            {[...Object.entries(poolMembersGrouped)].map(([key, group]) => {
+              if (!group.length) return null
+              const label = key === '__unassigned__' ? 'Unassigned' : key
+              return (
+                <div key={key} className="mb-2">
+                  <p className="px-1 pt-1 pb-0.5 text-[10px] font-sans font-semibold uppercase tracking-widest text-gray-400">
+                    {label}
+                  </p>
+                  <ul className="space-y-0.5">
+                    {group.map(m => (
+                      <li
+                        key={m.name}
+                        onClick={() => handleSelect(m.name)}
+                        className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded cursor-pointer border transition-colors select-none ${
+                          selected === m.name
+                            ? 'bg-gold/20 border-gold text-forest'
+                            : 'bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border-transparent'
+                        }`}
+                      >
+                        <span className="font-sans text-xs text-darktext truncate">{formatName(m.name)}</span>
+                        {m.ptm != null && (
+                          <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">PTM {m.ptm}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Move to Flight Select ─────────────────────────────────────────────────────
+function MoveToFlightSelect({ currentFlight, allFlights, prevFlight, nextFlight, onMove }) {
+  const [val, setVal] = useState('')
+
+  const otherFlights = allFlights.filter(f => f !== currentFlight)
+
+  function handleChange(e) {
+    const target = e.target.value
+    setVal('')
+    if (target) onMove(target)
+  }
+
+  return (
+    <select
+      value={val}
+      onChange={handleChange}
+      className="border border-gray-200 rounded px-1 py-1 text-xs font-sans focus:outline-none focus:ring-1 focus:ring-forest text-gray-500 bg-white min-w-[110px]"
+    >
+      <option value="">Move to…</option>
+      {prevFlight && <option value={prevFlight}>↑ Promote → {prevFlight}</option>}
+      {nextFlight && <option value={nextFlight}>↓ Relegate → {nextFlight}</option>}
+      <optgroup label="Any flight">
+        {otherFlights.map(f => (
+          <option key={f} value={f}>{f}</option>
+        ))}
+      </optgroup>
+    </select>
+  )
+}
+
+// ── Pairings Builder Panel ────────────────────────────────────────────────────
+function PairingsPanel({
+  totalPlayers, currentPairings, unpairedPlayers, manualPairings,
+  selectedUnpaired, setSelectedUnpaired,
+  generatePairings, startManualPairings, addGroupManual, removeGroupManual,
+  assignUnpairedToGroup, clearPairings, removePairedPlayer, exportPairings,
+  onExportPairingsPDF, tournament,
+  flightTagStyles,
+}) {
+  return (
+    <div>
+      {/* Controls */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-sans font-semibold text-gray-500 uppercase tracking-widest">Pairings always in groups of 4</span>
+        </div>
+        <div className="flex items-center gap-2 ml-auto flex-wrap">
+          {totalPlayers > 0 && (
+            <>
+              <button
+                onClick={generatePairings}
+                className="px-3 py-1.5 text-xs font-sans font-semibold rounded border border-forest text-forest hover:bg-forest hover:text-white transition-colors"
+              >
+                {currentPairings.length > 0 ? 'Re-generate (Auto)' : 'Auto-Generate Pairings'}
+              </button>
+              <button
+                onClick={startManualPairings}
+                className="px-3 py-1.5 text-xs font-sans font-semibold rounded border border-gold text-amber-700 hover:bg-amber-50 transition-colors"
+              >
+                Build Your Own
+              </button>
+            </>
+          )}
+          {currentPairings.length > 0 && (
+            <>
+              <button onClick={exportPairings} className="btn-primary text-xs py-1.5 px-3">
+                Export Pairings JSON
+              </button>
+              <button
+                onClick={onExportPairingsPDF}
+                disabled={!tournament}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                </svg>
+                Export Pairings PDF
+              </button>
+              <button
+                onClick={clearPairings}
+                className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
+              >
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* No players notice */}
+      {totalPlayers === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center">
+          <p className="text-amber-700 font-sans text-sm font-medium mb-1">No players entered yet</p>
+          <p className="text-amber-600 font-sans text-xs">Switch to Score Entry to add players to flights first.</p>
+        </div>
+      )}
+
+      {/* Manual build: unpaired pool */}
+      {manualPairings && unpairedPlayers.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <p className="text-xs font-sans font-semibold text-forest uppercase tracking-widest mb-3">
+            Unassigned Players — select one, then click a pairing group below
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {unpairedPlayers.map(p => (
+              <button
+                key={p.name}
+                onClick={() => setSelectedUnpaired(prev => prev === p.name ? null : p.name)}
+                className={`text-xs border px-3 py-1.5 rounded-full font-sans transition-colors ${
+                  selectedUnpaired === p.name
+                    ? 'bg-gold border-gold text-forest font-semibold'
+                    : (flightTagStyles[p.flight] ?? flightTagStyles.Unassigned)
+                }`}
+              >
+                {formatName(p.name)}
+                <span className="ml-1 opacity-60 text-[10px]">{p.flight}</span>
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={addGroupManual}
+            className="mt-3 px-3 py-1.5 text-xs font-sans rounded border border-dashed border-forest text-forest hover:bg-forest/5 transition-colors"
+          >
+            + Add New Pairing Group
+          </button>
+        </div>
+      )}
+
+      {/* Auto-mode unpaired banner */}
+      {!manualPairings && unpairedPlayers.length > 0 && currentPairings.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex flex-wrap items-center gap-3">
+          <span className="text-amber-700 font-sans text-xs font-semibold uppercase tracking-widest flex-shrink-0">
+            Not yet paired ({unpairedPlayers.length})
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {unpairedPlayers.map(p => (
+              <span key={p.name} className={`text-xs border px-2 py-0.5 rounded-full font-sans ${flightTagStyles[p.flight] ?? flightTagStyles.Unassigned}`}>
+                {formatName(p.name)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {currentPairings.length === 0 && totalPlayers > 0 && (
+        <div className="border-2 border-dashed border-gray-200 rounded-lg py-16 flex flex-col items-center justify-center">
+          <p className="text-gray-400 font-sans text-sm mb-4">No pairings yet. Choose Auto-Generate or Build Your Own above.</p>
+        </div>
+      )}
+
+      {/* Pairing cards grid */}
+      {currentPairings.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {currentPairings.map((card, cardIdx) => (
+            <div
+              key={cardIdx}
+              className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+            >
+              <div className="bg-forest px-4 py-2 flex items-center justify-between">
+                <span className="text-white font-sans text-xs font-semibold uppercase tracking-widest">
+                  {card.pairing}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-white/50 font-mono text-xs">{card.players.length} players</span>
+                  {manualPairings && (
+                    <button
+                      onClick={() => removeGroupManual(cardIdx)}
+                      className="text-white/40 hover:text-red-300 text-sm leading-none transition-colors"
+                      title="Remove this group"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+              <ul className="divide-y divide-gray-100 min-h-[60px]">
+                {card.players.map((player, playerIdx) => (
+                  <li
+                    key={player.name}
+                    className="px-3 py-2.5 flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-sans text-sm text-darktext truncate">{formatName(player.name)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[player.flight] ?? flightTagStyles.Unassigned}`}>
+                        {player.flight}
+                      </span>
+                      <button
+                        onClick={() => removePairedPlayer(cardIdx, playerIdx)}
+                        className="text-gray-300 hover:text-red-400 text-base leading-none transition-colors ml-0.5"
+                        title="Remove from pairing"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </li>
+                ))}
+                {card.players.length === 0 && (
+                  <li className="px-3 py-4 text-center text-gray-300 font-sans text-xs italic">
+                    Empty group
+                  </li>
+                )}
+              </ul>
+              {manualPairings && selectedUnpaired && card.players.length < 4 && (
+                <div className="border-t border-dashed border-gold/40 p-2">
+                  <button
+                    onClick={() => assignUnpairedToGroup(cardIdx)}
+                    className="w-full py-1.5 text-xs rounded bg-gold/10 text-amber-700 hover:bg-gold/20 font-sans font-semibold transition-colors"
+                  >
+                    Add {formatName(selectedUnpaired)} here
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Export hint */}
+      {currentPairings.length > 0 && (
+        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <p className="text-gray-500 font-sans text-xs leading-relaxed">
+            Export the pairings JSON and place it in <code className="bg-gray-100 px-1 rounded">src/data/pairings/</code>, then
+            import it in <code className="bg-gray-100 px-1 rounded">src/pages/Pairings.jsx</code> and add the entry to the{' '}
+            <code className="bg-gray-100 px-1 rounded">pairingsById</code> map.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Flight Management Panel ───────────────────────────────────────────────────
+function FlightManagementPanel({
+  effectiveMembers, flightSearch, setFlightSearch,
+  editingMember, setEditingMember,
+  updateMemberFlight, updateMemberPtm, exportMembersJson, flightTagStyles,
+}) {
+  const filtered = useMemo(() => {
+    const s = flightSearch.trim().toLowerCase()
+    return [...effectiveMembers]
+      .filter(m => s === '' || m.name.toLowerCase().includes(s) || formatName(m.name).toLowerCase().includes(s))
+      .sort(compareByLastName)
+  }, [effectiveMembers, flightSearch])
+
+  const FLIGHT_OPTIONS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+
+  return (
+    <div>
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex-1">
+          <p className="text-xs font-sans text-gray-500 leading-relaxed">
+            Set each player's flight and PTM here. Changes are saved locally and used throughout the admin panel.
+            Export <code className="bg-gray-100 px-1 rounded">members.json</code> to publish to the site.
+          </p>
+        </div>
+        <button onClick={exportMembersJson} className="btn-primary text-xs whitespace-nowrap flex-shrink-0">
+          Export members.json
+        </button>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-forest px-4 py-3 flex items-center gap-3">
+          <span className="text-white font-sans text-sm font-semibold">Player Roster</span>
+          <span className="text-white/50 font-mono text-xs">{effectiveMembers.length} members</span>
+          <div className="ml-auto">
+            <input
+              type="text"
+              value={flightSearch}
+              onChange={e => setFlightSearch(e.target.value)}
+              placeholder="Search…"
+              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-gold w-40"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="table-header text-gray-500 text-left">Player</th>
+                <th className="table-header text-gray-500 text-left">Current Flight</th>
+                <th className="table-header text-gray-500 text-center">PTM</th>
+                <th className="table-header text-gray-500 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((m, idx) => {
+                const isEditing = editingMember === m.name
+                return (
+                  <tr
+                    key={m.name}
+                    className={`border-b border-gray-100 last:border-0 transition-colors ${
+                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                    } ${isEditing ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                  >
+                    {/* Name */}
+                    <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
+                      {formatName(m.name)}
+                    </td>
+
+                    {/* Flight */}
+                    <td className="px-4 py-2.5">
+                      {isEditing ? (
+                        <select
+                          value={m.flight ?? ''}
+                          onChange={e => updateMemberFlight(m.name, e.target.value)}
+                          className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest w-full max-w-[180px]"
+                          autoFocus
+                        >
+                          <option value="">— Unassigned —</option>
+                          {FLIGHT_OPTIONS.map(f => (
+                            <option key={f} value={f}>{f}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`text-xs border px-2 py-0.5 rounded-full font-sans ${
+                          m.flight ? (flightTagStyles[m.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned
+                        }`}>
+                          {m.flight ?? 'Unassigned'}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* PTM */}
+                    <td className="px-4 py-2.5 text-center">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={m.ptm ?? ''}
+                          onChange={e => updateMemberPtm(m.name, e.target.value)}
+                          className="w-16 border border-gray-300 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:ring-2 focus:ring-forest"
+                        />
+                      ) : (
+                        <span className="stat-number text-xs text-gray-600">
+                          {m.ptm ?? '—'}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-4 py-2 text-center">
+                      {isEditing ? (
+                        <button
+                          onClick={() => setEditingMember(null)}
+                          className="px-3 py-1 text-xs rounded bg-forest text-white hover:bg-forest/80 font-sans font-semibold transition-colors"
+                        >
+                          Done
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setEditingMember(m.name)}
+                          className="px-3 py-1 text-xs rounded border border-gray-200 text-gray-500 hover:text-forest hover:border-forest font-sans transition-colors"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   )
 }
