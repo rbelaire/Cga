@@ -243,12 +243,22 @@ function AdminPanel() {
         .map((p, i) => ({ rank: i + 1, name: p.name, points: p.poy ?? 0, events: 1 }))
     }
 
-    const all = []
-    for (const fl of FLIGHTS) calcFlightPOY(data[tid]?.[fl] ?? []).forEach(p => all.push({ ...p, flight: fl }))
-    all.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0) || (b.plusMinus ?? 0) - (a.plusMinus ?? 0))
-    const newStandings = all.map((p, i) => ({
-      rank: i + 1, name: p.name, flight: p.flight, points: Number(p.score) || 0, eventsPlayed: 1, trend: 'up',
-    }))
+    const ptmLookup = Object.fromEntries(membersData.map(m => [m.name, m.ptm]))
+    const newStandings = { flights: {} }
+    for (const fl of FLIGHTS) {
+      const ps = calcFlightPOY(data[tid]?.[fl] ?? [])
+      const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
+      newStandings.flights[fl] = sorted.map((p, i) => ({
+        rank: i + 1,
+        name: p.name,
+        poy: p.poy ?? 0,
+        ptm: ptmLookup[p.name] ?? Number(p.ptm) || null,
+        latestScore: Number(p.score) || null,
+        latestTournament: tournament.name,
+        events: 1,
+        trend: 'up',
+      }))
+    }
 
     const slug = tid.replace(/[^a-z0-9]/gi, '-').toLowerCase()
     downloadJSON(resultFile, `${slug}-results.json`)

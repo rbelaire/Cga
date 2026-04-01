@@ -5,7 +5,6 @@ const navLinks = [
   { to: '/schedule', label: 'Schedule' },
   { to: '/results', label: 'Results' },
   { to: '/standings', label: 'Standings' },
-  { to: '/poy', label: 'POY' },
   { to: '/members', label: 'Members' },
   { to: '/rules', label: 'Rules' },
   { to: '/board', label: 'Board' },
