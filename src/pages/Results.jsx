@@ -5,16 +5,11 @@ import schedule from '../data/schedule.json'
 import koasati from '../data/results/2026-koasati-flow-control.json'
 import { formatDateLong } from '../utils/formatDate'
 import StandingsTable from '../components/ui/StandingsTable'
+import { formatName } from '../utils/formatName'
 
 const resultFiles = {
   '2026-01': koasati,
 }
-
-const scoreColumns = [
-  { key: 'rank', label: 'Rank', sortable: false },
-  { key: 'name', label: 'Player', sortable: true },
-  { key: 'points', label: 'Points', sortable: true },
-]
 
 export default function Results() {
   useEffect(() => { document.title = 'Results | CGA 2026' }, [])
@@ -78,7 +73,7 @@ export default function Results() {
                           <p className="text-forest text-xs font-sans font-semibold uppercase tracking-wide mb-0.5">
                             {fw.flight}
                           </p>
-                          <p className="text-darktext font-sans text-sm font-medium">{fw.winner}</p>
+                          <p className="text-darktext font-sans text-sm font-medium">{formatName(fw.winner)}</p>
                           <p className="stat-number text-gray-500 text-xs">{fw.points} pts</p>
                         </div>
                       ))}
