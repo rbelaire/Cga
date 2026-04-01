@@ -67,7 +67,7 @@ export default function TournamentCard({ tournament, compact = false }) {
         {status === 'completed' && (
           <div className="mt-3 flex flex-wrap items-center gap-4">
             <Link
-              to="/results"
+              to="/schedule"
               state={{ expand: id }}
               className="inline-block text-forest text-sm font-sans font-medium hover:text-gold transition-colors"
             >

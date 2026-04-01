@@ -1,5 +1,11 @@
+const TEE_STYLES = {
+  Back:  'bg-gray-800 text-white',
+  Front: 'bg-sky-600 text-white',
+  Sr:    'bg-amber-500 text-white',
+}
+
 export default function MemberCard({ member }) {
-  const { name, ptm, memberSince, email, cell, homePhone } = member
+  const { name, ptm, memberSince, email, cell, homePhone, tee } = member
   const hasData = ptm !== null
   const phone = cell || homePhone
   const initials = name
@@ -24,7 +30,12 @@ export default function MemberCard({ member }) {
           <p className={`font-sans font-medium text-sm truncate ${hasData ? 'text-darktext' : 'text-gray-500'}`}>
             {name}
           </p>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {tee && (
+              <span className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded ${TEE_STYLES[tee] ?? 'bg-gray-200 text-gray-600'}`}>
+                {tee}
+              </span>
+            )}
             {hasData ? (
               <span className="stat-number text-xs text-gold font-semibold">PTM {ptm}</span>
             ) : (
