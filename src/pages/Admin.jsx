@@ -17,6 +17,7 @@ const STORAGE_KEY  = 'cga_admin_v1'
 const PAIRINGS_KEY = 'cga_pairings_v1'
 const MEMBERS_KEY  = 'cga_members_v1'
 const CREDITS_KEY  = 'cga_credits_v1'
+const PAYMENTS_KEY = 'cga_payments_v1'
 const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
 
 const PDF_NAVY = [27,  59,  111]
@@ -557,6 +558,54 @@ function PdfBtn({ onClick, children, disabled = false }) {
   )
 }
 
+// ── PDF: Payment Status ───────────────────────────────────────────────────────
+async function exportPaymentsPDF(tournament, paymentMap, membersList) {
+  if (!tournament) return
+  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  let y = await buildPdfHeader(doc, 'Payment Status', `${tournament.name} · ${fmtDate(tournament.date)}`)
+
+  const active = membersList
+    .filter(m => m.active !== false)
+    .slice()
+    .sort((a, b) => {
+      const aPaid = paymentMap[a.name] ? 0 : 1
+      const bPaid = paymentMap[b.name] ? 0 : 1
+      if (aPaid !== bPaid) return aPaid - bPaid
+      return a.name.localeCompare(b.name)
+    })
+  const paidCount   = active.filter(m => paymentMap[m.name]).length
+  const unpaidCount = active.length - paidCount
+
+  autoTable(doc, {
+    head: [['#', 'Player', 'Flight', 'Status']],
+    body: active.map((m, i) => [
+      i + 1, m.name, m.flight ?? 'Unassigned',
+      paymentMap[m.name] ? 'PAID' : '—',
+    ]),
+    startY: y, theme: 'striped',
+    headStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    alternateRowStyles: { fillColor: [245, 248, 252] },
+    styles:             { fontSize: 8, cellPadding: 2.5 },
+    columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'center', cellWidth: 25 } },
+    margin: { left: 14, right: 14 },
+    didParseCell(data) {
+      if (data.section !== 'body') return
+      const m = active[data.row.index]
+      if (!m) return
+      if (data.column.index === 3) {
+        if (paymentMap[m.name]) {
+          data.cell.styles.textColor = [0, 140, 60]
+          data.cell.styles.fontStyle = 'bold'
+        } else {
+          data.cell.styles.textColor = [180, 180, 180]
+        }
+      }
+    },
+  })
+  addPdfFooter(doc, `${paidCount} paid · ${unpaidCount} unpaid · Generated ${new Date().toLocaleDateString()} · CGA`)
+  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-payment-status.pdf`)
+}
+
 // ── PIN gate ───────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@cga.local'
 
@@ -634,11 +683,17 @@ function AdminPanel() {
     try { return JSON.parse(localStorage.getItem(CREDITS_KEY)) || {} } catch { return {} }
   })
 
+  // Payments: { [tid]: { [memberName]: true } }
+  const [payments, setPayments] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(PAYMENTS_KEY)) || {} } catch { return {} }
+  })
+
   const [tid,          setTid]          = useState(schedule[0]?.id ?? '')
   const [flight,       setFlight]       = useState(FLIGHTS[0])
   const [poolSearch,   setPoolSearch]   = useState('')
   const [adminMode,    setAdminMode]    = useState('scores')
   const [creditSearch, setCreditSearch] = useState('')
+  const [paymentSearch, setPaymentSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
 
   // Global save error banner
@@ -653,6 +708,8 @@ function AdminPanel() {
   const [membersSaveStatus, setMembersSaveStatus] = useState(null)
   const [creditsSaving,  setCreditsSaving]  = useState(false)
   const [creditsSaveStatus, setCreditsSaveStatus] = useState(null)
+  const [paymentsSaving,  setPaymentsSaving]  = useState(false)
+  const [paymentsSaveStatus, setPaymentsSaveStatus] = useState(null)
   const [publishSaving,  setPublishSaving]  = useState(false)
   const [publishSaveStatus, setPublishSaveStatus] = useState(null)
 
@@ -676,6 +733,7 @@ function AdminPanel() {
   useEffect(() => { localStorage.setItem(PAIRINGS_KEY, JSON.stringify(pairingsData))    }, [pairingsData])
   useEffect(() => { localStorage.setItem(MEMBERS_KEY,  JSON.stringify(membersOverride)) }, [membersOverride])
   useEffect(() => { localStorage.setItem(CREDITS_KEY,  JSON.stringify(credits))         }, [credits])
+  useEffect(() => { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments))       }, [payments])
 
   const tournament     = schedule.find(t => t.id === tid)
   const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
@@ -1003,6 +1061,53 @@ function AdminPanel() {
     )
   }
 
+  // ── Payment mutations ─────────────────────────────────────────────────────────
+  function togglePayment(tournamentId, name) {
+    setPayments(prev => {
+      const tidMap = { ...(prev[tournamentId] ?? {}) }
+      if (tidMap[name]) delete tidMap[name]
+      else tidMap[name] = true
+      return { ...prev, [tournamentId]: tidMap }
+    })
+  }
+
+  function markAllPaid(tournamentId, names) {
+    setPayments(prev => {
+      const tidMap = { ...(prev[tournamentId] ?? {}) }
+      names.forEach(n => { tidMap[n] = true })
+      return { ...prev, [tournamentId]: tidMap }
+    })
+  }
+
+  function clearAllPayments(tournamentId) {
+    if (!window.confirm('Clear all payment records for this tournament?')) return
+    setPayments(prev => {
+      const next = { ...prev }
+      delete next[tournamentId]
+      return next
+    })
+  }
+
+  async function savePayments() {
+    await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, () =>
+      DB.savePayments(payments), setAdminError
+    )
+  }
+
+  // Payments derived state
+  const paymentTid = tid
+  const paymentMap = payments[paymentTid] ?? {}
+  const paymentPaidCount = Object.keys(paymentMap).length
+
+  const paymentRoster = useMemo(() => {
+    const search = paymentSearch.trim().toLowerCase()
+    return membersData
+      .filter(m => m.active !== false)
+      .filter(m => !search || m.name.toLowerCase().includes(search))
+      .slice()
+      .sort(compareByLastName)
+  }, [membersData, paymentSearch])
+
   // ── Excel import ──────────────────────────────────────────────────────────────
   function handleXlsxFile(e) {
     const file = e.target.files?.[0]
@@ -1244,6 +1349,7 @@ function AdminPanel() {
           ['pairings', 'Pairings Builder'],
           ['flights',  'Flight Management'],
           ['credits',  'Credit on Books'],
+          ['payments', 'Payments'],
         ].map(([mode, label]) => (
           <button
             key={mode}
@@ -1257,6 +1363,9 @@ function AdminPanel() {
             {label}
             {mode === 'credits' && creditNonZero > 0 && (
               <span className="ml-1.5 bg-gold text-forest rounded-full px-1.5 py-0.5 text-[10px] font-bold">{creditNonZero}</span>
+            )}
+            {mode === 'payments' && paymentPaidCount > 0 && (
+              <span className="ml-1.5 bg-green-500 text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold">{paymentPaidCount}</span>
             )}
           </button>
         ))}
@@ -1505,6 +1614,138 @@ function AdminPanel() {
       )}
 
       {/* ════════════════════════════════════════════════════════════════════════
+          PAYMENTS MODE
+      ════════════════════════════════════════════════════════════════════════ */}
+      {adminMode === 'payments' && (
+        <div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-48">
+              <input
+                type="text"
+                value={paymentSearch}
+                onChange={e => setPaymentSearch(e.target.value)}
+                placeholder="Search members…"
+                className="w-full border border-gray-200 rounded px-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
+              />
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <div className="text-xs font-sans text-gray-500">
+                <span className="font-semibold text-green-600">{paymentPaidCount}</span> of{' '}
+                <span className="font-semibold text-forest">{membersData.filter(m => m.active !== false).length}</span> paid
+              </div>
+              <SaveBtn onClick={savePayments} saving={paymentsSaving} status={paymentsSaveStatus} />
+              <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament}>
+                Export PDF
+              </PdfBtn>
+              {paymentPaidCount > 0 && (
+                <button
+                  onClick={() => clearAllPayments(paymentTid)}
+                  className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
+              <span className="text-white font-sans text-sm font-semibold">
+                Payment Status — {tournament?.name ?? 'Select Tournament'}
+              </span>
+              <span className="text-white/50 font-sans text-xs">{paymentRoster.length} members</span>
+            </div>
+
+            {/* Bulk actions */}
+            <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => markAllPaid(paymentTid, paymentRoster.filter(m => !paymentMap[m.name]).map(m => m.name))}
+                disabled={paymentRoster.every(m => paymentMap[m.name])}
+                className="px-3 py-1 text-xs font-sans font-medium rounded border border-green-200 text-green-600 bg-green-50 hover:bg-green-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Mark All Shown as Paid
+              </button>
+              <span className="text-xs font-sans text-gray-400">
+                {paymentRoster.filter(m => paymentMap[m.name]).length} of {paymentRoster.length} shown are paid
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[440px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="table-header text-gray-400 w-12 text-center">Paid</th>
+                    <th className="table-header text-gray-400 text-left">Player</th>
+                    <th className="table-header text-gray-400 text-left">Flight</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentRoster.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
+                        No members match your search.
+                      </td>
+                    </tr>
+                  ) : (
+                    paymentRoster.map((m, idx) => {
+                      const isPaid = !!paymentMap[m.name]
+                      return (
+                        <tr
+                          key={m.name}
+                          onClick={() => togglePayment(paymentTid, m.name)}
+                          className={`border-b border-gray-100 last:border-0 transition-colors cursor-pointer ${
+                            isPaid ? 'bg-green-50/60 hover:bg-green-100/60' : 'hover:bg-gray-50'
+                          } ${!isPaid && idx % 2 === 0 ? 'bg-white' : ''} ${!isPaid && idx % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
+                        >
+                          <td className="px-4 py-2.5 text-center">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full border-2 transition-colors ${
+                              isPaid
+                                ? 'bg-green-500 border-green-500 text-white'
+                                : 'border-gray-300 text-transparent hover:border-green-300'
+                            }`}>
+                              {isPaid && (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
+                            {formatName(m.name)}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[m.flight] ?? flightTagStyles.Unassigned}`}>
+                              {m.flight ?? 'Unassigned'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+                {paymentPaidCount > 0 && (
+                  <tfoot>
+                    <tr className="bg-green-50/80 border-t-2 border-green-200">
+                      <td className="px-4 py-2.5 text-center">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                      </td>
+                      <td colSpan={2} className="px-4 py-2.5 font-sans text-xs font-semibold uppercase tracking-widest text-green-700">
+                        {paymentPaidCount} member{paymentPaidCount !== 1 ? 's' : ''} paid
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════════
           PDF REPORTS  (always visible)
       ════════════════════════════════════════════════════════════════════════ */}
       <div className="mt-6 bg-white border border-gray-200 rounded-lg p-5">
@@ -1535,6 +1776,11 @@ function AdminPanel() {
           {Object.keys(credits).length > 0 && (
             <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
               Credit on Books
+            </PdfBtn>
+          )}
+          {paymentPaidCount > 0 && (
+            <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament}>
+              Payment Status
             </PdfBtn>
           )}
         </div>
