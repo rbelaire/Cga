@@ -157,8 +157,13 @@ function parseRosterXlsx(buffer) {
     const rawName = (nameColKey ? row[nameColKey] : null) ?? row['__EMPTY'] ?? row['Name'] ?? row['Player'] ?? null
     if (!rawName) continue
 
-    const tee    = normalizeTee(row['Tees'] ?? row['Tee'] ?? null)
-    const ptm    = row['Points to make'] ?? row['PTM'] ?? null
+    const tee             = normalizeTee(row['Tees'] ?? row['Tee'] ?? null)
+    const ptm             = row['Points to make'] ?? row['PTM'] ?? null
+    const flight          = row['Flight'] ?? null
+    const creditOnBooks   = row['Credit on Books'] !== null ? Number(row['Credit on Books']) : null
+    const email           = row['Email Address'] ?? row['Email'] ?? null
+    const homePhone       = row['Home Phone'] ?? null
+    const cellPhone       = row['Cell/Work'] ?? row['Cell'] ?? row['Work'] ?? null
     const history = [
       row['NEW'] ?? row['1st'] ?? null,
       row['2nd'] ?? null,
@@ -171,7 +176,11 @@ function parseRosterXlsx(buffer) {
     const rounds = history.filter(v => v !== null).length
 
     const memberName = findMember(rawName)
-    const entry = { rawName: String(rawName), tee, ptm, history, rounds, memberName }
+    const entry = {
+      rawName: String(rawName),
+      tee, ptm, flight, creditOnBooks, email, homePhone, cellPhone,
+      history, rounds, memberName
+    }
 
     if (memberName) matched.push(entry)
     else unmatched.push(entry)
@@ -1002,14 +1011,19 @@ function AdminPanel() {
     if (!importPreview) return
     setImportError(null)
     await withSaveState(setImportSaving, setImportStatus, async () => {
-      // Build updated member list: apply tee, ptm, and full PTM history from Excel rows
+      // Build updated member list: apply all Excel fields to members
       const overrideMap = {}
       for (const row of importPreview.matched) {
         if (row.memberName) {
           overrideMap[row.memberName] = {
-            ...(row.tee     !== null ? { tee:     row.tee                } : {}),
-            ...(row.ptm     !== null ? { ptm:     Number(row.ptm)        } : {}),
-            ...(row.history           ? { history: row.history           } : {}),
+            ...(row.tee            !== null ? { tee:           row.tee                } : {}),
+            ...(row.ptm            !== null ? { ptm:           Number(row.ptm)        } : {}),
+            ...(row.flight         !== null ? { flight:        row.flight             } : {}),
+            ...(row.creditOnBooks  !== null ? { creditOnBooks: row.creditOnBooks      } : {}),
+            ...(row.email          !== null ? { email:         row.email              } : {}),
+            ...(row.homePhone      !== null ? { homePhone:     row.homePhone          } : {}),
+            ...(row.cellPhone      !== null ? { cell:          row.cellPhone          } : {}),
+            ...(row.history                 ? { history:       row.history            } : {}),
             ...(typeof row.rounds === 'number' ? { rounds: row.rounds }  : {}),
           }
         }
@@ -1018,8 +1032,8 @@ function AdminPanel() {
       const updatedMembers = membersData.map(m => ({
         ...m,
         ...(overrideMap[m.name] ?? {}),
-        // Also apply any in-panel overrides
-        flight: membersOverride[m.name]?.flight ?? m.flight,
+        // Also apply any in-panel overrides (flight takes precedence from panel if set)
+        flight: membersOverride[m.name]?.flight ?? overrideMap[m.name]?.flight ?? m.flight,
       }))
 
       // Update local override state so the table reflects immediately
@@ -2078,7 +2092,7 @@ function FlightManagementPanel({
                 )}
               </p>
               <p className="text-xs font-sans text-amber-700 mt-0.5">
-                This will update tee and PTM for all matched members. Review below then confirm.
+                This will update member info (flight, tee, PTM, contact, credits). Review below then confirm.
               </p>
             </div>
             <button
@@ -2089,25 +2103,33 @@ function FlightManagementPanel({
 
           {/* Sample of changes */}
           <div className="overflow-x-auto rounded border border-amber-200 mb-3">
-            <table className="w-full text-xs font-sans min-w-[400px]">
+            <table className="w-full text-xs font-sans min-w-[600px]">
               <thead>
                 <tr className="bg-amber-100 text-amber-700">
-                  <th className="px-3 py-2 text-left font-semibold">Player</th>
-                  <th className="px-3 py-2 text-center font-semibold">Tee</th>
-                  <th className="px-3 py-2 text-center font-semibold">PTM</th>
+                  <th className="px-2 py-2 text-left font-semibold">Player</th>
+                  <th className="px-2 py-2 text-center font-semibold">Flight</th>
+                  <th className="px-2 py-2 text-center font-semibold">Tee</th>
+                  <th className="px-2 py-2 text-center font-semibold">PTM</th>
+                  <th className="px-2 py-2 text-center font-semibold">Credits</th>
+                  <th className="px-2 py-2 text-center font-semibold">Email</th>
+                  <th className="px-2 py-2 text-center font-semibold">Cell</th>
                 </tr>
               </thead>
               <tbody>
                 {importPreview.matched.slice(0, 8).map((row, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-amber-50/40'}>
-                    <td className="px-3 py-1.5 text-darktext">{formatName(row.memberName)}</td>
-                    <td className="px-3 py-1.5 text-center"><TeeTag tee={row.tee} /></td>
-                    <td className="px-3 py-1.5 text-center font-mono text-gray-600">{row.ptm ?? '—'}</td>
+                    <td className="px-2 py-1.5 text-darktext font-medium">{formatName(row.memberName)}</td>
+                    <td className="px-2 py-1.5 text-center text-gray-600">{row.flight ?? '—'}</td>
+                    <td className="px-2 py-1.5 text-center"><TeeTag tee={row.tee} /></td>
+                    <td className="px-2 py-1.5 text-center font-mono text-gray-600">{row.ptm ?? '—'}</td>
+                    <td className="px-2 py-1.5 text-center font-mono text-gray-600">{row.creditOnBooks ?? '—'}</td>
+                    <td className="px-2 py-1.5 text-center text-gray-500 truncate text-xs">{row.email ?? '—'}</td>
+                    <td className="px-2 py-1.5 text-center text-gray-500 truncate text-xs">{row.cellPhone ?? '—'}</td>
                   </tr>
                 ))}
                 {importPreview.matched.length > 8 && (
                   <tr>
-                    <td colSpan={3} className="px-3 py-2 text-center text-amber-600 italic">
+                    <td colSpan={7} className="px-2 py-2 text-center text-amber-600 italic">
                       …and {importPreview.matched.length - 8} more
                     </td>
                   </tr>
