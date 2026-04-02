@@ -89,37 +89,53 @@ function normalizeTee(t) {
  *   unmatched = rows from Excel we couldn't link to a member
  *   raw       = all parsed rows
  */
+const NAME_SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v'])
+
 function parseRosterXlsx(buffer) {
   const wb = XLSX.read(buffer, { type: 'array' })
   const sheetName = wb.SheetNames.find(s => s.toLowerCase().includes('roster')) ?? wb.SheetNames[0]
   const ws = wb.Sheets[sheetName]
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null })
 
-  // Build a reverse lookup: "Last First" → member name from membersData
-  // Also build last-name-only index for fuzzy matching
+  // Build a reverse lookup: "First Last" → memberName
+  // lastNameIdx uses the actual surname (skipping trailing suffixes like Jr/Sr/III)
   const exactLookup  = {}   // normalized "First Last" → memberName
-  const lastNameIdx  = {}   // lowercase last word → [memberName, ...]
+  const lastNameIdx  = {}   // lowercase surname → [memberName, ...]
 
   for (const m of membersData) {
     exactLookup[m.name.toLowerCase()] = m.name
-    const last = m.name.split(' ').pop().toLowerCase()
-    if (!lastNameIdx[last]) lastNameIdx[last] = []
-    lastNameIdx[last].push(m.name)
+    const words = m.name.split(' ')
+    const lastWord = words[words.length - 1].toLowerCase()
+    // If the last word is a suffix, use the second-to-last word as the surname
+    const surname = (NAME_SUFFIXES.has(lastWord) && words.length > 2)
+      ? words[words.length - 2].toLowerCase()
+      : lastWord
+    if (!lastNameIdx[surname]) lastNameIdx[surname] = []
+    lastNameIdx[surname].push(m.name)
   }
 
   function findMember(rawExcelName) {
     if (!rawExcelName) return null
-    // Excel format: "Last, First [Suffix]"
+    // Excel format: "Last, First [Suffix]"  OR  "First Last"
     const parts = String(rawExcelName).split(',').map(s => s.trim())
     if (parts.length < 2) return exactLookup[parts[0].toLowerCase()] ?? null
     const lastName  = parts[0]
-    const firstName = parts.slice(1).join(' ').trim()
-    const fullName  = (firstName + ' ' + lastName).toLowerCase()
+    const firstName = parts.slice(1).join(' ').trim()  // e.g. "Alan Sr"
 
-    // Exact match
+    // Try direct reassembly: "First Last"
+    const fullName = (firstName + ' ' + lastName).toLowerCase()
     if (exactLookup[fullName]) return exactLookup[fullName]
 
-    // Last-name fuzzy: if only one member has this last name, use it
+    // If firstName ends with a suffix (e.g. "Alan Sr"), try "First LastName Suffix"
+    const firstParts = firstName.split(' ')
+    const lastFirstPart = firstParts[firstParts.length - 1].toLowerCase()
+    if (NAME_SUFFIXES.has(lastFirstPart) && firstParts.length > 1) {
+      const firstOnly = firstParts.slice(0, -1).join(' ')
+      const altName = (firstOnly + ' ' + lastName + ' ' + firstParts[firstParts.length - 1]).toLowerCase()
+      if (exactLookup[altName]) return exactLookup[altName]
+    }
+
+    // Last-name fuzzy: if only one member has this surname, use it
     const lastLower = lastName.toLowerCase()
     const candidates = lastNameIdx[lastLower]
     if (candidates?.length === 1) return candidates[0]
@@ -127,11 +143,15 @@ function parseRosterXlsx(buffer) {
     return null
   }
 
+  // Detect the name column — try common header names case-insensitively
+  const firstRowKeys = Object.keys(rows[0] ?? {})
+  const nameColKey = firstRowKeys.find(k => /^(name|player|member|golfer|full.?name|member.?name)$/i.test(k))
+
   const matched   = []
   const unmatched = []
 
   for (const row of rows) {
-    const rawName = row['__EMPTY'] ?? row['Name'] ?? row['Player'] ?? null
+    const rawName = (nameColKey ? row[nameColKey] : null) ?? row['__EMPTY'] ?? row['Name'] ?? row['Player'] ?? null
     if (!rawName) continue
 
     const tee    = normalizeTee(row['Tees'] ?? row['Tee'] ?? null)
