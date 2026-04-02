@@ -4,7 +4,6 @@ import NextTournament from '../components/sections/NextTournament'
 import QuickLinks from '../components/sections/QuickLinks'
 import SponsorBar from '../components/sections/SponsorBar'
 import { Link } from 'react-router-dom'
-import standingsStatic from '../data/standings.json'
 import { formatName } from '../utils/formatName'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
@@ -13,7 +12,7 @@ const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th 
 
 export default function Home() {
   useEffect(() => { document.title = 'Carencro Golf Association' }, [])
-  const { data: standings } = useFireData(DB.listenStandings, standingsStatic)
+  const { data: standings } = useFireData(DB.listenStandings, { flights: {} })
 
   return (
     <>

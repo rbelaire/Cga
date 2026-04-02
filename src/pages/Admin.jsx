@@ -5,9 +5,6 @@ import * as XLSX from 'xlsx'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
-import membersData from '../data/members.json'
-import currentStandings from '../data/standings.json'
-import ptmData from '../data/ptm.json'
 import { formatName, compareByLastName } from '../utils/formatName'
 import { DB } from '../db'
 import { auth } from '../firebase'
@@ -594,6 +591,9 @@ export default function Admin() {
 
 // ── Admin panel ────────────────────────────────────────────────────────────────
 function AdminPanel() {
+  // Live members from Firebase
+  const { data: membersData = [] } = useFireData(DB.listenMembers, [])
+
   // Tournament score entry data
   const [data, setData] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {} } catch { return {} }
@@ -609,7 +609,7 @@ function AdminPanel() {
       if (saved) return saved
     } catch { /* ignore */ }
     // Default: build from membersData
-    return Object.fromEntries(membersData.map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
+    return Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
   })
 
   const [credits, setCredits] = useState(() => {

@@ -1,24 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import StandingsTable from '../components/ui/StandingsTable'
-import standingsStatic from '../data/standings.json'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
-import ptmData from '../data/ptm.json'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
-
-const roundsFromPtm = {}
-for (const player of ptmData) {
-  if (player.name && typeof player.rounds === 'number') {
-    roundsFromPtm[player.name] = player.rounds
-  }
-}
-
-function withRounds(row) {
-  const rounds = roundsFromPtm[row.name]
-  return rounds != null ? { ...row, rounds } : row
-}
 
 const columns = [
   { key: 'rank',        label: 'Rank',         sortable: false },
@@ -35,10 +21,27 @@ export default function Standings() {
   useEffect(() => { document.title = 'Standings | CGA 2026' }, [])
   const [tab, setTab] = useState(0)
 
-  const { data: standings } = useFireData(DB.listenStandings, standingsStatic)
+  const { data: standings } = useFireData(DB.listenStandings, { flights: {} })
+  const { data: ptmList } = useFireData(DB.listenPtm, [])
+
+  const roundsFromPtm = useMemo(() => {
+    const lookup = {}
+    for (const player of ptmList || []) {
+      if (player.name && typeof player.rounds === 'number') {
+        lookup[player.name] = player.rounds
+      }
+    }
+    return lookup
+  }, [ptmList])
 
   const currentFlight = FLIGHTS[tab]
-  const flightData = (standings?.flights?.[currentFlight] || []).map(withRounds)
+  const flightData = useMemo(
+    () => (standings?.flights?.[currentFlight] || []).map(row => {
+      const rounds = roundsFromPtm[row.name]
+      return rounds != null ? { ...row, rounds } : row
+    }),
+    [standings, currentFlight, roundsFromPtm]
+  )
 
   // Find latest tournament name from first player that has one
   const latestTournament = flightData.find(p => p.latestTournament)?.latestTournament ?? null

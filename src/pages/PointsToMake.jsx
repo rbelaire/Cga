@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
-import ptmFallback from '../data/ptm.json'
-import membersStatic from '../data/members.json'
 import { formatName } from '../utils/formatName'
 import TeeTag from '../components/ui/TeeTag'
 import { useFireData } from '../hooks/useFireData'
@@ -91,37 +89,30 @@ function TrendArrow({ ptm, ptmAtFlowControl }) {
 export default function PointsToMake() {
   useEffect(() => { document.title = 'Points to Make | CGA 2026' }, [])
 
-  const { data: ptmStatic } = useFireData(DB.listenPtm, ptmFallback)
+  const { data: ptmList } = useFireData(DB.listenPtm, [])
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
   const [showAll, setShowAll] = useState(false)
 
-  // Use live member data from Firestore; fall back to static members
-  // Once the Excel is imported via admin, members will have history/rounds fields
-  const { data: liveMembers } = useFireData(DB.listenMembers, membersStatic)
+  // Use live member data from Firestore
+  const { data: liveMembers } = useFireData(DB.listenMembers, [])
 
-  // Derive ptmData from live members. If a member has no history in Firestore yet,
-  // try to find a matching row in the static ptm.json as a secondary fallback.
-  const staticPtmByName = useMemo(
-    () => Object.fromEntries(ptmStatic.map(r => [r.name, r])),
-    []
-  )
-
+  // Derive ptmData from live members
   const ptmData = useMemo(() => {
-    const source = liveMembers ?? membersStatic
-    return source.map(m => {
-      // If Firestore member already has history, use it directly
+    return (liveMembers ?? []).map(m => {
+      // If member already has history, use it directly
       if (Array.isArray(m.history) && m.history.some(v => v != null)) {
         return memberToPtmRow(m)
       }
-      // Fall back to static ptm.json for this member if available
-      if (staticPtmByName[m.name]) {
-        return staticPtmByName[m.name]
+      // Fall back to ptm list entry if available
+      const ptmEntry = ptmList?.find(p => p.name === m.name)
+      if (ptmEntry) {
+        return ptmEntry
       }
       return memberToPtmRow(m)
     })
-  }, [liveMembers, staticPtmByName])
+  }, [liveMembers, ptmList])
 
   const handleSort = (key) => {
     if (sortKey === key) {
