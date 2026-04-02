@@ -19,6 +19,7 @@ export default function Members() {
 
   // Build events lookup from live standings
   const { data: standings } = useFireData(DB.listenStandings, { flights: {} })
+  const { data: ptmList } = useFireData(DB.listenPtm, [])
   const eventsFromStandings = useMemo(() => {
     const lookup = {}
     for (const flight of FLIGHTS) {
@@ -31,14 +32,34 @@ export default function Members() {
     return lookup
   }, [standings])
 
-  const withEvents = (m) => {
-    const events = m.events ?? eventsFromStandings[m.name] ?? null
-    return events !== null ? { ...m, events } : m
-  }
+  const roundsFromPtm = useMemo(() => {
+    const lookup = {}
+    for (const player of ptmList ?? []) {
+      if (!player?.name) continue
+      if (typeof player.rounds === 'number') {
+        lookup[player.name] = player.rounds
+        continue
+      }
+      if (Array.isArray(player.history)) {
+        lookup[player.name] = player.history.filter(v => typeof v === 'number').length
+      }
+    }
+    return lookup
+  }, [ptmList])
 
   const enrichedMembers = useMemo(
-    () => (liveMembers ?? []).map(withEvents),
-    [liveMembers, eventsFromStandings]
+    () => (liveMembers ?? []).map((m) => {
+      const events = m.events ?? eventsFromStandings[m.name] ?? null
+      const rounds = typeof m.rounds === 'number'
+        ? m.rounds
+        : Array.isArray(m.history)
+          ? m.history.filter(v => typeof v === 'number').length
+          : roundsFromPtm[m.name] ?? null
+
+      if (events === null && rounds === null) return m
+      return { ...m, ...(events !== null ? { events } : {}), ...(rounds !== null ? { rounds } : {}) }
+    }),
+    [liveMembers, eventsFromStandings, roundsFromPtm]
   )
 
   const byFlight = useMemo(() =>
