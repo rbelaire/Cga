@@ -158,7 +158,7 @@ export default function Standings() {
         </>
       ) : (
         <div className="animate-tab-in">
-          <StandingsTable data={scratchData} columns={scratchColumns} highlightTop={3} />
+          <StandingsTable data={scratchData} columns={scratchColumns} highlightTop={3} showBubble={false} />
         </div>
       )}
     </PageWrapper>

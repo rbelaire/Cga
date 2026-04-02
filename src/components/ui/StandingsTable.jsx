@@ -21,7 +21,7 @@ const TREND_COLORS = {
   stable: 'text-gray-400',
 }
 
-function CellValue({ col, row, idx, highlightTop }) {
+function CellValue({ col, row, idx, highlightTop, showBubble }) {
   if (col.key === 'rank') return (
     <span className={`stat-number font-semibold ${idx < highlightTop ? 'text-gold' : 'text-gray-500'}`}>
       {idx < highlightTop ? `#${row.rank || idx + 1}` : row.rank || idx + 1}
@@ -32,7 +32,7 @@ function CellValue({ col, row, idx, highlightTop }) {
       <span className={`font-sans ${idx < highlightTop ? 'text-darktext font-semibold' : 'text-darktext'}`}>
         {formatName(row.name)}
       </span>
-      {isBubble(getBubbleRounds(row)) && (
+      {showBubble && isBubble(getBubbleRounds(row)) && (
         <span className="text-xs font-sans font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200 whitespace-nowrap">
           Bubble
         </span>
@@ -83,7 +83,7 @@ function CellValue({ col, row, idx, highlightTop }) {
   return <span className="text-darktext font-sans">{row[col.key]}</span>
 }
 
-export default function StandingsTable({ data, columns, highlightTop = 3 }) {
+export default function StandingsTable({ data, columns, highlightTop = 3, showBubble = true }) {
   const defaultColumns = columns || [
     { key: 'rank', label: 'Rank', sortable: false },
     { key: 'name', label: 'Player', sortable: true },
@@ -146,7 +146,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
               }`}>
                 {formatName(row.name)}
               </span>
-              {isBubble(getBubbleRounds(row)) && (
+              {showBubble && isBubble(getBubbleRounds(row)) && (
                 <span className="text-xs font-sans font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200 whitespace-nowrap">
                   Bubble
                 </span>
@@ -164,7 +164,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
                   <div key={col.key} className="flex items-center justify-between gap-1">
                     <span className="text-gray-400 font-sans text-xs">{col.label}</span>
                     <span className="text-xs">
-                      <CellValue col={col} row={row} idx={idx} highlightTop={highlightTop} />
+                      <CellValue col={col} row={row} idx={idx} highlightTop={highlightTop} showBubble={showBubble} />
                     </span>
                   </div>
                 ))}
@@ -212,7 +212,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
               >
                 {defaultColumns.map((col) => (
                   <td key={col.key} className="px-4 py-3">
-                    <CellValue col={col} row={row} idx={idx} highlightTop={highlightTop} />
+                    <CellValue col={col} row={row} idx={idx} highlightTop={highlightTop} showBubble={showBubble} />
                   </td>
                 ))}
               </tr>
