@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import membersData from '../data/members.json'
@@ -68,6 +69,92 @@ function downloadJSON(obj, filename) {
     download: filename,
   })
   a.click()
+}
+
+// ── Excel roster parsing ──────────────────────────────────────────────────────
+function normalizeTee(t) {
+  if (!t) return null
+  const s = String(t).trim().toUpperCase()
+  if (s === 'BACK')  return 'Back'
+  if (s === 'SR' || s === 'SENIOR') return 'Senior'
+  if (s === 'FRONT') return 'Front'
+  return null
+}
+
+/**
+ * Parse an ArrayBuffer of an .xlsx file and return an array of
+ * { name, tee, ptm, history, rounds } objects matched against membersData.
+ * Returns { matched, unmatched, raw } where:
+ *   matched   = rows we found a member for
+ *   unmatched = rows from Excel we couldn't link to a member
+ *   raw       = all parsed rows
+ */
+function parseRosterXlsx(buffer) {
+  const wb = XLSX.read(buffer, { type: 'array' })
+  const sheetName = wb.SheetNames.find(s => s.toLowerCase().includes('roster')) ?? wb.SheetNames[0]
+  const ws = wb.Sheets[sheetName]
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: null })
+
+  // Build a reverse lookup: "Last First" → member name from membersData
+  // Also build last-name-only index for fuzzy matching
+  const exactLookup  = {}   // normalized "First Last" → memberName
+  const lastNameIdx  = {}   // lowercase last word → [memberName, ...]
+
+  for (const m of membersData) {
+    exactLookup[m.name.toLowerCase()] = m.name
+    const last = m.name.split(' ').pop().toLowerCase()
+    if (!lastNameIdx[last]) lastNameIdx[last] = []
+    lastNameIdx[last].push(m.name)
+  }
+
+  function findMember(rawExcelName) {
+    if (!rawExcelName) return null
+    // Excel format: "Last, First [Suffix]"
+    const parts = String(rawExcelName).split(',').map(s => s.trim())
+    if (parts.length < 2) return exactLookup[parts[0].toLowerCase()] ?? null
+    const lastName  = parts[0]
+    const firstName = parts.slice(1).join(' ').trim()
+    const fullName  = (firstName + ' ' + lastName).toLowerCase()
+
+    // Exact match
+    if (exactLookup[fullName]) return exactLookup[fullName]
+
+    // Last-name fuzzy: if only one member has this last name, use it
+    const lastLower = lastName.toLowerCase()
+    const candidates = lastNameIdx[lastLower]
+    if (candidates?.length === 1) return candidates[0]
+
+    return null
+  }
+
+  const matched   = []
+  const unmatched = []
+
+  for (const row of rows) {
+    const rawName = row['__EMPTY'] ?? row['Name'] ?? row['Player'] ?? null
+    if (!rawName) continue
+
+    const tee    = normalizeTee(row['Tees'] ?? row['Tee'] ?? null)
+    const ptm    = row['Points to make'] ?? row['PTM'] ?? null
+    const history = [
+      row['NEW'] ?? row['1st'] ?? null,
+      row['2nd'] ?? null,
+      row['3rd'] ?? null,
+      row['4th'] ?? null,
+      row['5th'] ?? null,
+      row['6th'] ?? null,
+      row['7th'] ?? null,
+    ]
+    const rounds = history.filter(v => v !== null).length
+
+    const memberName = findMember(rawName)
+    const entry = { rawName: String(rawName), tee, ptm, history, rounds, memberName }
+
+    if (memberName) matched.push(entry)
+    else unmatched.push(entry)
+  }
+
+  return { matched, unmatched }
 }
 
 async function withSaveState(setSaving, setSaveStatus, fn) {
@@ -507,6 +594,12 @@ function AdminPanel() {
   const [flightSearch,  setFlightSearch]  = useState('')
   const [editingMember, setEditingMember] = useState(null)
 
+  // Excel import state
+  const [importPreview,  setImportPreview]  = useState(null)   // { matched, unmatched } | null
+  const [importSaving,   setImportSaving]   = useState(false)
+  const [importStatus,   setImportStatus]   = useState(null)   // null | 'ok' | 'err'
+  const fileInputRef = useRef(null)
+
   // Draft-cache to localStorage (unchanged — keeps data across page refreshes)
   useEffect(() => { localStorage.setItem(STORAGE_KEY,  JSON.stringify(data))            }, [data])
   useEffect(() => { localStorage.setItem(PAIRINGS_KEY, JSON.stringify(pairingsData))    }, [pairingsData])
@@ -839,6 +932,61 @@ function AdminPanel() {
     )
   }
 
+  // ── Excel import ──────────────────────────────────────────────────────────────
+  function handleXlsxFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const result = parseRosterXlsx(ev.target.result)
+        setImportPreview(result)
+        setImportStatus(null)
+      } catch (err) {
+        console.error('Excel parse error:', err)
+        setImportStatus('err')
+      }
+    }
+    reader.readAsArrayBuffer(file)
+    // Reset so the same file can be re-selected
+    e.target.value = ''
+  }
+
+  async function confirmImport() {
+    if (!importPreview) return
+    await withSaveState(setImportSaving, setImportStatus, async () => {
+      // Build updated member list: apply tee + ptm from Excel rows
+      const overrideMap = {}
+      for (const row of importPreview.matched) {
+        if (row.memberName) {
+          overrideMap[row.memberName] = {
+            ...(row.tee  !== null ? { tee:  row.tee  } : {}),
+            ...(row.ptm  !== null ? { ptm:  Number(row.ptm) } : {}),
+          }
+        }
+      }
+
+      const updatedMembers = membersData.map(m => ({
+        ...m,
+        ...(overrideMap[m.name] ?? {}),
+        // Also apply any in-panel overrides
+        flight: membersOverride[m.name]?.flight ?? m.flight,
+      }))
+
+      // Update local override state so the table reflects immediately
+      setMembersOverride(prev => {
+        const next = { ...prev }
+        for (const [name, changes] of Object.entries(overrideMap)) {
+          next[name] = { ...(next[name] ?? {}), ...changes }
+        }
+        return next
+      })
+
+      await DB.saveMembers(updatedMembers)
+      setImportPreview(null)
+    })
+  }
+
   // ── Save scores draft to Firestore ───────────────────────────────────────────
   async function saveScores() {
     await withSaveState(setScoresSaving, setScoresSaveStatus, () =>
@@ -1039,6 +1187,13 @@ function AdminPanel() {
           membersSaving={membersSaving}
           membersSaveStatus={membersSaveStatus}
           flightTagStyles={flightTagStyles}
+          fileInputRef={fileInputRef}
+          handleXlsxFile={handleXlsxFile}
+          importPreview={importPreview}
+          setImportPreview={setImportPreview}
+          confirmImport={confirmImport}
+          importSaving={importSaving}
+          importStatus={importStatus}
         />
       )}
 
@@ -1768,6 +1923,8 @@ function FlightManagementPanel({
   editingMember, setEditingMember,
   updateMemberFlight, updateMemberPtm, updateMemberTee,
   saveMembers, membersSaving, membersSaveStatus, flightTagStyles,
+  fileInputRef, handleXlsxFile, importPreview, setImportPreview,
+  confirmImport, importSaving, importStatus,
 }) {
   const filtered = useMemo(() => {
     const s = flightSearch.trim().toLowerCase()
@@ -1780,14 +1937,109 @@ function FlightManagementPanel({
 
   return (
     <div>
+      {/* Toolbar */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
           <p className="text-xs font-sans text-gray-500 leading-relaxed">
-            Set each player's flight and PTM here. Hit <strong className="text-darktext">Save to Cloud</strong> to publish changes to the live site instantly.
+            Edit individual rows below, or <strong className="text-darktext">upload your spreadsheet</strong> to import tee and PTM data for the whole roster at once.
+            Hit <strong className="text-darktext">Save to Cloud</strong> to publish.
           </p>
         </div>
-        <SaveBtn onClick={saveMembers} saving={membersSaving} status={membersSaveStatus} className="whitespace-nowrap flex-shrink-0" />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleXlsxFile}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-sans font-semibold rounded-lg border border-forest text-forest hover:bg-forest hover:text-white transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import Excel
+          </button>
+          <SaveBtn onClick={saveMembers} saving={membersSaving} status={membersSaveStatus} />
+        </div>
       </div>
+
+      {/* Import preview */}
+      {importPreview && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <p className="text-sm font-sans font-semibold text-amber-800">
+                Ready to import — {importPreview.matched.length} members matched
+                {importPreview.unmatched.length > 0 && (
+                  <span className="text-amber-600"> · {importPreview.unmatched.length} rows not found in roster</span>
+                )}
+              </p>
+              <p className="text-xs font-sans text-amber-700 mt-0.5">
+                This will update tee and PTM for all matched members. Review below then confirm.
+              </p>
+            </div>
+            <button
+              onClick={() => setImportPreview(null)}
+              className="text-amber-500 hover:text-amber-800 text-lg leading-none flex-shrink-0"
+            >×</button>
+          </div>
+
+          {/* Sample of changes */}
+          <div className="overflow-x-auto rounded border border-amber-200 mb-3">
+            <table className="w-full text-xs font-sans min-w-[400px]">
+              <thead>
+                <tr className="bg-amber-100 text-amber-700">
+                  <th className="px-3 py-2 text-left font-semibold">Player</th>
+                  <th className="px-3 py-2 text-center font-semibold">Tee</th>
+                  <th className="px-3 py-2 text-center font-semibold">PTM</th>
+                </tr>
+              </thead>
+              <tbody>
+                {importPreview.matched.slice(0, 8).map((row, i) => (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-amber-50/40'}>
+                    <td className="px-3 py-1.5 text-darktext">{formatName(row.memberName)}</td>
+                    <td className="px-3 py-1.5 text-center"><TeeTag tee={row.tee} /></td>
+                    <td className="px-3 py-1.5 text-center font-mono text-gray-600">{row.ptm ?? '—'}</td>
+                  </tr>
+                ))}
+                {importPreview.matched.length > 8 && (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-2 text-center text-amber-600 italic">
+                      …and {importPreview.matched.length - 8} more
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {importPreview.unmatched.length > 0 && (
+            <p className="text-xs text-amber-600 mb-3">
+              <strong>Not matched:</strong> {importPreview.unmatched.map(r => r.rawName).join(', ')}
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <SaveBtn
+              onClick={confirmImport}
+              saving={importSaving}
+              status={importStatus}
+              label={`Import ${importPreview.matched.length} Members`}
+              className="!bg-amber-600 hover:!bg-amber-700"
+            />
+            <button
+              onClick={() => setImportPreview(null)}
+              className="px-3 py-2 text-xs font-sans rounded border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="bg-forest px-4 py-3 flex items-center gap-3">
