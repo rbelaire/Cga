@@ -1299,6 +1299,7 @@ function AdminPanel() {
       {adminMode === 'flights' && (
         <FlightManagementPanel
           effectiveMembers={effectiveMembers}
+          membersData={membersData}
           flightSearch={flightSearch}
           setFlightSearch={setFlightSearch}
           editingMember={editingMember}
@@ -2041,7 +2042,7 @@ function PairingsPanel({
 const TEE_OPTIONS = ['Back', 'Senior', 'Front']
 
 function FlightManagementPanel({
-  effectiveMembers, flightSearch, setFlightSearch,
+  effectiveMembers, membersData, flightSearch, setFlightSearch,
   editingMember, setEditingMember,
   updateMemberFlight, updateMemberPtm, updateMemberTee,
   saveMembers, membersSaving, membersSaveStatus, flightTagStyles,
@@ -2170,7 +2171,7 @@ function FlightManagementPanel({
               onClick={confirmImport}
               saving={importSaving}
               status={importStatus}
-              label={`Import ${importPreview.matched.length} Members`}
+              label={`Import ${importPreview.matched.length + (membersData.length === 0 ? importPreview.unmatched.length : 0)} Members`}
               className="!bg-amber-600 hover:!bg-amber-700"
             />
             <button
