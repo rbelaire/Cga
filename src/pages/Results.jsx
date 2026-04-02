@@ -2,16 +2,10 @@ import { useState, useEffect } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
-import koasati from '../data/results/2026-koasati-flow-control.json'
 import { formatDateLong } from '../utils/formatDate'
 import StandingsTable from '../components/ui/StandingsTable'
 import { formatName } from '../utils/formatName'
 import { DB } from '../db'
-
-// Static fallback results — used until Firestore responds for each tournament
-const staticResultFiles = {
-  '2026-01': koasati,
-}
 
 export default function Results() {
   useEffect(() => { document.title = 'Results | CGA 2026' }, [])
@@ -19,7 +13,7 @@ export default function Results() {
   const { state } = useLocation()
   const [expanded, setExpanded] = useState(state?.expand ?? completed[0]?.id ?? null)
 
-  // Live results from Firestore, merged on top of static fallbacks
+  // Live results from Firestore
   const [liveResults, setLiveResults] = useState({})
   useEffect(() => {
     if (!completed.length) return
@@ -31,7 +25,7 @@ export default function Results() {
     return () => unsubs.forEach(u => u?.())
   }, []) // completed derives from static schedule.json — stable
 
-  const resultFiles = { ...staticResultFiles, ...liveResults }
+  const resultFiles = liveResults
 
   return (
     <PageWrapper>

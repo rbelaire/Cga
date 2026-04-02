@@ -2,41 +2,43 @@ import { useState, useEffect, useMemo } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import MemberCard from '../components/ui/MemberCard'
 import SearchBar from '../components/ui/SearchBar'
-import membersStatic from '../data/members.json'
 import { compareByLastName } from '../utils/formatName'
-import standings from '../data/standings.json'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const TABS = ['All', ...FLIGHTS]
 
-// Build a name → events lookup from standings (static — doesn't need to be reactive)
-const eventsFromStandings = {}
-for (const flight of FLIGHTS) {
-  for (const player of standings.flights[flight] ?? []) {
-    if (player.name && typeof player.events === 'number') {
-      eventsFromStandings[player.name] = player.events
-    }
-  }
-}
-
-function withEvents(m) {
-  const events = m.events ?? eventsFromStandings[m.name] ?? null
-  return events !== null ? { ...m, events } : m
-}
-
 export default function Members() {
   useEffect(() => { document.title = 'Members | CGA 2026' }, [])
   const [tab, setTab] = useState('All')
   const [query, setQuery] = useState('')
 
-  // Live member roster from Firestore; falls back to static JSON while loading
-  const { data: liveMembers } = useFireData(DB.listenMembers, membersStatic)
+  // Live member roster from Firestore
+  const { data: liveMembers } = useFireData(DB.listenMembers, [])
+
+  // Build events lookup from live standings
+  const { data: standings } = useFireData(DB.listenStandings, { flights: {} })
+  const eventsFromStandings = useMemo(() => {
+    const lookup = {}
+    for (const flight of FLIGHTS) {
+      for (const player of standings.flights?.[flight] ?? []) {
+        if (player.name && typeof player.events === 'number') {
+          lookup[player.name] = player.events
+        }
+      }
+    }
+    return lookup
+  }, [standings])
+
+  const withEvents = (m) => {
+    const events = m.events ?? eventsFromStandings[m.name] ?? null
+    return events !== null ? { ...m, events } : m
+  }
 
   const enrichedMembers = useMemo(
-    () => (liveMembers ?? membersStatic).map(withEvents),
-    [liveMembers]
+    () => (liveMembers ?? []).map(withEvents),
+    [liveMembers, eventsFromStandings]
   )
 
   const byFlight = useMemo(() =>
