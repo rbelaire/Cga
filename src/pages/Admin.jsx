@@ -2,12 +2,15 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
+import { signInWithEmailAndPassword } from 'firebase/auth'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import membersData from '../data/members.json'
 import currentStandings from '../data/standings.json'
+import ptmData from '../data/ptm.json'
 import { formatName, compareByLastName } from '../utils/formatName'
 import { DB } from '../db'
+import { auth } from '../firebase'
 import TeeTag from '../components/ui/TeeTag'
 
 const FLIGHTS      = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
@@ -177,7 +180,7 @@ function parseRosterXlsx(buffer) {
   return { matched, unmatched }
 }
 
-async function withSaveState(setSaving, setSaveStatus, fn) {
+async function withSaveState(setSaving, setSaveStatus, fn, setErrMsg = null) {
   setSaving(true)
   setSaveStatus(null)
   try {
@@ -186,6 +189,7 @@ async function withSaveState(setSaving, setSaveStatus, fn) {
   } catch (e) {
     console.error('Firestore save error:', e)
     setSaveStatus('err')
+    setErrMsg?.(e?.message || String(e) || 'Unknown error')
   } finally {
     setSaving(false)
     setTimeout(() => setSaveStatus(null), 3000)
@@ -532,14 +536,26 @@ function PdfBtn({ onClick, children, disabled = false }) {
 }
 
 // ── PIN gate ───────────────────────────────────────────────────────────────────
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@cga.local'
+
 export default function Admin() {
   const [pin,      setPin]      = useState('')
   const [unlocked, setUnlocked] = useState(false)
   const [err,      setErr]      = useState(false)
+  const [loading,  setLoading]  = useState(false)
 
-  const tryUnlock = () => {
-    if (pin === PIN) { setUnlocked(true) }
-    else { setErr(true); setTimeout(() => setErr(false), 1500) }
+  const tryUnlock = async () => {
+    if (pin !== PIN) { setErr(true); setTimeout(() => setErr(false), 1500); return }
+    setLoading(true)
+    try {
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pin)
+    } catch (e) {
+      // Auth failure is non-fatal — admin UI still works, writes will just fail
+      console.warn('Firebase sign-in failed:', e.message)
+    } finally {
+      setLoading(false)
+      setUnlocked(true)
+    }
   }
 
   if (!unlocked) return (
@@ -554,7 +570,9 @@ export default function Admin() {
             className={`w-full border rounded px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-forest ${err ? 'border-red-400' : 'border-gray-300'}`}
           />
           {err && <p className="text-red-500 text-xs font-sans">Incorrect PIN.</p>}
-          <button onClick={tryUnlock} className="btn-primary w-full text-center">Unlock</button>
+          <button onClick={tryUnlock} disabled={loading} className="btn-primary w-full text-center disabled:opacity-60">
+            {loading ? 'Signing in…' : 'Unlock'}
+          </button>
         </div>
       </div>
     </PageWrapper>
@@ -593,6 +611,9 @@ function AdminPanel() {
   const [adminMode,    setAdminMode]    = useState('scores')
   const [creditSearch, setCreditSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
+
+  // Global save error banner
+  const [adminError, setAdminError] = useState(null)  // string | null
 
   // Save states: null | 'ok' | 'err'
   const [scoresSaving,   setScoresSaving]   = useState(false)
@@ -891,7 +912,7 @@ function AdminPanel() {
   async function savePairings() {
     if (!tournament) return
     await withSaveState(setPairingsSaving, setPairingsSaveStatus, () =>
-      DB.savePairings({ ...pairingsData })
+      DB.savePairings({ ...pairingsData }), setAdminError
     )
   }
 
@@ -925,7 +946,7 @@ function AdminPanel() {
       tee:    membersOverride[m.name]?.tee    ?? m.tee,
     }))
     await withSaveState(setMembersSaving, setMembersSaveStatus, () =>
-      DB.saveMembers(updated)
+      DB.saveMembers(updated), setAdminError
     )
   }
 
@@ -948,7 +969,7 @@ function AdminPanel() {
 
   async function saveCredits() {
     await withSaveState(setCreditsSaving, setCreditsSaveStatus, () =>
-      DB.saveCredits(credits)
+      DB.saveCredits(credits), setAdminError
     )
   }
 
@@ -1004,15 +1025,50 @@ function AdminPanel() {
         return next
       })
 
-      await DB.saveMembers(updatedMembers)
+      // Build updated PTM list: apply tee + ptm + history + rounds from Excel rows
+      const ptmOverrideMap = {}
+      for (const row of importPreview.matched) {
+        if (row.memberName) {
+          ptmOverrideMap[row.memberName] = {
+            ...(row.tee     !== null ? { tee:     row.tee                } : {}),
+            ...(row.ptm     !== null ? { ptm:     Number(row.ptm)        } : {}),
+            ...(row.history           ? { history: row.history           } : {}),
+            ...(row.rounds  != null   ? { rounds:  row.rounds            } : {}),
+          }
+        }
+      }
+      // Merge overrides into existing ptm.json list (preserves ptmAtFlowControl etc.)
+      const updatedPtm = ptmData.map(p => ({
+        ...p,
+        ...(ptmOverrideMap[p.name] ?? {}),
+      }))
+      // Add any matched rows not already in ptm.json
+      const ptmNames = new Set(ptmData.map(p => p.name))
+      for (const row of importPreview.matched) {
+        if (row.memberName && !ptmNames.has(row.memberName)) {
+          updatedPtm.push({
+            name:             row.memberName,
+            ptm:              row.ptm  !== null ? Number(row.ptm) : null,
+            ptmAtFlowControl: null,
+            tee:              row.tee  ?? null,
+            history:          row.history,
+            rounds:           row.rounds,
+          })
+        }
+      }
+
+      await Promise.all([
+        DB.saveMembers(updatedMembers),
+        DB.savePtm(updatedPtm),
+      ])
       setImportPreview(null)
-    })
+    }, setAdminError)
   }
 
   // ── Save scores draft to Firestore ───────────────────────────────────────────
   async function saveScores() {
     await withSaveState(setScoresSaving, setScoresSaveStatus, () =>
-      DB.saveScores(data)
+      DB.saveScores(data), setAdminError
     )
   }
 
@@ -1071,12 +1127,21 @@ function AdminPanel() {
         DB.savePoy(newPoy),
         DB.saveStandings(newStandings),
       ])
-    })
+    }, setAdminError)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <PageWrapper>
+      {/* Error banner */}
+      {adminError && (
+        <div className="mb-4 flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm font-sans text-red-700">
+          <span className="font-semibold flex-shrink-0">Save error:</span>
+          <span className="flex-1 break-all">{adminError}</span>
+          <button onClick={() => setAdminError(null)} className="flex-shrink-0 text-red-400 hover:text-red-700 leading-none text-lg">×</button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-end justify-between mb-6">
         <div>

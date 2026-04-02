@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
-import membersStatic from '../data/members.json'
-import ptmStatic from '../data/ptm.json'
+import ptmFallback from '../data/ptm.json'
 import { formatName } from '../utils/formatName'
 import TeeTag from '../components/ui/TeeTag'
 import { useFireData } from '../hooks/useFireData'
@@ -91,6 +90,7 @@ function TrendArrow({ ptm, ptmAtFlowControl }) {
 export default function PointsToMake() {
   useEffect(() => { document.title = 'Points to Make | CGA 2026' }, [])
 
+  const { data: ptmData } = useFireData(DB.listenPtm, ptmFallback)
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
