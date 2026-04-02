@@ -117,11 +117,24 @@ function parseRosterXlsx(buffer, membersList) {
 
   function findMember(rawExcelName) {
     if (!rawExcelName) return null
-    // Excel format: "Last, First [Suffix]"  OR  "First Last"
-    const parts = String(rawExcelName).split(',').map(s => s.trim())
-    if (parts.length < 2) return exactLookup[parts[0].toLowerCase()] ?? null
-    const lastName  = parts[0]
-    const firstName = parts.slice(1).join(' ').trim()  // e.g. "Alan Sr"
+    const nameStr = String(rawExcelName).trim()
+
+    // If "Last, First" format, convert to "First Last" for lookup
+    let firstName, lastName
+    if (nameStr.includes(',')) {
+      const parts = nameStr.split(',').map(s => s.trim())
+      lastName = parts[0]
+      firstName = parts.slice(1).join(' ').trim()
+    } else {
+      // "First Last" format
+      const words = nameStr.split(/\s+/)
+      firstName = words.slice(0, -1).join(' ')
+      lastName = words[words.length - 1]
+      if (!firstName) {
+        // Single word, try exact lookup
+        return exactLookup[nameStr.toLowerCase()] ?? null
+      }
+    }
 
     // Try direct reassembly: "First Last"
     const fullName = (firstName + ' ' + lastName).toLowerCase()
@@ -1017,7 +1030,15 @@ function AdminPanel() {
       // If Firebase is empty, accept all unmatched rows as new members (bootstrap mode)
       const isBootstrapping = membersData.length === 0
       const rowsToImport = isBootstrapping
-        ? [...importPreview.matched, ...importPreview.unmatched.map(r => ({ ...r, memberName: r.rawName }))]
+        ? [...importPreview.matched, ...importPreview.unmatched.map(r => {
+            // Convert "Last, First" to "First Last" for new members
+            let normalizedName = r.rawName
+            if (r.rawName.includes(',')) {
+              const parts = r.rawName.split(',').map(s => s.trim())
+              normalizedName = parts.slice(1).join(' ') + ' ' + parts[0]
+            }
+            return { ...r, memberName: normalizedName }
+          })]
         : importPreview.matched
 
       // Build updated member list: apply all Excel fields to members
