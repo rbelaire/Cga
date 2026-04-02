@@ -71,6 +71,11 @@ export const DB = {
   savePtm:   (list) => fsSet('cga/ptm', { list }),
   listenPtm: (cb)   => fsListen('cga/ptm', d => cb(d?.list ?? null)),
 
+  // Payments (map of { [tid]: { [memberName]: true } })
+  getPayments:    () => fsGet('cga/payments').then(d => d?.data ?? {}),
+  savePayments:   (data) => fsSet('cga/payments', { data }),
+  listenPayments: (cb) => fsListen('cga/payments', d => cb(d?.data ?? {})),
+
   // Score entry work-in-progress
   getScores:    () => fsGet('cga/scores').then(d => d?.data ?? {}),
   saveScores:   (data) => fsSet('cga/scores', { data }),
