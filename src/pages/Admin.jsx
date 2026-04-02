@@ -178,7 +178,7 @@ function parseRosterXlsx(buffer) {
   return { matched, unmatched }
 }
 
-async function withSaveState(setSaving, setSaveStatus, fn) {
+async function withSaveState(setSaving, setSaveStatus, fn, setErrMsg = null) {
   setSaving(true)
   setSaveStatus(null)
   try {
@@ -187,6 +187,7 @@ async function withSaveState(setSaving, setSaveStatus, fn) {
   } catch (e) {
     console.error('Firestore save error:', e)
     setSaveStatus('err')
+    setErrMsg?.(e?.message || String(e) || 'Unknown error')
   } finally {
     setSaving(false)
     setTimeout(() => setSaveStatus(null), 3000)
@@ -595,6 +596,9 @@ function AdminPanel() {
   const [creditSearch, setCreditSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
 
+  // Global save error banner
+  const [adminError, setAdminError] = useState(null)  // string | null
+
   // Save states: null | 'ok' | 'err'
   const [scoresSaving,   setScoresSaving]   = useState(false)
   const [scoresSaveStatus, setScoresSaveStatus] = useState(null)
@@ -892,7 +896,7 @@ function AdminPanel() {
   async function savePairings() {
     if (!tournament) return
     await withSaveState(setPairingsSaving, setPairingsSaveStatus, () =>
-      DB.savePairings({ ...pairingsData })
+      DB.savePairings({ ...pairingsData }), setAdminError
     )
   }
 
@@ -926,7 +930,7 @@ function AdminPanel() {
       tee:    membersOverride[m.name]?.tee    ?? m.tee,
     }))
     await withSaveState(setMembersSaving, setMembersSaveStatus, () =>
-      DB.saveMembers(updated)
+      DB.saveMembers(updated), setAdminError
     )
   }
 
@@ -949,7 +953,7 @@ function AdminPanel() {
 
   async function saveCredits() {
     await withSaveState(setCreditsSaving, setCreditsSaveStatus, () =>
-      DB.saveCredits(credits)
+      DB.saveCredits(credits), setAdminError
     )
   }
 
@@ -1040,13 +1044,13 @@ function AdminPanel() {
         DB.savePtm(updatedPtm),
       ])
       setImportPreview(null)
-    })
+    }, setAdminError)
   }
 
   // ── Save scores draft to Firestore ───────────────────────────────────────────
   async function saveScores() {
     await withSaveState(setScoresSaving, setScoresSaveStatus, () =>
-      DB.saveScores(data)
+      DB.saveScores(data), setAdminError
     )
   }
 
@@ -1105,12 +1109,21 @@ function AdminPanel() {
         DB.savePoy(newPoy),
         DB.saveStandings(newStandings),
       ])
-    })
+    }, setAdminError)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <PageWrapper>
+      {/* Error banner */}
+      {adminError && (
+        <div className="mb-4 flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm font-sans text-red-700">
+          <span className="font-semibold flex-shrink-0">Save error:</span>
+          <span className="flex-1 break-all">{adminError}</span>
+          <button onClick={() => setAdminError(null)} className="flex-shrink-0 text-red-400 hover:text-red-700 leading-none text-lg">×</button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-end justify-between mb-6">
         <div>
