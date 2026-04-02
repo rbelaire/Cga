@@ -92,7 +92,7 @@ function normalizeTee(t) {
  */
 const NAME_SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v'])
 
-function parseRosterXlsx(buffer) {
+function parseRosterXlsx(buffer, membersList) {
   const wb = XLSX.read(buffer, { type: 'array' })
   const sheetName = wb.SheetNames.find(s => s.toLowerCase().includes('roster')) ?? wb.SheetNames[0]
   const ws = wb.Sheets[sheetName]
@@ -103,7 +103,7 @@ function parseRosterXlsx(buffer) {
   const exactLookup  = {}   // normalized "First Last" → memberName
   const lastNameIdx  = {}   // lowercase surname → [memberName, ...]
 
-  for (const m of membersData) {
+  for (const m of membersList) {
     exactLookup[m.name.toLowerCase()] = m.name
     const words = m.name.split(' ')
     const lastWord = words[words.length - 1].toLowerCase()
@@ -372,13 +372,13 @@ async function exportPairingsPDF(tournament, pairings) {
 }
 
 // ── PDF: Points to Make ────────────────────────────────────────────────────────
-async function exportPtmPDF() {
+async function exportPtmPDF(membersList) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   let y = await buildPdfHeader(doc, 'Points to Make', 'CGA 2026 Season — Full Roster by Flight')
 
   const grouped = FLIGHTS.reduce((acc, f) => ({ ...acc, [f]: [] }), {})
   const unassigned = []
-  for (const m of membersData) {
+  for (const m of membersList) {
     if (m.active === false) continue
     if (m.flight && grouped[m.flight]) grouped[m.flight].push(m)
     else unassigned.push(m)
@@ -482,10 +482,10 @@ async function exportResultsPDF(tournament, flightData) {
 }
 
 // ── PDF: Credit on Books ───────────────────────────────────────────────────────
-async function exportCreditsPDF(credits) {
+async function exportCreditsPDF(credits, membersList) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   let y = await buildPdfHeader(doc, 'Credit on Books', `CGA 2026 · As of ${new Date().toLocaleDateString()}`)
-  const rows = membersData
+  const rows = membersList
     .filter(m => m.active !== false)
     .map(m => ({ name: m.name, flight: m.flight ?? 'Unassigned', balance: credits[m.name] ?? 0 }))
     .sort((a, b) => {
@@ -592,8 +592,10 @@ export default function Admin() {
 
 // ── Admin panel ────────────────────────────────────────────────────────────────
 function AdminPanel() {
-  // Live members from Firebase
+  // Live data from Firebase
   const { data: membersData = [] } = useFireData(DB.listenMembers, [])
+  const { data: currentStandings } = useFireData(DB.listenStandings, { flights: {} })
+  const { data: livePtmData } = useFireData(DB.listenPtm, [])
 
   // Tournament score entry data
   const [data, setData] = useState(() => {
@@ -682,7 +684,7 @@ function AdminPanel() {
       flight: membersOverride[m.name]?.flight ?? m.flight,
       ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
     }))
-  }, [membersOverride])
+  }, [membersData, membersOverride])
 
   const ptmLookup = useMemo(
     () => Object.fromEntries(effectiveMembers.map(m => [m.name, m.ptm])),
@@ -734,7 +736,7 @@ function AdminPanel() {
       .filter(m => !search || m.name.toLowerCase().includes(search))
       .slice()
       .sort(compareByLastName)
-  }, [creditSearch])
+  }, [membersData, creditSearch])
 
   const creditTotal = useMemo(
     () => Object.values(credits).reduce((s, v) => s + v, 0),
@@ -993,7 +995,7 @@ function AdminPanel() {
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const result = parseRosterXlsx(ev.target.result)
+        const result = parseRosterXlsx(ev.target.result, membersData)
         setImportPreview(result)
         setImportStatus(null)
         setImportError(null)
@@ -1058,13 +1060,13 @@ function AdminPanel() {
           }
         }
       }
-      // Merge overrides into existing ptm.json list (preserves ptmAtFlowControl etc.)
-      const updatedPtm = ptmData.map(p => ({
+      // Merge overrides into existing PTM list (preserves ptmAtFlowControl etc.)
+      const updatedPtm = (livePtmData || []).map(p => ({
         ...p,
         ...(ptmOverrideMap[p.name] ?? {}),
       }))
-      // Add any matched rows not already in ptm.json
-      const ptmNames = new Set(ptmData.map(p => p.name))
+      // Add any matched rows not already in PTM list
+      const ptmNames = new Set((livePtmData || []).map(p => p.name))
       for (const row of importPreview.matched) {
         if (row.memberName && !ptmNames.has(row.memberName)) {
           updatedPtm.push({
@@ -1329,7 +1331,7 @@ function AdminPanel() {
                 total
               </div>
               <SaveBtn onClick={saveCredits} saving={creditsSaving} status={creditsSaveStatus} />
-              <PdfBtn onClick={() => exportCreditsPDF(credits)}>
+              <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
                 Export Credits PDF
               </PdfBtn>
               {Object.keys(credits).length > 0 && (
@@ -1467,7 +1469,7 @@ function AdminPanel() {
           <PdfBtn onClick={() => exportTournamentInfoPDF(tournament)} disabled={!tournament}>
             Selected Tournament Info
           </PdfBtn>
-          <PdfBtn onClick={() => exportPtmPDF()}>
+          <PdfBtn onClick={() => exportPtmPDF(membersData)}>
             Points to Make (Full Roster)
           </PdfBtn>
           {totalPlayers > 0 && (
@@ -1481,7 +1483,7 @@ function AdminPanel() {
             </PdfBtn>
           )}
           {Object.keys(credits).length > 0 && (
-            <PdfBtn onClick={() => exportCreditsPDF(credits)}>
+            <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
               Credit on Books
             </PdfBtn>
           )}
