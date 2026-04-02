@@ -344,7 +344,7 @@
   {
     "name": "Brett Breaux",
     "flight": "1st Flight",
-    "ptm": 25.4,
+    "ptm": 25,
     "memberSince": null,
     "active": true,
     "email": "brett@becchomes.com",
@@ -498,7 +498,7 @@
   {
     "name": "Alan Chasteen Sr",
     "flight": "1st Flight",
-    "ptm": 29.8,
+    "ptm": 30,
     "memberSince": null,
     "active": true,
     "email": "abchasteen@gmail.com",
@@ -1004,7 +1004,7 @@
   {
     "name": "Kyle Guidry",
     "flight": null,
-    "ptm": 29.6,
+    "ptm": 30,
     "memberSince": null,
     "active": true,
     "email": "kjguidry24@gmail.com",
@@ -1312,7 +1312,7 @@
   {
     "name": "Rickey Lavergne",
     "flight": "5th Flight",
-    "ptm": 12.6,
+    "ptm": 13,
     "memberSince": null,
     "active": true,
     "email": "rlavergne@apsonline.com",
@@ -1334,7 +1334,7 @@
   {
     "name": "Danny Leblanc",
     "flight": "5th Flight",
-    "ptm": 13.6,
+    "ptm": 14,
     "memberSince": null,
     "active": true,
     "email": "dee196743@yahoo.com",
@@ -1664,7 +1664,7 @@
   {
     "name": "Corey Minzey",
     "flight": null,
-    "ptm": 10.7,
+    "ptm": 11,
     "memberSince": null,
     "active": true,
     "email": "csminzey@yahoo.com",
@@ -1796,7 +1796,7 @@
   {
     "name": "Tyler Quirk",
     "flight": null,
-    "ptm": 25.6,
+    "ptm": 26,
     "memberSince": null,
     "active": true,
     "email": "tquirk007@yahoo.com",
@@ -1840,7 +1840,7 @@
   {
     "name": "Jeff Richard",
     "flight": "1st Flight",
-    "ptm": 31.4,
+    "ptm": 31,
     "memberSince": null,
     "active": true,
     "email": "jrichard6201@yahoo.com",
@@ -2093,7 +2093,7 @@
   {
     "name": "Dave Tuttle",
     "flight": "3rd Flight",
-    "ptm": 22.8,
+    "ptm": 23,
     "memberSince": null,
     "active": true,
     "email": "tuttledave@hotmail.com",

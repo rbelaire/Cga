@@ -515,7 +515,7 @@ function AdminPanel() {
 
   const tournament     = schedule.find(t => t.id === tid)
   const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
-  const rawPlayers   = data[tid]?.[flight] ?? []
+  const rawPlayers     = data[tid]?.[flight] ?? []
   const players      = useMemo(() => calcFlightPOY(rawPlayers), [rawPlayers])
   const totalPlayers = FLIGHTS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
 
@@ -608,6 +608,32 @@ function AdminPanel() {
     if (allAddedNames.has(name)) return
     const ptm = ptmLookup[name] ?? ''
     flightSet([...rawPlayers, { name, ptm: ptm !== null && ptm !== undefined ? ptm : '', score: '', eligible: true }])
+  }
+
+  function addSelectedPlayers() {
+    const toAdd = [...selectedPool].filter(n => !allAddedNames.has(n))
+    if (!toAdd.length) return
+    flightSet([...rawPlayers, ...toAdd.map(name => ({ name, ptm: '', score: '', eligible: true }))])
+    setSelectedPool(new Set())
+  }
+
+  function togglePoolSelect(name) {
+    setSelectedPool(prev => {
+      const next = new Set(prev)
+      next.has(name) ? next.delete(name) : next.add(name)
+      return next
+    })
+  }
+
+  function toggleGroupSelect(members) {
+    const names     = members.map(m => m.name)
+    const allChosen = names.every(n => selectedPool.has(n))
+    setSelectedPool(prev => {
+      const next = new Set(prev)
+      if (allChosen) names.forEach(n => next.delete(n))
+      else           names.forEach(n => next.add(n))
+      return next
+    })
   }
 
   function removePlayer(idx) {
