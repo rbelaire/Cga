@@ -7,9 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        'forest':       '#1B3B6F',   // Navy blue (primary)
-        'forest-light': '#2B4F8C',   // Lighter navy
-        'forest-dark':  '#0F2347',   // Darker navy
+        'forest':       '#0F2A4A',   // Navy blue (primary)
+        'forest-light': '#1B3B6F',   // Lighter navy
+        'forest-dark':  '#0A1F35',   // Darker navy
         'gold':         '#C9A84C',   // Amber gold (eagle accent)
         'gold-light':   '#D4B44A',   // Lighter gold
         'gold-dark':    '#A88935',   // Darker gold
