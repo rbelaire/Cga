@@ -3,8 +3,11 @@ import { Link, useParams } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import flowControlPairings from '../data/pairings/2026-flow-control-pairings.json'
 import { formatName } from '../utils/formatName'
+import { useFireData } from '../hooks/useFireData'
+import { DB } from '../db'
 
-const pairingsById = {
+// Static fallback — used until Firestore responds
+const staticPairings = {
   '2026-01': flowControlPairings,
 }
 
@@ -20,7 +23,10 @@ const flightTagStyles = {
 
 export default function Pairings() {
   const { tournamentId } = useParams()
-  const data = pairingsById[tournamentId]
+  const { data: pairingsMap } = useFireData(DB.listenPairings, staticPairings)
+
+  // Prefer live data; fall back to static if Firestore has no entry yet
+  const data = (pairingsMap?.[tournamentId]) ?? staticPairings[tournamentId] ?? null
 
   useEffect(() => {
     document.title = data ? `Pairings | ${data.tournament}` : 'Pairings | CGA 2026'

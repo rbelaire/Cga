@@ -6,8 +6,10 @@ import koasati from '../data/results/2026-koasati-flow-control.json'
 import { formatDateLong } from '../utils/formatDate'
 import StandingsTable from '../components/ui/StandingsTable'
 import { formatName } from '../utils/formatName'
+import { DB } from '../db'
 
-const resultFiles = {
+// Static fallback results — used until Firestore responds for each tournament
+const staticResultFiles = {
   '2026-01': koasati,
 }
 
@@ -16,6 +18,20 @@ export default function Results() {
   const completed = schedule.filter((t) => t.status === 'completed')
   const { state } = useLocation()
   const [expanded, setExpanded] = useState(state?.expand ?? completed[0]?.id ?? null)
+
+  // Live results from Firestore, merged on top of static fallbacks
+  const [liveResults, setLiveResults] = useState({})
+  useEffect(() => {
+    if (!completed.length) return
+    const unsubs = completed.map(t =>
+      DB.listenResult(t.id, (data) => {
+        if (data) setLiveResults(prev => ({ ...prev, [t.id]: data }))
+      })
+    )
+    return () => unsubs.forEach(u => u?.())
+  }, []) // completed derives from static schedule.json — stable
+
+  const resultFiles = { ...staticResultFiles, ...liveResults }
 
   return (
     <PageWrapper>
@@ -105,10 +121,10 @@ function FlightLeaderboards({ leaderboard }) {
   const scoreColumns = [
     { key: 'rank',      label: 'Rank',   sortable: false },
     { key: 'name',      label: 'Player', sortable: true  },
-    { key: 'poy',       label: 'POY',    sortable: true  },
-    { key: 'points',    label: 'Score',  sortable: true  },
-    { key: 'ptm',       label: 'PTM',    sortable: true  },
-    { key: 'plusMinus', label: '+/-',    sortable: true  },
+    { key: 'poy',       label: 'POY',    sortable: true,  tooltip: 'Player of the Year points earned at this tournament.' },
+    { key: 'points',    label: 'Score',  sortable: true,  tooltip: 'Stableford score posted at this tournament.' },
+    { key: 'ptm',       label: 'PTM',    sortable: true,  tooltip: 'Points to Make — handicap target for this tournament.' },
+    { key: 'plusMinus', label: '+/−',    sortable: true,  tooltip: 'Score minus PTM. Positive = above target (better).' },
   ]
 
   return (
@@ -132,7 +148,9 @@ function FlightLeaderboards({ leaderboard }) {
           </button>
         ))}
       </div>
-      <StandingsTable data={leaderboard[flight]} columns={scoreColumns} highlightTop={3} />
+      <div key={flight} className="animate-tab-in">
+        <StandingsTable data={leaderboard[flight]} columns={scoreColumns} highlightTop={3} />
+      </div>
     </div>
   )
 }
