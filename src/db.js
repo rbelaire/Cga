@@ -7,7 +7,7 @@
  *   cga/poy              – { flights: { ... } }
  *   cga/pairings         – { [tournamentId]: [...] }
  *   cga/credits          – { [memberName]: balance }
- *   cga/results/{tid}    – full result document for one tournament
+ *   cga/results          – { data: { [tid]: resultDoc, ... } }
  *   cga/scores           – { [tid]: { [flight]: [...players] } }  (admin work-in-progress)
  */
 import { db } from './firebase'
@@ -26,6 +26,10 @@ export async function fsGet(path) {
 
 export async function fsSet(path, data) {
   await setDoc(REF(path), data)
+}
+
+export async function fsMerge(path, data) {
+  await setDoc(REF(path), data, { merge: true })
 }
 
 export function fsListen(path, callback) {
@@ -72,8 +76,8 @@ export const DB = {
   saveScores:   (data) => fsSet('cga/scores', { data }),
   listenScores: (cb)  => fsListen('cga/scores', d => cb(d?.data ?? {})),
 
-  // Tournament results (one doc per tournament)
-  getResult:    (tid) => fsGet(`results/${tid}`),
-  saveResult:   (tid, data) => fsSet(`results/${tid}`, data),
-  listenResult: (tid, cb) => fsListen(`results/${tid}`, cb),
+  // Tournament results (map of all tournaments in one doc)
+  getResult:    (tid) => fsGet('cga/results').then(d => d?.data?.[tid] ?? null),
+  saveResult:   (tid, data) => fsMerge('cga/results', { data: { [tid]: data } }),
+  listenResult: (tid, cb) => fsListen('cga/results', d => cb(d?.data?.[tid] ?? null)),
 }

@@ -735,7 +735,7 @@ function AdminPanel() {
     [currentPairings]
   )
   const unpairedPlayers = useMemo(
-    () => FLIGHTS.flatMap(fl =>
+    () => ALL_SCORE_TABS.flatMap(fl =>
       (data[tid]?.[fl] ?? [])
         .filter(p => !pairedNames.has(p.name))
         .map(p => ({ name: p.name, flight: fl }))
@@ -837,7 +837,7 @@ function AdminPanel() {
 
   // ── Pairings functions ────────────────────────────────────────────────────────
   function generatePairings() {
-    const allPlayers = FLIGHTS.flatMap(fl =>
+    const allPlayers = ALL_SCORE_TABS.flatMap(fl =>
       (data[tid]?.[fl] ?? []).map(p => ({ name: p.name, flight: fl }))
     )
     if (!allPlayers.length) return
