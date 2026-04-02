@@ -641,6 +641,7 @@ function AdminPanel() {
   const [importPreview,  setImportPreview]  = useState(null)   // { matched, unmatched } | null
   const [importSaving,   setImportSaving]   = useState(false)
   const [importStatus,   setImportStatus]   = useState(null)   // null | 'ok' | 'err'
+  const [importError,    setImportError]    = useState(null)   // error message | null
   const fileInputRef = useRef(null)
 
   // Draft-cache to localStorage (unchanged — keeps data across page refreshes)
@@ -985,9 +986,11 @@ function AdminPanel() {
         const result = parseRosterXlsx(ev.target.result)
         setImportPreview(result)
         setImportStatus(null)
+        setImportError(null)
       } catch (err) {
         console.error('Excel parse error:', err)
         setImportStatus('err')
+        setImportError(err?.message || String(err) || 'Failed to parse Excel file')
       }
     }
     reader.readAsArrayBuffer(file)
@@ -997,6 +1000,7 @@ function AdminPanel() {
 
   async function confirmImport() {
     if (!importPreview) return
+    setImportError(null)
     await withSaveState(setImportSaving, setImportStatus, async () => {
       // Build updated member list: apply tee, ptm, and full PTM history from Excel rows
       const overrideMap = {}
@@ -2052,6 +2056,15 @@ function FlightManagementPanel({
           <SaveBtn onClick={saveMembers} saving={membersSaving} status={membersSaveStatus} />
         </div>
       </div>
+
+      {/* Import error */}
+      {importError && (
+        <div className="mb-4 flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm font-sans text-red-700">
+          <span className="font-semibold flex-shrink-0">Import error:</span>
+          <span className="flex-1 break-all">{importError}</span>
+          <button onClick={() => setImportError(null)} className="flex-shrink-0 text-red-400 hover:text-red-700 leading-none text-lg">×</button>
+        </div>
+      )}
 
       {/* Import preview */}
       {importPreview && (
