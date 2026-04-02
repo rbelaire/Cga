@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import PageWrapper from '../components/layout/PageWrapper'
@@ -6,6 +6,7 @@ import schedule from '../data/schedule.json'
 import membersData from '../data/members.json'
 import currentStandings from '../data/standings.json'
 import { formatName, compareByLastName } from '../utils/formatName'
+import { DB } from '../db'
 
 const FLIGHTS      = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const STORAGE_KEY  = 'cga_admin_v1'
@@ -59,12 +60,28 @@ function calcFlightPOY(players) {
 const fmtPM  = pm => pm == null ? '—' : pm > 0 ? `+${pm}` : `${pm}`
 const fmtPOY = p  => p.poy == null ? '—' : p.eligible === false ? 'X' : p.poy % 1 === 0 ? String(p.poy) : p.poy.toFixed(1)
 
+// Keep downloadJSON for PDF-adjacent uses (e.g. debug), but primary flow is Firestore.
 function downloadJSON(obj, filename) {
   const a = Object.assign(document.createElement('a'), {
     href:     URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' })),
     download: filename,
   })
   a.click()
+}
+
+async function withSaveState(setSaving, setSaveStatus, fn) {
+  setSaving(true)
+  setSaveStatus(null)
+  try {
+    await fn()
+    setSaveStatus('ok')
+  } catch (e) {
+    console.error('Firestore save error:', e)
+    setSaveStatus('err')
+  } finally {
+    setSaving(false)
+    setTimeout(() => setSaveStatus(null), 3000)
+  }
 }
 
 function fmtDate(iso) {
@@ -462,48 +479,38 @@ function AdminPanel() {
     try { return JSON.parse(localStorage.getItem(CREDITS_KEY)) || {} } catch { return {} }
   })
 
-  const [saved,        setSaved]        = useState(false)
   const [tid,          setTid]          = useState(schedule[0]?.id ?? '')
   const [flight,       setFlight]       = useState(FLIGHTS[0])
   const [poolSearch,   setPoolSearch]   = useState('')
-  const [exportNote,   setExportNote]   = useState('')
-  const [adminMode,    setAdminMode]    = useState('scores')  // 'scores' | 'pairings' | 'flights' | 'credits'
+  const [adminMode,    setAdminMode]    = useState('scores')
   const [creditSearch, setCreditSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
 
-  // pairings manual mode: unpaired pool → cards
-  const [manualPairings,  setManualPairings]  = useState(false)
-  const [selectedUnpaired, setSelectedUnpaired] = useState(null)  // name of selected player
+  // Save states: null | 'ok' | 'err'
+  const [scoresSaving,   setScoresSaving]   = useState(false)
+  const [scoresSaveStatus, setScoresSaveStatus] = useState(null)
+  const [pairingsSaving, setPairingsSaving] = useState(false)
+  const [pairingsSaveStatus, setPairingsSaveStatus] = useState(null)
+  const [membersSaving,  setMembersSaving]  = useState(false)
+  const [membersSaveStatus, setMembersSaveStatus] = useState(null)
+  const [creditsSaving,  setCreditsSaving]  = useState(false)
+  const [creditsSaveStatus, setCreditsSaveStatus] = useState(null)
+  const [publishSaving,  setPublishSaving]  = useState(false)
+  const [publishSaveStatus, setPublishSaveStatus] = useState(null)
+
+  // pairings manual mode
+  const [manualPairings,   setManualPairings]   = useState(false)
+  const [selectedUnpaired, setSelectedUnpaired] = useState(null)
 
   // flight management edit state
-  const [flightSearch, setFlightSearch] = useState('')
-  const [editingMember, setEditingMember] = useState(null) // name of member being edited inline
+  const [flightSearch,  setFlightSearch]  = useState('')
+  const [editingMember, setEditingMember] = useState(null)
 
-  // persist score data and show saved indicator
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    const t = setTimeout(() => {
-      setSaved(true)
-      const t2 = setTimeout(() => setSaved(false), 1200)
-      return () => clearTimeout(t2)
-    }, 0)
-    return () => clearTimeout(t)
-  }, [data])
-
-  // persist pairings
-  useEffect(() => {
-    localStorage.setItem(PAIRINGS_KEY, JSON.stringify(pairingsData))
-  }, [pairingsData])
-
-  // persist member overrides
-  useEffect(() => {
-    localStorage.setItem(MEMBERS_KEY, JSON.stringify(membersOverride))
-  }, [membersOverride])
-
-  // persist credits
-  useEffect(() => {
-    localStorage.setItem(CREDITS_KEY, JSON.stringify(credits))
-  }, [credits])
+  // Draft-cache to localStorage (unchanged — keeps data across page refreshes)
+  useEffect(() => { localStorage.setItem(STORAGE_KEY,  JSON.stringify(data))            }, [data])
+  useEffect(() => { localStorage.setItem(PAIRINGS_KEY, JSON.stringify(pairingsData))    }, [pairingsData])
+  useEffect(() => { localStorage.setItem(MEMBERS_KEY,  JSON.stringify(membersOverride)) }, [membersOverride])
+  useEffect(() => { localStorage.setItem(CREDITS_KEY,  JSON.stringify(credits))         }, [credits])
 
   const tournament     = schedule.find(t => t.id === tid)
   const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
@@ -741,12 +748,10 @@ function AdminPanel() {
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
   }
 
-  function exportPairings() {
-    if (!tournament || !currentPairings.length) return
-    const slug = tid.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-    downloadJSON(
-      { id: tid, tournament: tournament.name, source: 'CGA Admin', pairings: currentPairings },
-      `${slug}-pairings.json`
+  async function savePairings() {
+    if (!tournament) return
+    await withSaveState(setPairingsSaving, setPairingsSaveStatus, () =>
+      DB.savePairings({ ...pairingsData })
     )
   }
 
@@ -765,13 +770,15 @@ function AdminPanel() {
     }))
   }
 
-  function exportMembersJson() {
+  async function saveMembers() {
     const updated = membersData.map(m => ({
       ...m,
       flight: membersOverride[m.name]?.flight ?? m.flight,
       ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
     }))
-    downloadJSON(updated, 'members.json')
+    await withSaveState(setMembersSaving, setMembersSaveStatus, () =>
+      DB.saveMembers(updated)
+    )
   }
 
   // ── Credit mutations ──────────────────────────────────────────────────────────
@@ -791,67 +798,75 @@ function AdminPanel() {
     setCredits({})
   }
 
-  // ── Results export ────────────────────────────────────────────────────────────
-  function doExport() {
-    if (!tournament) return
-    const flightWinners = [], leaderboard = {}
-    for (const fl of FLIGHTS) {
-      const ps     = calcFlightPOY(data[tid]?.[fl] ?? [])
-      const ranked = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
-      const allRows = [...ranked, ...ps.filter(p => p.rank == null)]
-      leaderboard[fl] = allRows.map(p => ({
-        rank: p.rank ?? 0, name: p.name, poy: p.poy ?? 0,
-        points: Number(p.score) || 0, ptm: Number(p.ptm) || 0, plusMinus: p.plusMinus ?? 0,
-      }))
-      if (ranked[0]) flightWinners.push({ flight: fl, winner: ranked[0].name, points: ranked[0].poy ?? 0 })
-    }
-
-    const resultFile = {
-      id: tid, name: tournament.name, date: tournament.date, course: tournament.course,
-      format: 'Individual Stroke Play', status: 'completed', flightWinners, leaderboard,
-    }
-
-    const newPoy = { flights: {} }
-    for (const fl of FLIGHTS) {
-      const ps = calcFlightPOY(data[tid]?.[fl] ?? [])
-      newPoy.flights[fl] = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
-        .map((p, i) => ({ rank: i + 1, name: p.name, points: p.poy ?? 0, events: 1 }))
-    }
-
-    const prevPtmLookup = {}
-    for (const fl of FLIGHTS) {
-      for (const p of (currentStandings.flights[fl] ?? [])) {
-        if (p.ptm != null) prevPtmLookup[p.name] = p.ptm
-      }
-    }
-
-    const newStandings = { flights: {} }
-    for (const fl of FLIGHTS) {
-      const ps     = calcFlightPOY(data[tid]?.[fl] ?? [])
-      const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
-      newStandings.flights[fl] = sorted.map((p, i) => {
-        const newPtm   = ptmLookup[p.name] ?? (Number(p.ptm) || null)
-        const oldPtm   = prevPtmLookup[p.name] ?? null
-        const ptmDelta = (newPtm != null && oldPtm != null) ? +(newPtm - oldPtm).toFixed(2) : 0
-        return {
-          rank: i + 1, name: p.name, poy: p.poy ?? 0, ptm: newPtm, ptmDelta,
-          latestScore: Number(p.score) || null, latestTournament: tournament.name, events: 1, trend: 'up',
-        }
-      })
-    }
-
-    const slug = tid.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-    downloadJSON(resultFile,  `${slug}-results.json`)
-    setTimeout(() => downloadJSON(newPoy,       'poy.json'),       200)
-    setTimeout(() => downloadJSON(newStandings, 'standings.json'), 400)
-    setExportNote(
-      `3 files downloaded.\n` +
-      `1. Place ${slug}-results.json → src/data/results/\n` +
-      `2. Replace poy.json and standings.json → src/data/\n` +
-      `3. In Results.jsx add:\n` +
-      `   import r${slug.replace(/-/g, '_')} from '../data/results/${slug}-results.json'\n` +
-      `   '${tid}': r${slug.replace(/-/g, '_')}  ← add to resultFiles`
+  async function saveCredits() {
+    await withSaveState(setCreditsSaving, setCreditsSaveStatus, () =>
+      DB.saveCredits(credits)
     )
+  }
+
+  // ── Save scores draft to Firestore ───────────────────────────────────────────
+  async function saveScores() {
+    await withSaveState(setScoresSaving, setScoresSaveStatus, () =>
+      DB.saveScores(data)
+    )
+  }
+
+  // ── Publish tournament results to Firestore ───────────────────────────────────
+  async function doExport() {
+    if (!tournament) return
+    await withSaveState(setPublishSaving, setPublishSaveStatus, async () => {
+      const flightWinners = [], leaderboard = {}
+      for (const fl of FLIGHTS) {
+        const ps      = calcFlightPOY(data[tid]?.[fl] ?? [])
+        const ranked  = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
+        const allRows = [...ranked, ...ps.filter(p => p.rank == null)]
+        leaderboard[fl] = allRows.map(p => ({
+          rank: p.rank ?? 0, name: p.name, poy: p.poy ?? 0,
+          points: Number(p.score) || 0, ptm: Number(p.ptm) || 0, plusMinus: p.plusMinus ?? 0,
+        }))
+        if (ranked[0]) flightWinners.push({ flight: fl, winner: ranked[0].name, points: ranked[0].poy ?? 0 })
+      }
+
+      const resultDoc = {
+        id: tid, name: tournament.name, date: tournament.date, course: tournament.course,
+        format: 'Individual Stroke Play', status: 'completed', flightWinners, leaderboard,
+      }
+
+      const newPoy = { flights: {} }
+      for (const fl of FLIGHTS) {
+        const ps = calcFlightPOY(data[tid]?.[fl] ?? [])
+        newPoy.flights[fl] = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
+          .map((p, i) => ({ rank: i + 1, name: p.name, points: p.poy ?? 0, events: 1 }))
+      }
+
+      const prevPtmLookup = {}
+      for (const fl of FLIGHTS) {
+        for (const p of (currentStandings.flights[fl] ?? [])) {
+          if (p.ptm != null) prevPtmLookup[p.name] = p.ptm
+        }
+      }
+
+      const newStandings = { flights: {} }
+      for (const fl of FLIGHTS) {
+        const ps     = calcFlightPOY(data[tid]?.[fl] ?? [])
+        const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
+        newStandings.flights[fl] = sorted.map((p, i) => {
+          const newPtm   = ptmLookup[p.name] ?? (Number(p.ptm) || null)
+          const oldPtm   = prevPtmLookup[p.name] ?? null
+          const ptmDelta = (newPtm != null && oldPtm != null) ? +(newPtm - oldPtm).toFixed(2) : 0
+          return {
+            rank: i + 1, name: p.name, poy: p.poy ?? 0, ptm: newPtm, ptmDelta,
+            latestScore: Number(p.score) || null, latestTournament: tournament.name, events: 1, trend: 'up',
+          }
+        })
+      }
+
+      await Promise.all([
+        DB.saveResult(tid, resultDoc),
+        DB.savePoy(newPoy),
+        DB.saveStandings(newStandings),
+      ])
+    })
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -863,7 +878,6 @@ function AdminPanel() {
           <h1 className="section-title text-3xl">Tournament Admin</h1>
           <div className="gold-divider" />
         </div>
-        {saved && <span className="text-green-600 font-sans text-xs mb-7">Saved ✓</span>}
       </div>
 
       {/* Tournament selector */}
@@ -934,7 +948,11 @@ function AdminPanel() {
           fmtPM={fmtPM}
           fmtPOY={fmtPOY}
           doExport={doExport}
-          exportNote={exportNote}
+          publishSaving={publishSaving}
+          publishSaveStatus={publishSaveStatus}
+          saveScores={saveScores}
+          scoresSaving={scoresSaving}
+          scoresSaveStatus={scoresSaveStatus}
           ptmLookup={ptmLookup}
           tournament={tournament}
           totalPlayers={totalPlayers}
@@ -960,7 +978,9 @@ function AdminPanel() {
           assignUnpairedToGroup={assignUnpairedToGroup}
           clearPairings={clearPairings}
           removePairedPlayer={removePairedPlayer}
-          exportPairings={exportPairings}
+          savePairings={savePairings}
+          pairingsSaving={pairingsSaving}
+          pairingsSaveStatus={pairingsSaveStatus}
           onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}
           tournament={tournament}
           flightTagStyles={flightTagStyles}
@@ -979,7 +999,9 @@ function AdminPanel() {
           setEditingMember={setEditingMember}
           updateMemberFlight={updateMemberFlight}
           updateMemberPtm={updateMemberPtm}
-          exportMembersJson={exportMembersJson}
+          saveMembers={saveMembers}
+          membersSaving={membersSaving}
+          membersSaveStatus={membersSaveStatus}
           flightTagStyles={flightTagStyles}
         />
       )}
@@ -1007,6 +1029,7 @@ function AdminPanel() {
                 </span>{' '}
                 total
               </div>
+              <SaveBtn onClick={saveCredits} saving={creditsSaving} status={creditsSaveStatus} />
               <PdfBtn onClick={() => exportCreditsPDF(credits)}>
                 Export Credits PDF
               </PdfBtn>
@@ -1169,12 +1192,40 @@ function AdminPanel() {
   )
 }
 
+// ── Reusable Save Button ──────────────────────────────────────────────────────
+function SaveBtn({ onClick, saving, status, label = 'Save to Cloud', className = '' }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={saving}
+      className={`flex items-center gap-1.5 px-4 py-2 text-xs font-sans font-semibold rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+        status === 'ok'  ? 'bg-green-600 text-white' :
+        status === 'err' ? 'bg-red-500   text-white' :
+                           'bg-forest    text-white hover:bg-forest/90'
+      } ${className}`}
+    >
+      {saving ? (
+        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+      ) : status === 'ok' ? '✓ Saved' : status === 'err' ? '✗ Error' : (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+      )}
+      {!saving && status !== 'ok' && status !== 'err' && label}
+    </button>
+  )
+}
+
 // ── Score Entry Panel ─────────────────────────────────────────────────────────
 function ScoreEntryPanel({
   flights, flight, setFlight, data, tid, players, rawPlayers,
   poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
   addPlayer, removePlayer, updatePlayer, clearFlight, movePlayerToFlight,
-  prevFlight, nextFlight, fmtPM, fmtPOY, doExport, exportNote,
+  prevFlight, nextFlight, fmtPM, fmtPOY, doExport,
+  publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
 }) {
   return (
@@ -1346,32 +1397,29 @@ function ScoreEntryPanel({
         </div>
       </div>
 
-      {/* Export & Publish */}
+      {/* Save & Publish */}
       <div className="bg-white border border-gray-200 rounded-lg p-5">
-        <h2 className="text-forest font-sans text-xs font-semibold uppercase tracking-widest mb-1">Export & Publish</h2>
+        <h2 className="text-forest font-sans text-xs font-semibold uppercase tracking-widest mb-1">Save & Publish</h2>
         <p className="text-gray-500 font-sans text-xs mb-4 leading-relaxed">
-          Downloads updated JSON files. Replace in <code className="bg-gray-100 px-1 rounded">src/data/</code> and commit to publish sitewide.
+          <strong className="text-darktext">Save Draft</strong> — stores scores in the cloud for later.{' '}
+          <strong className="text-darktext">Publish Results</strong> — calculates standings and POY and makes them live on the site instantly.
         </p>
         <div className="flex flex-wrap gap-2">
-          <button onClick={doExport} className="btn-primary text-xs py-2 px-4">
-            Download All JSON Files
-          </button>
-          <button
+          <SaveBtn onClick={saveScores} saving={scoresSaving} status={scoresSaveStatus} label="Save Draft" />
+          <SaveBtn
+            onClick={doExport}
+            saving={publishSaving}
+            status={publishSaveStatus}
+            label="Publish Results"
+            className="!bg-gold !text-forest hover:!bg-gold/90"
+          />
+          <PdfBtn
             onClick={onExportResultsPDF}
             disabled={!tournament || totalPlayers === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-            </svg>
             Export Results PDF
-          </button>
+          </PdfBtn>
         </div>
-        {exportNote && (
-          <pre className="mt-4 bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono text-gray-600 whitespace-pre-wrap leading-relaxed">
-            {exportNote}
-          </pre>
-        )}
       </div>
     </>
   )
@@ -1486,8 +1534,8 @@ function PairingsPanel({
   totalPlayers, currentPairings, unpairedPlayers, manualPairings,
   selectedUnpaired, setSelectedUnpaired,
   generatePairings, startManualPairings, addGroupManual, removeGroupManual,
-  assignUnpairedToGroup, clearPairings, removePairedPlayer, exportPairings,
-  onExportPairingsPDF, tournament,
+  assignUnpairedToGroup, clearPairings, removePairedPlayer, savePairings,
+  pairingsSaving, pairingsSaveStatus, onExportPairingsPDF, tournament,
   flightTagStyles,
 }) {
   return (
@@ -1516,19 +1564,10 @@ function PairingsPanel({
           )}
           {currentPairings.length > 0 && (
             <>
-              <button onClick={exportPairings} className="btn-primary text-xs py-1.5 px-3">
-                Export Pairings JSON
-              </button>
-              <button
-                onClick={onExportPairingsPDF}
-                disabled={!tournament}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-semibold rounded border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                </svg>
+              <SaveBtn onClick={savePairings} saving={pairingsSaving} status={pairingsSaveStatus} label="Save Pairings" />
+              <PdfBtn onClick={onExportPairingsPDF} disabled={!tournament}>
                 Export Pairings PDF
-              </button>
+              </PdfBtn>
               <button
                 onClick={clearPairings}
                 className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
@@ -1689,7 +1728,7 @@ function PairingsPanel({
 function FlightManagementPanel({
   effectiveMembers, flightSearch, setFlightSearch,
   editingMember, setEditingMember,
-  updateMemberFlight, updateMemberPtm, exportMembersJson, flightTagStyles,
+  updateMemberFlight, updateMemberPtm, saveMembers, membersSaving, membersSaveStatus, flightTagStyles,
 }) {
   const filtered = useMemo(() => {
     const s = flightSearch.trim().toLowerCase()
@@ -1705,13 +1744,10 @@ function FlightManagementPanel({
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
           <p className="text-xs font-sans text-gray-500 leading-relaxed">
-            Set each player's flight and PTM here. Changes are saved locally and used throughout the admin panel.
-            Export <code className="bg-gray-100 px-1 rounded">members.json</code> to publish to the site.
+            Set each player's flight and PTM here. Hit <strong className="text-darktext">Save to Cloud</strong> to publish changes to the live site instantly.
           </p>
         </div>
-        <button onClick={exportMembersJson} className="btn-primary text-xs whitespace-nowrap flex-shrink-0">
-          Export members.json
-        </button>
+        <SaveBtn onClick={saveMembers} saving={membersSaving} status={membersSaveStatus} className="whitespace-nowrap flex-shrink-0" />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">

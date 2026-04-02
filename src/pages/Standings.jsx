@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import StandingsTable from '../components/ui/StandingsTable'
-import standings from '../data/standings.json'
+import standingsStatic from '../data/standings.json'
+import { useFireData } from '../hooks/useFireData'
+import { DB } from '../db'
 import ptmData from '../data/ptm.json'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
@@ -33,8 +35,10 @@ export default function Standings() {
   useEffect(() => { document.title = 'Standings | CGA 2026' }, [])
   const [tab, setTab] = useState(0)
 
+  const { data: standings } = useFireData(DB.listenStandings, standingsStatic)
+
   const currentFlight = FLIGHTS[tab]
-  const flightData = (standings.flights[currentFlight] || []).map(withRounds)
+  const flightData = (standings?.flights?.[currentFlight] || []).map(withRounds)
 
   // Find latest tournament name from first player that has one
   const latestTournament = flightData.find(p => p.latestTournament)?.latestTournament ?? null
@@ -59,7 +63,7 @@ export default function Standings() {
 
       <div className="flex flex-wrap gap-2 mb-6">
         {FLIGHTS.map((label, i) => {
-          const count = (standings.flights[label] || []).length
+          const count = (standings?.flights?.[label] || []).length
           return (
             <button
               key={label}

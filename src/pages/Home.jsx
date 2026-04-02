@@ -4,13 +4,16 @@ import NextTournament from '../components/sections/NextTournament'
 import QuickLinks from '../components/sections/QuickLinks'
 import SponsorBar from '../components/sections/SponsorBar'
 import { Link } from 'react-router-dom'
-import standings from '../data/standings.json'
+import standingsStatic from '../data/standings.json'
 import { formatName } from '../utils/formatName'
+import { useFireData } from '../hooks/useFireData'
+import { DB } from '../db'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 
 export default function Home() {
   useEffect(() => { document.title = 'Carencro Golf Association' }, [])
+  const { data: standings } = useFireData(DB.listenStandings, standingsStatic)
 
   return (
     <>
@@ -35,7 +38,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FLIGHTS.map((flight) => {
-              const top5 = (standings.flights[flight] || []).slice(0, 5)
+              const top5 = (standings?.flights?.[flight] || []).slice(0, 5)
               return (
                 <div key={flight} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                   <div className="bg-forest px-4 py-3">
