@@ -11,26 +11,34 @@ function roundPtm(val) {
   return Math.round(val)
 }
 
-
 function ScoreCell({ value, ptm }) {
   if (value == null) return <span className="text-gray-300 stat-number">—</span>
   if (ptm == null) return <span className="stat-number text-gray-500">{value}</span>
   const diff = value - ptm
   const color = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-500'
-  return <span className={`stat-number font-medium ${color}`}>{value}</span>
+  const icon = diff > 0 ? '▲' : diff < 0 ? '▼' : null
+  return (
+    <span className={`stat-number font-medium ${color} inline-flex items-center gap-0.5`}>
+      {icon && <span className="text-xs leading-none">{icon}</span>}
+      {value}
+    </span>
+  )
 }
 
-function SortHeader({ label, colKey, sortKey, sortDir, onSort, className = '' }) {
+function SortHeader({ label, colKey, sortKey, sortDir, onSort, className = '', tooltip }) {
   return (
     <th
       className={`table-header text-white cursor-pointer select-none ${className}`}
       onClick={() => onSort(colKey)}
+      title={tooltip}
     >
       <span className="flex items-center gap-1">
         {label}
-        {sortKey === colKey && (
-          <span className="text-gold">{sortDir === 'asc' ? '↑' : '↓'}</span>
-        )}
+        {tooltip && <span className="text-white/40 text-xs" aria-hidden="true">ⓘ</span>}
+        {sortKey === colKey
+          ? <span className="text-gold">{sortDir === 'asc' ? '↑' : '↓'}</span>
+          : <span className="text-white/30">⇅</span>
+        }
       </span>
     </th>
   )
@@ -154,19 +162,77 @@ export default function PointsToMake() {
         </span>
         <span>·</span>
         <span>
-          <span className="text-green-600 font-semibold stat-number">Green</span> = above PTM
+          <span className="text-green-600 font-semibold">▲</span>
+          <span className="text-green-600 font-semibold stat-number ml-0.5">Green</span> = above PTM
           &nbsp;·&nbsp;
-          <span className="text-red-500 font-semibold stat-number">Red</span> = below PTM
+          <span className="text-red-500 font-semibold">▼</span>
+          <span className="text-red-500 font-semibold stat-number ml-0.5">Red</span> = below PTM
         </span>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      {/* Mobile cards — visible below sm */}
+      <div className="sm:hidden space-y-2 mb-6">
+        {sorted.length === 0 ? (
+          <p className="text-center text-gray-400 font-sans text-sm py-8">No players found.</p>
+        ) : sorted.map((player, idx) => {
+          const displayPtm = roundPtm(player.ptm)
+          const noPtm = displayPtm == null
+          return (
+            <div
+              key={player.name}
+              className={`border border-gray-200 rounded-lg p-3 ${
+                noPtm ? 'opacity-50 bg-white' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+              }`}
+            >
+              {/* Header: name + PTM */}
+              <div className="flex items-center gap-2 mb-2">
+                <span className="font-sans text-darktext font-medium flex-1 min-w-0 truncate">
+                  {formatName(player.name)}
+                </span>
+                <TeeTag tee={player.tee} />
+                {displayPtm != null ? (
+                  <span className="flex items-center gap-1">
+                    <span className="text-xs text-gray-400 font-sans">PTM</span>
+                    <span className="stat-number font-bold text-forest">{displayPtm}</span>
+                    <TrendArrow ptm={player.ptm} ptmAtFlowControl={player.ptmAtFlowControl} />
+                  </span>
+                ) : (
+                  <span className="text-gray-300 stat-number text-sm">—</span>
+                )}
+              </div>
+              {/* Recent scores row */}
+              <div className="flex items-end gap-3 flex-wrap">
+                {player.history.slice(0, 5).map((score, hi) => (
+                  <div key={hi} className="flex flex-col items-center">
+                    <span className="text-gray-400 font-sans text-xs leading-none mb-0.5">
+                      {HISTORY_LABELS[hi]}
+                    </span>
+                    <ScoreCell value={score} ptm={displayPtm} />
+                  </div>
+                ))}
+                <span className="ml-auto stat-number text-gray-400 text-xs self-end">
+                  {player.rounds}/7
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Desktop table — hidden below sm */}
+      <div className="hidden sm:block overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
             <tr className="bg-forest border-b border-forest">
-              <SortHeader label="Player" colKey="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-              <SortHeader label="PTM" colKey="ptm" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+              <SortHeader
+                label="Player" colKey="name"
+                sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
+              />
+              <SortHeader
+                label="PTM" colKey="ptm"
+                sortKey={sortKey} sortDir={sortDir} onSort={handleSort}
+                tooltip="Points to Make — your handicap target score, calculated from your last 7 rounds."
+              />
               {HISTORY_LABELS.map((lbl) => (
                 <th key={lbl} className="table-header text-white/70 font-normal">
                   {lbl}
