@@ -62,6 +62,9 @@ function CellValue({ col, row, idx, highlightTop }) {
   if (col.key === 'events') return (
     <span className="stat-number text-gray-500">{row.events}</span>
   )
+  if (col.key === 'scratchPts') return (
+    <span className="stat-number font-semibold text-darktext">{row.scratchPts ?? '—'}</span>
+  )
   if (col.key === 'trend') return row.trend ? (
     <span className={`text-base font-bold ${TREND_COLORS[row.trend]}`}>
       {TREND_ICONS[row.trend]}
