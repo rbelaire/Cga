@@ -5,6 +5,11 @@ function isBubble(rounds) {
   return typeof rounds === 'number' && rounds >= 1 && rounds < 4
 }
 
+function getBubbleRounds(row) {
+  if (typeof row.rounds === 'number') return row.rounds
+  return row.events
+}
+
 const TREND_ICONS = {
   up: '↑',
   down: '↓',
@@ -27,7 +32,7 @@ function CellValue({ col, row, idx, highlightTop }) {
       <span className={`font-sans ${idx < highlightTop ? 'text-darktext font-semibold' : 'text-darktext'}`}>
         {formatName(row.name)}
       </span>
-      {isBubble(row.events) && (
+      {isBubble(getBubbleRounds(row)) && (
         <span className="text-xs font-sans font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200 whitespace-nowrap">
           Bubble
         </span>
@@ -141,7 +146,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3 }) {
               }`}>
                 {formatName(row.name)}
               </span>
-              {isBubble(row.events) && (
+              {isBubble(getBubbleRounds(row)) && (
                 <span className="text-xs font-sans font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200 whitespace-nowrap">
                   Bubble
                 </span>

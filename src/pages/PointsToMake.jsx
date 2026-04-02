@@ -19,9 +19,7 @@ function roundPtm(val) {
  */
 function memberToPtmRow(m) {
   const history = Array.isArray(m.history) ? m.history : Array(7).fill(null)
-  const rounds = typeof m.rounds === 'number'
-    ? m.rounds
-    : history.filter(v => typeof v === 'number').length
+  const rounds = history.filter(v => typeof v === 'number').length
   return {
     name:              m.name,
     tee:               m.tee ?? null,
