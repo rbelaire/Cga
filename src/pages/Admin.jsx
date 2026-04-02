@@ -7,6 +7,7 @@ import membersData from '../data/members.json'
 import currentStandings from '../data/standings.json'
 import { formatName, compareByLastName } from '../utils/formatName'
 import { DB } from '../db'
+import TeeTag from '../components/ui/TeeTag'
 
 const FLIGHTS      = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const STORAGE_KEY  = 'cga_admin_v1'
@@ -770,11 +771,19 @@ function AdminPanel() {
     }))
   }
 
+  function updateMemberTee(name, newTee) {
+    setMembersOverride(prev => ({
+      ...prev,
+      [name]: { ...(prev[name] ?? {}), tee: newTee || null }
+    }))
+  }
+
   async function saveMembers() {
     const updated = membersData.map(m => ({
       ...m,
       flight: membersOverride[m.name]?.flight ?? m.flight,
       ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
+      tee:    membersOverride[m.name]?.tee    ?? m.tee,
     }))
     await withSaveState(setMembersSaving, setMembersSaveStatus, () =>
       DB.saveMembers(updated)
@@ -999,6 +1008,7 @@ function AdminPanel() {
           setEditingMember={setEditingMember}
           updateMemberFlight={updateMemberFlight}
           updateMemberPtm={updateMemberPtm}
+          updateMemberTee={updateMemberTee}
           saveMembers={saveMembers}
           membersSaving={membersSaving}
           membersSaveStatus={membersSaveStatus}
@@ -1725,10 +1735,13 @@ function PairingsPanel({
 }
 
 // ── Flight Management Panel ───────────────────────────────────────────────────
+const TEE_OPTIONS = ['Back', 'Senior', 'Front']
+
 function FlightManagementPanel({
   effectiveMembers, flightSearch, setFlightSearch,
   editingMember, setEditingMember,
-  updateMemberFlight, updateMemberPtm, saveMembers, membersSaving, membersSaveStatus, flightTagStyles,
+  updateMemberFlight, updateMemberPtm, updateMemberTee,
+  saveMembers, membersSaving, membersSaveStatus, flightTagStyles,
 }) {
   const filtered = useMemo(() => {
     const s = flightSearch.trim().toLowerCase()
@@ -1770,8 +1783,9 @@ function FlightManagementPanel({
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="table-header text-gray-500 text-left">Player</th>
-                <th className="table-header text-gray-500 text-left">Current Flight</th>
+                <th className="table-header text-gray-500 text-left">Flight</th>
                 <th className="table-header text-gray-500 text-center">PTM</th>
+                <th className="table-header text-gray-500 text-center">Tee</th>
                 <th className="table-header text-gray-500 text-center">Actions</th>
               </tr>
             </thead>
@@ -1826,6 +1840,24 @@ function FlightManagementPanel({
                         <span className="stat-number text-xs text-gray-600">
                           {m.ptm ?? '—'}
                         </span>
+                      )}
+                    </td>
+
+                    {/* Tee */}
+                    <td className="px-4 py-2.5 text-center">
+                      {isEditing ? (
+                        <select
+                          value={m.tee ?? ''}
+                          onChange={e => updateMemberTee(m.name, e.target.value)}
+                          className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
+                        >
+                          <option value="">—</option>
+                          {TEE_OPTIONS.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <TeeTag tee={m.tee} />
                       )}
                     </td>
 

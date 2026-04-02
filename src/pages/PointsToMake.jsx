@@ -2,14 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import ptmData from '../data/ptm.json'
 import { formatName } from '../utils/formatName'
+import TeeTag from '../components/ui/TeeTag'
 
 const HISTORY_LABELS = ['New', '2nd', '3rd', '4th', '5th', '6th', '7th']
-
-const TEE_STYLES = {
-  Back:  'bg-gray-800 text-white',
-  Front: 'bg-sky-600 text-white',
-  Sr:    'bg-amber-500 text-white',
-}
 
 function roundPtm(val) {
   if (val == null) return null
@@ -201,11 +196,7 @@ export default function PointsToMake() {
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <span className="font-sans text-darktext font-medium">{formatName(player.name)}</span>
-                        {player.tee && (
-                          <span className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${TEE_STYLES[player.tee] ?? 'bg-gray-200 text-gray-600'}`}>
-                            {player.tee}
-                          </span>
-                        )}
+                        <TeeTag tee={player.tee} />
                       </div>
                     </td>
                     <td className="px-4 py-2.5">

@@ -1,10 +1,5 @@
 import { formatName } from '../../utils/formatName'
-
-const TEE_STYLES = {
-  Back:  'bg-gray-800 text-white',
-  Front: 'bg-sky-600 text-white',
-  Sr:    'bg-amber-500 text-white',
-}
+import TeeTag from './TeeTag'
 
 function isBubble(events) {
   return typeof events === 'number' && events >= 1 && events < 4
@@ -44,11 +39,7 @@ export default function MemberCard({ member }) {
                 Bubble
               </span>
             )}
-            {tee && (
-              <span className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded ${TEE_STYLES[tee] ?? 'bg-gray-200 text-gray-600'}`}>
-                {tee}
-              </span>
-            )}
+            <TeeTag tee={tee} />
             {memberSince && (
               <span className="text-xs text-gray-400 font-sans">'{String(memberSince).slice(-2)}</span>
             )}
