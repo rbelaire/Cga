@@ -1304,6 +1304,8 @@ function AdminPanel() {
           confirmImport={confirmImport}
           importSaving={importSaving}
           importStatus={importStatus}
+          importError={importError}
+          setImportError={setImportError}
         />
       )}
 
@@ -2031,7 +2033,7 @@ function FlightManagementPanel({
   updateMemberFlight, updateMemberPtm, updateMemberTee,
   saveMembers, membersSaving, membersSaveStatus, flightTagStyles,
   fileInputRef, handleXlsxFile, importPreview, setImportPreview,
-  confirmImport, importSaving, importStatus,
+  confirmImport, importSaving, importStatus, importError, setImportError,
 }) {
   const filtered = useMemo(() => {
     const s = flightSearch.trim().toLowerCase()
