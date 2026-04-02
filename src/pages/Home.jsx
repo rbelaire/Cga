@@ -5,29 +5,11 @@ import QuickLinks from '../components/sections/QuickLinks'
 import SponsorBar from '../components/sections/SponsorBar'
 import { Link } from 'react-router-dom'
 import { formatName } from '../utils/formatName'
+import { computeScratch } from '../utils/computeScratch'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
-
-function computeScratch(allResults) {
-  const totals = {}
-  for (const tid of Object.keys(allResults)) {
-    const result = allResults[tid]
-    if (!result?.leaderboard) continue
-    for (const flight of Object.keys(result.leaderboard)) {
-      for (const player of result.leaderboard[flight]) {
-        if (!player.name || typeof player.points !== 'number') continue
-        if (!totals[player.name]) totals[player.name] = { name: player.name, scratchPts: 0, events: 0 }
-        totals[player.name].scratchPts += player.points
-        totals[player.name].events += 1
-      }
-    }
-  }
-  return Object.values(totals)
-    .sort((a, b) => b.scratchPts - a.scratchPts)
-    .slice(0, 10)
-}
 
 export default function Home() {
   useEffect(() => { document.title = 'Carencro Golf Association' }, [])
@@ -44,7 +26,7 @@ export default function Home() {
     return all.sort((a, b) => (b.poy ?? 0) - (a.poy ?? 0)).slice(0, 10)
   }, [standings])
 
-  const scratchTop10 = useMemo(() => computeScratch(allResults ?? {}), [allResults])
+  const scratchTop10 = useMemo(() => computeScratch(allResults ?? {}).slice(0, 10), [allResults])
 
   return (
     <>

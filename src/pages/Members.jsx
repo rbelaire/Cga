@@ -135,7 +135,7 @@ export default function Members() {
       </div>
 
       <p className="text-gray-500 font-sans text-sm mb-4">
-        {filtered.length} {filtered.length === 1 ? 'member' : 'members'}{tab !== 'All' ? ` · sorted by PTM` : ''}
+        {filtered.length} {filtered.length === 1 ? 'member' : 'members'}{tab !== 'All' ? ` · sorted by last name` : ''}
       </p>
 
       {tab === 'All' && !query ? (

@@ -6,8 +6,8 @@ function isBubble(rounds) {
 }
 
 export default function MemberCard({ member }) {
-  const { name, ptm, memberSince, email, cell, homePhone, tee, events, rounds } = member
-  const hasData = ptm !== null
+  const { name, ptm, memberSince, email, cell, homePhone, tee, flight, events, rounds } = member
+  const hasData = ptm !== null && flight != null
   const phone = cell || homePhone
   const displayName = formatName(name)
   const bubbleRounds = typeof rounds === 'number' ? rounds : events

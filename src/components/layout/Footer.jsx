@@ -33,7 +33,7 @@ export default function Footer() {
                 ['/', 'Home'],
                 ['/schedule', 'Tournament Schedule'],
                 ['/standings', 'Season Standings'],
-                ['/schedule', 'Results'],
+                ['/results', 'Results'],
                 ['/eligibility', 'Eligibility Rules'],
               ].map(([to, label]) => (
                 <li key={label}>

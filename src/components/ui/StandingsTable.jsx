@@ -104,15 +104,6 @@ export default function StandingsTable({ data, columns, highlightTop = 3, showBu
     }
   }
 
-  const sorted = sortKey
-    ? [...data].sort((a, b) => {
-        const av = a[sortKey]
-        const bv = b[sortKey]
-        const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv
-        return sortDir === 'asc' ? cmp : -cmp
-      })
-    : data
-
   if (!data || data.length === 0) {
     return (
       <div className="rounded-lg border border-gray-100 bg-gray-50 py-12 text-center">
@@ -120,6 +111,18 @@ export default function StandingsTable({ data, columns, highlightTop = 3, showBu
       </div>
     )
   }
+
+  const sorted = sortKey
+    ? [...data].sort((a, b) => {
+        const av = a[sortKey]
+        const bv = b[sortKey]
+        if (av == null && bv == null) return 0
+        if (av == null) return 1
+        if (bv == null) return -1
+        const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    : data
 
   const metricCols = defaultColumns.filter(c => !['rank', 'name', 'trend'].includes(c.key))
 

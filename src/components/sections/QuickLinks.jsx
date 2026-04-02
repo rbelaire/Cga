@@ -67,10 +67,10 @@ export default function QuickLinks() {
   return (
     <section className="py-8 sm:py-10 bg-gray-50 border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           {links.map(({ to, label, description, icon }) => (
             <Link
-              key={to}
+              key={label}
               to={to}
               className="group flex flex-col items-center text-center px-2 py-5 sm:p-6 bg-white border border-gray-200 rounded-xl hover:border-gold hover:shadow-sm active:scale-95 transition-all duration-150"
             >

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import StandingsTable from '../components/ui/StandingsTable'
+import { computeScratch } from '../utils/computeScratch'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 
@@ -23,25 +24,6 @@ const scratchColumns = [
   { key: 'scratchPts', label: 'Scratch Pts', sortable: true,  tooltip: 'Total Stableford points scored across all completed tournaments.' },
   { key: 'events',     label: 'Events',       sortable: true,  tooltip: 'Number of tournaments played this season.' },
 ]
-
-function computeScratch(allResults) {
-  const totals = {}
-  for (const tid of Object.keys(allResults)) {
-    const result = allResults[tid]
-    if (!result?.leaderboard) continue
-    for (const flight of Object.keys(result.leaderboard)) {
-      for (const player of result.leaderboard[flight]) {
-        if (!player.name || typeof player.points !== 'number') continue
-        if (!totals[player.name]) totals[player.name] = { name: player.name, scratchPts: 0, events: 0 }
-        totals[player.name].scratchPts += player.points
-        totals[player.name].events += 1
-      }
-    }
-  }
-  return Object.values(totals)
-    .sort((a, b) => b.scratchPts - a.scratchPts)
-    .map((p, i) => ({ ...p, rank: i + 1 }))
-}
 
 export default function Standings() {
   useEffect(() => { document.title = 'Standings | CGA 2026' }, [])

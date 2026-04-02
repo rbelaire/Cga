@@ -1,6 +1,9 @@
+import { useEffect } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 
 export default function Eligibility() {
+  useEffect(() => { document.title = 'Eligibility | CGA 2026' }, [])
+
   return (
     <PageWrapper className="max-w-3xl">
       <div className="mb-8">
@@ -43,9 +46,9 @@ export default function Eligibility() {
               <tbody>
                 {[
                   ['Championship', '+5 to 5'],
-                  ['A Flight', '6 to 12'],
-                  ['B Flight', '13 to 18'],
-                  ['C Flight', '19 and above'],
+                  ['1st Flight', '6 to 12'],
+                  ['2nd Flight', '13 to 18'],
+                  ['3rd Flight', '19 and above'],
                 ].map(([flight, range], i) => (
                   <tr key={flight} className={i % 2 === 0 ? 'bg-gray-100' : 'bg-white'}>
                     <td className="px-4 py-2 font-sans font-medium text-forest">{flight}</td>
