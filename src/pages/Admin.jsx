@@ -8,6 +8,7 @@ import schedule from '../data/schedule.json'
 import { formatName, compareByLastName } from '../utils/formatName'
 import { DB } from '../db'
 import { auth } from '../firebase'
+import { useFireData } from '../hooks/useFireData'
 import TeeTag from '../components/ui/TeeTag'
 
 const FLIGHTS      = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
