@@ -62,6 +62,11 @@ export const DB = {
   saveCredits:   (balances) => fsSet('cga/credits', { balances }),
   listenCredits: (cb) => fsListen('cga/credits', d => cb(d?.balances ?? {})),
 
+  // PTM history (list of { name, ptm, ptmAtFlowControl, tee, history, rounds })
+  getPtm:    () => fsGet('cga/ptm').then(d => d?.list ?? null),
+  savePtm:   (list) => fsSet('cga/ptm', { list }),
+  listenPtm: (cb)   => fsListen('cga/ptm', d => cb(d?.list ?? null)),
+
   // Score entry work-in-progress
   getScores:    () => fsGet('cga/scores').then(d => d?.data ?? {}),
   saveScores:   (data) => fsSet('cga/scores', { data }),
