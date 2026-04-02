@@ -15,7 +15,7 @@ const STORAGE_KEY  = 'cga_admin_v1'
 const PAIRINGS_KEY = 'cga_pairings_v1'
 const MEMBERS_KEY  = 'cga_members_v1'
 const CREDITS_KEY  = 'cga_credits_v1'
-const PIN          = 'cga2026'
+const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
 
 const PDF_NAVY = [27,  59,  111]
 const PDF_GOLD = [201, 168, 76]

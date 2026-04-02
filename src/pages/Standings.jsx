@@ -23,11 +23,11 @@ function withRounds(row) {
 const columns = [
   { key: 'rank',        label: 'Rank',         sortable: false },
   { key: 'name',        label: 'Player',        sortable: true  },
-  { key: 'poy',         label: 'POY Pts',       sortable: true  },
-  { key: 'ptm',         label: 'PTM',           sortable: true  },
-  { key: 'ptmDelta',    label: 'PTM Δ',         sortable: true  },
-  { key: 'latestScore', label: 'Latest Score',  sortable: true  },
-  { key: 'events',      label: 'Events',        sortable: true  },
+  { key: 'poy',         label: 'POY Pts',       sortable: true,  tooltip: 'Player of the Year points. Top finishers per flight earn points each tournament (base 350, −25 per position).' },
+  { key: 'ptm',         label: 'PTM',           sortable: true,  tooltip: 'Points to Make — your handicap target score calculated from your last 7 rounds.' },
+  { key: 'ptmDelta',    label: 'PTM Δ',         sortable: true,  tooltip: 'Change in PTM since the previous tournament. ▼ green = improved (lower target). ▲ red = higher target.' },
+  { key: 'latestScore', label: 'Latest Score',  sortable: true,  tooltip: 'Your Stableford score at the most recent tournament.' },
+  { key: 'events',      label: 'Events',        sortable: true,  tooltip: 'Number of tournaments played this season.' },
   { key: 'trend',       label: '',              sortable: false  },
 ]
 
@@ -81,7 +81,9 @@ export default function Standings() {
         })}
       </div>
 
-      <StandingsTable data={flightData} columns={columns} highlightTop={3} />
+      <div key={tab} className="animate-tab-in">
+        <StandingsTable data={flightData} columns={columns} highlightTop={3} />
+      </div>
     </PageWrapper>
   )
 }

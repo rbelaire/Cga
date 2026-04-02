@@ -22,7 +22,7 @@ const links = [
     ),
   },
   {
-    to: '/schedule',
+    to: '/results',
     label: 'Results',
     description: 'Past event scores',
     icon: (

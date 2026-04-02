@@ -29,10 +29,7 @@ export default function Home() {
               <h2 className="section-title">2026 Flight Standings</h2>
               <div className="gold-divider" />
             </div>
-            <Link
-              to="/standings"
-              className="mb-7 px-4 py-2 text-sm font-sans font-medium rounded-lg border border-forest text-forest hover:bg-forest hover:text-white transition-colors"
-            >
+            <Link to="/standings" className="btn-outline mb-7 text-sm py-2 px-4">
               Full Standings →
             </Link>
           </div>
