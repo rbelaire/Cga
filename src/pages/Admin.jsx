@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
+import { signInWithEmailAndPassword } from 'firebase/auth'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import membersData from '../data/members.json'
@@ -9,6 +10,7 @@ import currentStandings from '../data/standings.json'
 import ptmData from '../data/ptm.json'
 import { formatName, compareByLastName } from '../utils/formatName'
 import { DB } from '../db'
+import { auth } from '../firebase'
 import TeeTag from '../components/ui/TeeTag'
 
 const FLIGHTS      = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
@@ -534,14 +536,26 @@ function PdfBtn({ onClick, children, disabled = false }) {
 }
 
 // ── PIN gate ───────────────────────────────────────────────────────────────────
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@cga.local'
+
 export default function Admin() {
   const [pin,      setPin]      = useState('')
   const [unlocked, setUnlocked] = useState(false)
   const [err,      setErr]      = useState(false)
+  const [loading,  setLoading]  = useState(false)
 
-  const tryUnlock = () => {
-    if (pin === PIN) { setUnlocked(true) }
-    else { setErr(true); setTimeout(() => setErr(false), 1500) }
+  const tryUnlock = async () => {
+    if (pin !== PIN) { setErr(true); setTimeout(() => setErr(false), 1500); return }
+    setLoading(true)
+    try {
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pin)
+    } catch (e) {
+      // Auth failure is non-fatal — admin UI still works, writes will just fail
+      console.warn('Firebase sign-in failed:', e.message)
+    } finally {
+      setLoading(false)
+      setUnlocked(true)
+    }
   }
 
   if (!unlocked) return (
@@ -556,7 +570,9 @@ export default function Admin() {
             className={`w-full border rounded px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-forest ${err ? 'border-red-400' : 'border-gray-300'}`}
           />
           {err && <p className="text-red-500 text-xs font-sans">Incorrect PIN.</p>}
-          <button onClick={tryUnlock} className="btn-primary w-full text-center">Unlock</button>
+          <button onClick={tryUnlock} disabled={loading} className="btn-primary w-full text-center disabled:opacity-60">
+            {loading ? 'Signing in…' : 'Unlock'}
+          </button>
         </div>
       </div>
     </PageWrapper>
