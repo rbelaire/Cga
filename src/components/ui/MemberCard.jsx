@@ -1,16 +1,17 @@
 import { formatName } from '../../utils/formatName'
 import TeeTag from './TeeTag'
 
-function isBubble(events) {
-  return typeof events === 'number' && events >= 1 && events < 4
+function isBubble(rounds) {
+  return typeof rounds === 'number' && rounds >= 1 && rounds < 4
 }
 
 export default function MemberCard({ member }) {
-  const { name, ptm, memberSince, email, cell, homePhone, tee, events } = member
+  const { name, ptm, memberSince, email, cell, homePhone, tee, events, rounds } = member
   const hasData = ptm !== null
   const phone = cell || homePhone
   const displayName = formatName(name)
-  const bubble = isBubble(events)
+  const bubbleRounds = typeof rounds === 'number' ? rounds : events
+  const bubble = isBubble(bubbleRounds)
   const initials = name
     .split(' ')
     .map((n) => n[0])
