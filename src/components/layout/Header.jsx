@@ -3,12 +3,14 @@ import { Link, NavLink } from 'react-router-dom'
 
 const navLinks = [
   { to: '/schedule', label: 'Schedule' },
+  { to: '/results', label: 'Results' },
   { to: '/points-to-make', label: 'Points to Make' },
   { to: '/standings', label: 'Standings' },
   { to: '/members', label: 'Members' },
   { to: '/rules', label: 'Rules' },
   { to: '/board', label: 'Board' },
   { to: '/sponsors', label: 'Sponsors' },
+  { to: '/admin', label: 'Admin', highlight: true },
 ]
 
 export default function Header() {
@@ -48,7 +50,7 @@ export default function Header() {
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map(({ to, label }) => (
+            {navLinks.map(({ to, label, highlight }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -56,7 +58,9 @@ export default function Header() {
                   `px-3 py-2 text-sm font-sans font-medium rounded transition-colors duration-150 ${
                     isActive
                       ? 'text-gold bg-white/10 border-b-2 border-gold'
-                      : 'text-white/90 hover:text-gold hover:bg-white/5'
+                      : highlight
+                        ? 'text-gold/80 hover:text-gold hover:bg-white/5'
+                        : 'text-white/90 hover:text-gold hover:bg-white/5'
                   }`
                 }
               >
@@ -87,7 +91,7 @@ export default function Header() {
       {menuOpen && (
         <div className="lg:hidden bg-forest-dark border-t border-forest-light/30">
           <nav className="px-4 py-3 flex flex-col gap-1">
-            {navLinks.map(({ to, label }) => (
+            {navLinks.map(({ to, label, highlight }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -96,7 +100,9 @@ export default function Header() {
                   `block px-4 py-3 text-sm font-sans font-medium rounded ${
                     isActive
                       ? 'text-gold bg-forest'
-                      : 'text-white/80 hover:text-gold hover:bg-forest'
+                      : highlight
+                        ? 'text-gold/80 hover:text-gold hover:bg-forest'
+                        : 'text-white/80 hover:text-gold hover:bg-forest'
                   }`
                 }
               >
