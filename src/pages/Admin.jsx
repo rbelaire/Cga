@@ -11,7 +11,8 @@ import { auth } from '../firebase'
 import { useFireData } from '../hooks/useFireData'
 import TeeTag from '../components/ui/TeeTag'
 
-const FLIGHTS      = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+const ALL_SCORE_TABS   = [...FLIGHTS, 'New Players']
 const STORAGE_KEY  = 'cga_admin_v1'
 const PAIRINGS_KEY = 'cga_pairings_v1'
 const MEMBERS_KEY  = 'cga_members_v1'
@@ -28,7 +29,8 @@ const flightTagStyles = {
   '3rd Flight': 'bg-emerald-50 text-emerald-700 border-emerald-200',
   '4th Flight': 'bg-purple-50 text-purple-700 border-purple-200',
   '5th Flight': 'bg-pink-50 text-pink-700 border-pink-200',
-  Unassigned:   'bg-gray-100 text-gray-600 border-gray-200',
+  Unassigned:    'bg-gray-100 text-gray-600 border-gray-200',
+  'New Players': 'bg-teal-50 text-teal-700 border-teal-200',
 }
 
 // ── POY calculation ────────────────────────────────────────────────────────────
@@ -679,12 +681,12 @@ function AdminPanel() {
   const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
   const rawPlayers     = data[tid]?.[flight] ?? []
   const players      = useMemo(() => calcFlightPOY(rawPlayers), [rawPlayers])
-  const totalPlayers = FLIGHTS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
+  const totalPlayers = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
 
   // All names entered for this tournament across all flights
   const allAddedNames = useMemo(() => {
     const names = new Set()
-    for (const fl of FLIGHTS) {
+    for (const fl of ALL_SCORE_TABS) {
       for (const p of (data[tid]?.[fl] ?? [])) names.add(p.name)
     }
     return names
@@ -829,9 +831,9 @@ function AdminPanel() {
     })
   }
 
-  const flightIdx  = FLIGHTS.indexOf(flight)
-  const prevFlight = flightIdx > 0                  ? FLIGHTS[flightIdx - 1] : null
-  const nextFlight = flightIdx < FLIGHTS.length - 1 ? FLIGHTS[flightIdx + 1] : null
+  const flightIdx  = ALL_SCORE_TABS.indexOf(flight)
+  const prevFlight = flightIdx > 0                       ? ALL_SCORE_TABS[flightIdx - 1] : null
+  const nextFlight = flightIdx < ALL_SCORE_TABS.length - 1 ? ALL_SCORE_TABS[flightIdx + 1] : null
 
   // ── Pairings functions ────────────────────────────────────────────────────────
   function generatePairings() {
@@ -1254,7 +1256,7 @@ function AdminPanel() {
       ══════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'scores' && (
         <ScoreEntryPanel
-          flights={FLIGHTS}
+          flights={ALL_SCORE_TABS}
           flight={flight}
           setFlight={f => { setFlight(f); setPoolSearch('') }}
           data={data}
@@ -1619,7 +1621,14 @@ function ScoreEntryPanel({
         <div className="flex-1 min-w-0">
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
-              <span className="text-white font-sans text-sm font-semibold">{flight}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-white font-sans text-sm font-semibold">{flight}</span>
+                {flight === 'New Players' && (
+                  <span className="text-xs font-sans px-2 py-0.5 rounded bg-teal-400/30 text-teal-200 border border-teal-400/40">
+                    scores logged — not published to standings
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-gold font-mono text-xs">{rawPlayers.length} players</span>
                 {rawPlayers.length > 0 && (
