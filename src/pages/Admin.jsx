@@ -1147,6 +1147,17 @@ function AdminPanel() {
         if (ranked[0]) flightWinners.push({ flight: fl, winner: ranked[0].name, points: ranked[0].poy ?? 0 })
       }
 
+      // Include New Players in leaderboard (poy: 0) so scratch standings count them
+      const newPlayerRows = (data[tid]?.['New Players'] ?? []).filter(p => p.name && p.score != null && p.score !== '')
+      if (newPlayerRows.length) {
+        leaderboard['New Players'] = newPlayerRows.map(p => ({
+          rank: 0, name: p.name, poy: 0,
+          points: Number(p.score) || 0, ptm: Number(p.ptm) || 0,
+          plusMinus: (p.ptm != null && p.ptm !== '' && p.score != null && p.score !== '')
+            ? Number(p.score) - Number(p.ptm) : 0,
+        }))
+      }
+
       const resultDoc = {
         id: tid, name: tournament.name, date: tournament.date, course: tournament.course,
         format: 'Individual Stroke Play', status: 'completed', flightWinners, leaderboard,
