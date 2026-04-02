@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, Link } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import koasati from '../data/results/2026-koasati-flow-control.json'
@@ -19,6 +19,12 @@ export default function Results() {
 
   return (
     <PageWrapper>
+      <nav className="flex items-center gap-1.5 text-xs font-sans text-gray-400 mb-6">
+        <Link to="/" className="hover:text-forest transition-colors">Home</Link>
+        <span>/</span>
+        <span className="text-darktext font-medium">Results</span>
+      </nav>
+
       <div className="mb-8">
         <h1 className="section-title text-3xl sm:text-4xl">Tournament Results</h1>
         <div className="gold-divider" />

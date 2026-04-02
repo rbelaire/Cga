@@ -95,7 +95,7 @@ export default function Members() {
       </p>
 
       {tab === 'All' && !query ? (
-        <div className="space-y-8">
+        <div key="all" className="animate-tab-in space-y-8">
           {FLIGHTS.map((flight) => {
             const players = byFlight[flight] ?? []
             if (players.length === 0) return null
@@ -134,16 +134,21 @@ export default function Members() {
           )}
         </div>
       ) : (
-        <>
+        <div key={tab + query} className="animate-tab-in">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filtered.map((m) => (
               <MemberCard key={m.name} member={m} />
             ))}
           </div>
           {filtered.length === 0 && (
-            <p className="text-center text-gray-500 font-sans py-16">No members match your search.</p>
+            <div className="text-center py-16">
+              <p className="text-gray-500 font-sans text-sm">No members match "{query}".</p>
+              <p className="text-gray-400 font-sans text-xs mt-1">
+                Try a different name or{tab !== 'All' ? ' switch to the All tab to search across all flights.' : ' check your spelling.'}
+              </p>
+            </div>
           )}
-        </>
+        </div>
       )}
     </PageWrapper>
   )

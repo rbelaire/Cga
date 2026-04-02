@@ -81,7 +81,9 @@ export default function Standings() {
         })}
       </div>
 
-      <StandingsTable data={flightData} columns={columns} highlightTop={3} />
+      <div key={tab} className="animate-tab-in">
+        <StandingsTable data={flightData} columns={columns} highlightTop={3} />
+      </div>
     </PageWrapper>
   )
 }
