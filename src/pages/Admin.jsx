@@ -6,6 +6,7 @@ import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import membersData from '../data/members.json'
 import currentStandings from '../data/standings.json'
+import ptmData from '../data/ptm.json'
 import { formatName, compareByLastName } from '../utils/formatName'
 import { DB } from '../db'
 import TeeTag from '../components/ui/TeeTag'
@@ -1002,7 +1003,42 @@ function AdminPanel() {
         return next
       })
 
-      await DB.saveMembers(updatedMembers)
+      // Build updated PTM list: apply tee + ptm + history + rounds from Excel rows
+      const ptmOverrideMap = {}
+      for (const row of importPreview.matched) {
+        if (row.memberName) {
+          ptmOverrideMap[row.memberName] = {
+            ...(row.tee     !== null ? { tee:     row.tee                } : {}),
+            ...(row.ptm     !== null ? { ptm:     Number(row.ptm)        } : {}),
+            ...(row.history           ? { history: row.history           } : {}),
+            ...(row.rounds  != null   ? { rounds:  row.rounds            } : {}),
+          }
+        }
+      }
+      // Merge overrides into existing ptm.json list (preserves ptmAtFlowControl etc.)
+      const updatedPtm = ptmData.map(p => ({
+        ...p,
+        ...(ptmOverrideMap[p.name] ?? {}),
+      }))
+      // Add any matched rows not already in ptm.json
+      const ptmNames = new Set(ptmData.map(p => p.name))
+      for (const row of importPreview.matched) {
+        if (row.memberName && !ptmNames.has(row.memberName)) {
+          updatedPtm.push({
+            name:             row.memberName,
+            ptm:              row.ptm  !== null ? Number(row.ptm) : null,
+            ptmAtFlowControl: null,
+            tee:              row.tee  ?? null,
+            history:          row.history,
+            rounds:           row.rounds,
+          })
+        }
+      }
+
+      await Promise.all([
+        DB.saveMembers(updatedMembers),
+        DB.savePtm(updatedPtm),
+      ])
       setImportPreview(null)
     })
   }
