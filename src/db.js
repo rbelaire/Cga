@@ -73,7 +73,7 @@ export const DB = {
   listenScores: (cb)  => fsListen('cga/scores', d => cb(d?.data ?? {})),
 
   // Tournament results (one doc per tournament)
-  getResult:  (tid) => fsGet(`cga/results/${tid}`),
-  saveResult: (tid, data) => fsSet(`cga/results/${tid}`, data),
-  listenResult: (tid, cb) => fsListen(`cga/results/${tid}`, cb),
+  getResult:    (tid) => fsGet(`results/${tid}`),
+  saveResult:   (tid, data) => fsSet(`results/${tid}`, data),
+  listenResult: (tid, cb) => fsListen(`results/${tid}`, cb),
 }
