@@ -80,4 +80,5 @@ export const DB = {
   getResult:    (tid) => fsGet('cga/results').then(d => d?.data?.[tid] ?? null),
   saveResult:   (tid, data) => fsMerge('cga/results', { data: { [tid]: data } }),
   listenResult: (tid, cb) => fsListen('cga/results', d => cb(d?.data?.[tid] ?? null)),
+  listenResults: (cb) => fsListen('cga/results', d => cb(d?.data ?? {})),
 }
