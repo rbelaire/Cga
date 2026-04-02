@@ -1014,11 +1014,18 @@ function AdminPanel() {
     if (!importPreview) return
     setImportError(null)
     await withSaveState(setImportSaving, setImportStatus, async () => {
+      // If Firebase is empty, accept all unmatched rows as new members (bootstrap mode)
+      const isBootstrapping = membersData.length === 0
+      const rowsToImport = isBootstrapping
+        ? [...importPreview.matched, ...importPreview.unmatched.map(r => ({ ...r, memberName: r.rawName }))]
+        : importPreview.matched
+
       // Build updated member list: apply all Excel fields to members
       const overrideMap = {}
-      for (const row of importPreview.matched) {
+      for (const row of rowsToImport) {
         if (row.memberName) {
           overrideMap[row.memberName] = {
+            name:              row.memberName,
             ...(row.tee            !== null ? { tee:           row.tee                } : {}),
             ...(row.ptm            !== null ? { ptm:           Number(row.ptm)        } : {}),
             ...(row.flight         !== null ? { flight:        row.flight             } : {}),
@@ -1032,12 +1039,18 @@ function AdminPanel() {
         }
       }
 
-      const updatedMembers = membersData.map(m => ({
-        ...m,
-        ...(overrideMap[m.name] ?? {}),
-        // Also apply any in-panel overrides (flight takes precedence from panel if set)
-        flight: membersOverride[m.name]?.flight ?? overrideMap[m.name]?.flight ?? m.flight,
-      }))
+      let updatedMembers
+      if (isBootstrapping) {
+        // Create new members from Excel rows
+        updatedMembers = Object.values(overrideMap)
+      } else {
+        // Update existing members
+        updatedMembers = membersData.map(m => ({
+          ...m,
+          ...(overrideMap[m.name] ?? {}),
+          flight: membersOverride[m.name]?.flight ?? overrideMap[m.name]?.flight ?? m.flight,
+        }))
+      }
 
       // Update local override state so the table reflects immediately
       setMembersOverride(prev => {
@@ -1050,7 +1063,7 @@ function AdminPanel() {
 
       // Build updated PTM list: apply tee + ptm + history + rounds from Excel rows
       const ptmOverrideMap = {}
-      for (const row of importPreview.matched) {
+      for (const row of rowsToImport) {
         if (row.memberName) {
           ptmOverrideMap[row.memberName] = {
             ...(row.tee     !== null ? { tee:     row.tee                } : {}),
@@ -1065,9 +1078,9 @@ function AdminPanel() {
         ...p,
         ...(ptmOverrideMap[p.name] ?? {}),
       }))
-      // Add any matched rows not already in PTM list
+      // Add any new rows not already in PTM list
       const ptmNames = new Set((livePtmData || []).map(p => p.name))
-      for (const row of importPreview.matched) {
+      for (const row of rowsToImport) {
         if (row.memberName && !ptmNames.has(row.memberName)) {
           updatedPtm.push({
             name:             row.memberName,
@@ -2093,11 +2106,14 @@ function FlightManagementPanel({
               <p className="text-sm font-sans font-semibold text-amber-800">
                 Ready to import — {importPreview.matched.length} members matched
                 {importPreview.unmatched.length > 0 && (
-                  <span className="text-amber-600"> · {importPreview.unmatched.length} rows not found in roster</span>
+                  <span className="text-amber-600"> · {importPreview.unmatched.length} new members will be created</span>
                 )}
               </p>
               <p className="text-xs font-sans text-amber-700 mt-0.5">
-                This will update member info (flight, tee, PTM, contact, credits). Review below then confirm.
+                {membersData.length === 0
+                  ? 'Bootstrapping roster: all unmatched rows will be added as new members.'
+                  : 'This will update member info (flight, tee, PTM, contact, credits).'}
+                {' '}Review below then confirm.
               </p>
             </div>
             <button
