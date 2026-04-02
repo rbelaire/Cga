@@ -11,7 +11,7 @@ const hdcpColumns = [
   { key: 'name',        label: 'Player',        sortable: true  },
   { key: 'poy',         label: 'HDCP',          sortable: true,  tooltip: 'Handicap Player of the Year points. Top finishers per flight earn points each tournament (base 350, −25 per position).' },
   { key: 'ptm',         label: 'PTM',           sortable: true,  tooltip: 'Points to Make — your handicap target score calculated from your last 7 rounds.' },
-  { key: 'ptmDelta',    label: 'PTM Δ',         sortable: true,  tooltip: 'Change in PTM since the previous tournament. ▼ green = improved (lower target). ▲ red = higher target.' },
+  { key: 'ptmDelta',    label: 'PTM Δ',         sortable: true,  tooltip: 'Change in PTM from the Koasati tournament to current PTM. ▼ green = improved (lower target). ▲ red = higher target.' },
   { key: 'latestScore', label: 'Latest Score',  sortable: true,  tooltip: 'Your Stableford score at the most recent tournament.' },
   { key: 'events',      label: 'Events',        sortable: true,  tooltip: 'Number of tournaments played this season.' },
   { key: 'trend',       label: '',              sortable: false  },
@@ -62,13 +62,30 @@ export default function Standings() {
     return lookup
   }, [ptmList])
 
+  const koasatiPtmLookup = useMemo(() => {
+    const lookup = {}
+    for (const player of ptmList || []) {
+      if (player.name && typeof player.ptmAtFlowControl === 'number') {
+        lookup[player.name] = player.ptmAtFlowControl
+      }
+    }
+    return lookup
+  }, [ptmList])
+
   const currentFlight = FLIGHTS[tab]
   const flightData = useMemo(
     () => (standings?.flights?.[currentFlight] || []).map(row => {
       const rounds = roundsFromPtm[row.name]
-      return rounds != null ? { ...row, rounds } : row
+      const baselinePtm = koasatiPtmLookup[row.name]
+      const ptmDelta =
+        typeof row.ptm === 'number' && typeof baselinePtm === 'number'
+          ? +(row.ptm - baselinePtm).toFixed(2)
+          : null
+
+      const nextRow = ptmDelta == null ? row : { ...row, ptmDelta }
+      return rounds != null ? { ...nextRow, rounds } : nextRow
     }),
-    [standings, currentFlight, roundsFromPtm]
+    [standings, currentFlight, roundsFromPtm, koasatiPtmLookup]
   )
 
   const scratchData = useMemo(() => computeScratch(allResults ?? {}), [allResults])
