@@ -7,7 +7,7 @@ import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
-const TABS = ['All', ...FLIGHTS]
+const TABS = ['All', ...FLIGHTS, 'New Players']
 
 export default function Members() {
   useEffect(() => { document.title = 'Members | CGA 2026' }, [])
@@ -58,17 +58,21 @@ export default function Members() {
     [enrichedMembers]
   )
 
+  const newPlayers = useMemo(
+    () => enrichedMembers.filter((m) => m.memberSince === 2026).sort(compareByLastName),
+    [enrichedMembers]
+  )
+
   function switchTab(label) {
     setTab(label)
     setQuery('')
   }
 
-  const baseList = useMemo(
-    () => tab === 'All'
-      ? [...enrichedMembers].sort(compareByLastName)
-      : byFlight[tab] ?? [],
-    [tab, enrichedMembers, byFlight]
-  )
+  const baseList = useMemo(() => {
+    if (tab === 'All') return [...enrichedMembers].sort(compareByLastName)
+    if (tab === 'New Players') return newPlayers
+    return byFlight[tab] ?? []
+  }, [tab, enrichedMembers, byFlight, newPlayers])
 
   const filtered = useMemo(
     () => query
@@ -102,7 +106,7 @@ export default function Members() {
             {label}
             {label !== 'All' && (
               <span className="ml-1.5 text-xs opacity-70">
-                ({(byFlight[label] ?? []).length})
+                ({label === 'New Players' ? newPlayers.length : (byFlight[label] ?? []).length})
               </span>
             )}
           </button>
@@ -135,6 +139,22 @@ export default function Members() {
               </div>
             )
           })}
+          {newPlayers.length > 0 && (
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="font-sans font-semibold text-gold text-sm uppercase tracking-widest">
+                  New Players
+                </h2>
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400 font-sans">{newPlayers.length} members</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {newPlayers.map((m) => (
+                  <MemberCard key={m.name} member={m} />
+                ))}
+              </div>
+            </div>
+          )}
           {unassigned.length > 0 && (
             <div>
               <div className="flex items-center gap-3 mb-3">
