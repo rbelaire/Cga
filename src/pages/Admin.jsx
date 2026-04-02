@@ -996,13 +996,15 @@ function AdminPanel() {
   async function confirmImport() {
     if (!importPreview) return
     await withSaveState(setImportSaving, setImportStatus, async () => {
-      // Build updated member list: apply tee + ptm from Excel rows
+      // Build updated member list: apply tee, ptm, and full PTM history from Excel rows
       const overrideMap = {}
       for (const row of importPreview.matched) {
         if (row.memberName) {
           overrideMap[row.memberName] = {
-            ...(row.tee  !== null ? { tee:  row.tee  } : {}),
-            ...(row.ptm  !== null ? { ptm:  Number(row.ptm) } : {}),
+            ...(row.tee     !== null ? { tee:     row.tee                } : {}),
+            ...(row.ptm     !== null ? { ptm:     Number(row.ptm)        } : {}),
+            ...(row.history           ? { history: row.history           } : {}),
+            ...(typeof row.rounds === 'number' ? { rounds: row.rounds }  : {}),
           }
         }
       }
@@ -1986,13 +1988,10 @@ function PairingsPanel({
         </div>
       )}
 
-      {/* Export hint */}
       {currentPairings.length > 0 && (
-        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <p className="text-gray-500 font-sans text-xs leading-relaxed">
-            Export the pairings JSON and place it in <code className="bg-gray-100 px-1 rounded">src/data/pairings/</code>, then
-            import it in <code className="bg-gray-100 px-1 rounded">src/pages/Pairings.jsx</code> and add the entry to the{' '}
-            <code className="bg-gray-100 px-1 rounded">pairingsById</code> map.
+        <div className="mt-4 bg-blue-50 border border-blue-100 rounded-lg p-4">
+          <p className="text-blue-700 font-sans text-xs leading-relaxed">
+            Hit <strong>Save Pairings</strong> to publish directly to the site. Members will see pairings live immediately.
           </p>
         </div>
       )}

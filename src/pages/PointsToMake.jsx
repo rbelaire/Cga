@@ -13,6 +13,26 @@ function roundPtm(val) {
   return Math.round(val)
 }
 
+/**
+ * Derive PTM-page data from a member record.
+ * Members gain history/rounds/ptmAtFlowControl once the Excel has been imported via admin.
+ * Falls back to ptm.json shape for backward compat.
+ */
+function memberToPtmRow(m) {
+  const history = Array.isArray(m.history) ? m.history : Array(7).fill(null)
+  const rounds = typeof m.rounds === 'number'
+    ? m.rounds
+    : history.filter(v => v != null).length
+  return {
+    name:              m.name,
+    tee:               m.tee ?? null,
+    ptm:               m.ptm ?? null,
+    ptmAtFlowControl:  m.ptmAtFlowControl ?? null,
+    history,
+    rounds,
+  }
+}
+
 function ScoreCell({ value, ptm }) {
   if (value == null) return <span className="text-gray-300 stat-number">—</span>
   if (ptm == null) return <span className="stat-number text-gray-500">{value}</span>
@@ -76,6 +96,32 @@ export default function PointsToMake() {
   const [sortDir, setSortDir] = useState('asc')
   const [showAll, setShowAll] = useState(false)
 
+  // Use live member data from Firestore; fall back to static members
+  // Once the Excel is imported via admin, members will have history/rounds fields
+  const { data: liveMembers } = useFireData(DB.listenMembers, membersStatic)
+
+  // Derive ptmData from live members. If a member has no history in Firestore yet,
+  // try to find a matching row in the static ptm.json as a secondary fallback.
+  const staticPtmByName = useMemo(
+    () => Object.fromEntries(ptmStatic.map(r => [r.name, r])),
+    []
+  )
+
+  const ptmData = useMemo(() => {
+    const source = liveMembers ?? membersStatic
+    return source.map(m => {
+      // If Firestore member already has history, use it directly
+      if (Array.isArray(m.history) && m.history.some(v => v != null)) {
+        return memberToPtmRow(m)
+      }
+      // Fall back to static ptm.json for this member if available
+      if (staticPtmByName[m.name]) {
+        return staticPtmByName[m.name]
+      }
+      return memberToPtmRow(m)
+    })
+  }, [liveMembers, staticPtmByName])
+
   const handleSort = (key) => {
     if (sortKey === key) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -88,7 +134,7 @@ export default function PointsToMake() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
     return ptmData.filter(p => !q || p.name.toLowerCase().includes(q))
-  }, [search])
+  }, [search, ptmData])
 
   const active = useMemo(
     () => showAll ? filtered : filtered.filter(p => p.ptm != null || p.ptmAtFlowControl != null),

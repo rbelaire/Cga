@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import PageWrapper from '../components/layout/PageWrapper'
 import MemberCard from '../components/ui/MemberCard'
 import SearchBar from '../components/ui/SearchBar'
-import members from '../data/members.json'
+import membersStatic from '../data/members.json'
 import { compareByLastName } from '../utils/formatName'
 import standings from '../data/standings.json'
+import { useFireData } from '../hooks/useFireData'
+import { DB } from '../db'
 
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const TABS = ['All', ...FLIGHTS]
 
-// Build a name → events lookup from standings so MemberCard can show Bubble tags
+// Build a name → events lookup from standings (static — doesn't need to be reactive)
 const eventsFromStandings = {}
 for (const flight of FLIGHTS) {
   for (const player of standings.flights[flight] ?? []) {
@@ -24,39 +26,54 @@ function withEvents(m) {
   return events !== null ? { ...m, events } : m
 }
 
-const enrichedMembers = members.map(withEvents)
-
-const byFlight = Object.fromEntries(
-  FLIGHTS.map((flight) => {
-    const players = enrichedMembers
-      .filter((m) => m.flight === flight)
-      .sort(compareByLastName)
-    return [flight, players]
-  })
-)
-
-const unassigned = enrichedMembers
-  .filter((m) => !m.flight)
-  .sort(compareByLastName)
-
 export default function Members() {
   useEffect(() => { document.title = 'Members | CGA 2026' }, [])
   const [tab, setTab] = useState('All')
   const [query, setQuery] = useState('')
+
+  // Live member roster from Firestore; falls back to static JSON while loading
+  const { data: liveMembers } = useFireData(DB.listenMembers, membersStatic)
+
+  const enrichedMembers = useMemo(
+    () => (liveMembers ?? membersStatic).map(withEvents),
+    [liveMembers]
+  )
+
+  const byFlight = useMemo(() =>
+    Object.fromEntries(
+      FLIGHTS.map((flight) => {
+        const players = enrichedMembers
+          .filter((m) => m.flight === flight)
+          .sort(compareByLastName)
+        return [flight, players]
+      })
+    ),
+    [enrichedMembers]
+  )
+
+  const unassigned = useMemo(
+    () => enrichedMembers.filter((m) => !m.flight).sort(compareByLastName),
+    [enrichedMembers]
+  )
 
   function switchTab(label) {
     setTab(label)
     setQuery('')
   }
 
-  const baseList =
-    tab === 'All'
+  const baseList = useMemo(
+    () => tab === 'All'
       ? [...enrichedMembers].sort(compareByLastName)
-      : byFlight[tab] ?? []
+      : byFlight[tab] ?? [],
+    [tab, enrichedMembers, byFlight]
+  )
 
-  const filtered = query
-    ? baseList.filter((m) => m.name.toLowerCase().includes(query.toLowerCase()))
-    : baseList
+  const filtered = useMemo(
+    () => query
+      ? baseList.filter((m) => m.name.toLowerCase().includes(query.toLowerCase()))
+      : baseList,
+    [baseList, query]
+  )
 
   return (
     <PageWrapper>
