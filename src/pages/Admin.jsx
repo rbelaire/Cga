@@ -539,22 +539,23 @@ function PdfBtn({ onClick, children, disabled = false }) {
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@cga.local'
 
 export default function Admin() {
-  const [pin,      setPin]      = useState('')
-  const [unlocked, setUnlocked] = useState(false)
-  const [err,      setErr]      = useState(false)
-  const [loading,  setLoading]  = useState(false)
+  const [pin,       setPin]       = useState('')
+  const [unlocked,  setUnlocked]  = useState(false)
+  const [err,       setErr]       = useState(false)
+  const [loading,   setLoading]   = useState(false)
+  const [authError, setAuthError] = useState(null)
 
   const tryUnlock = async () => {
     if (pin !== PIN) { setErr(true); setTimeout(() => setErr(false), 1500); return }
     setLoading(true)
+    setAuthError(null)
     try {
       await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pin)
+      setUnlocked(true)
     } catch (e) {
-      // Auth failure is non-fatal — admin UI still works, writes will just fail
-      console.warn('Firebase sign-in failed:', e.message)
+      setAuthError(e.message)
     } finally {
       setLoading(false)
-      setUnlocked(true)
     }
   }
 
@@ -570,6 +571,7 @@ export default function Admin() {
             className={`w-full border rounded px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-forest ${err ? 'border-red-400' : 'border-gray-300'}`}
           />
           {err && <p className="text-red-500 text-xs font-sans">Incorrect PIN.</p>}
+          {authError && <p className="text-red-500 text-xs font-sans break-all">Firebase: {authError}</p>}
           <button onClick={tryUnlock} disabled={loading} className="btn-primary w-full text-center disabled:opacity-60">
             {loading ? 'Signing in…' : 'Unlock'}
           </button>
