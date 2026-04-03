@@ -861,6 +861,11 @@ function AdminPanel() {
     [effectiveMembers]
   )
 
+  const memberFlightLookup = useMemo(
+    () => Object.fromEntries(effectiveMembers.map(m => [m.name, m.flight])),
+    [effectiveMembers]
+  )
+
   // Payments for selected tournament
   const paymentMap = payments[tid] ?? {}
 
@@ -951,13 +956,21 @@ function AdminPanel() {
   function addSelectedPlayers() {
     const names = [...selectedPool].filter(name => !allAddedNames.has(name))
     if (!names.length) return
-    const entries = names.map(name => ({
-      name,
-      ptm: ptmLookup[name] ?? '',
-      score: '',
-      eligible: true,
-    }))
-    flightSet([...rawPlayers, ...entries])
+    setData(prev => {
+      const td = { ...(prev[tid] ?? {}) }
+      names.forEach(name => {
+        const memberFlight = memberFlightLookup[name]
+        const targetFlight = FLIGHTS.includes(memberFlight) ? memberFlight : 'New Players'
+        const entry = {
+          name,
+          ptm: ptmLookup[name] ?? '',
+          score: '',
+          eligible: true,
+        }
+        td[targetFlight] = [...(td[targetFlight] ?? []), entry]
+      })
+      return { ...prev, [tid]: td }
+    })
     setSelectedPool(new Set())
   }
 
@@ -975,26 +988,6 @@ function AdminPanel() {
     if (!window.confirm(`Clear all players from ${flight}?`)) return
     flightSet([])
   }
-
-  // Move player to a different flight
-  function movePlayerToFlight(playerIdx, targetFlight) {
-    const player = rawPlayers[playerIdx]
-    if (!player) return
-    setData(prev => {
-      const td = { ...(prev[tid] ?? {}) }
-      const srcList = [...(td[flight] ?? [])]
-      srcList.splice(playerIdx, 1)
-      td[flight] = srcList
-      const dstList = [...(td[targetFlight] ?? [])]
-      dstList.push({ ...player })
-      td[targetFlight] = dstList
-      return { ...prev, [tid]: td }
-    })
-  }
-
-  const flightIdx  = ALL_SCORE_TABS.indexOf(flight)
-  const prevFlight = flightIdx > 0                       ? ALL_SCORE_TABS[flightIdx - 1] : null
-  const nextFlight = flightIdx < ALL_SCORE_TABS.length - 1 ? ALL_SCORE_TABS[flightIdx + 1] : null
 
   // ── Pairings functions ────────────────────────────────────────────────────────
   function generatePairings() {
@@ -1721,9 +1714,6 @@ function AdminPanel() {
           removePlayer={removePlayer}
           updatePlayer={updatePlayer}
           clearFlight={clearFlight}
-          movePlayerToFlight={movePlayerToFlight}
-          prevFlight={prevFlight}
-          nextFlight={nextFlight}
           fmtPM={fmtPM}
           fmtPOY={fmtPOY}
           onOpenPublishPreview={() => openPublishPreview(tid)}
@@ -2514,8 +2504,7 @@ function ScoreEntryPanel({
   flights, flight, setFlight, data, tid, players, rawPlayers,
   poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
   selectedPool, togglePoolSelect, toggleGroupSelect, addSelectedPlayers,
-  removePlayer, updatePlayer, clearFlight, movePlayerToFlight,
-  prevFlight, nextFlight, fmtPM, fmtPOY, onOpenPublishPreview,
+  removePlayer, updatePlayer, clearFlight, fmtPM, fmtPOY, onOpenPublishPreview,
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
 }) {
@@ -2620,7 +2609,6 @@ function ScoreEntryPanel({
               onToggle={togglePoolSelect}
               onToggleGroup={toggleGroupSelect}
               onAddSelected={addSelectedPlayers}
-              currentFlight={flight}
             />
           </div>
         </div>
@@ -2659,7 +2647,6 @@ function ScoreEntryPanel({
                       <th className="table-header text-gray-400 text-center">+/-</th>
                       <th className="table-header text-gray-400 text-center">POY</th>
                       <th className="table-header text-gray-400 text-center">Elig.</th>
-                      <th className="table-header text-gray-400 text-center">Move to Flight</th>
                       <th className="table-header text-gray-400 w-8"></th>
                     </tr>
                   </thead>
@@ -2723,16 +2710,6 @@ function ScoreEntryPanel({
                             className="accent-forest cursor-pointer w-4 h-4"
                           />
                         </td>
-                        {/* Move to flight */}
-                        <td className="px-2 py-1.5 text-center">
-                          <MoveToFlightSelect
-                            currentFlight={flight}
-                            allFlights={flights}
-                            prevFlight={prevFlight}
-                            nextFlight={nextFlight}
-                            onMove={targetFlight => movePlayerToFlight(idx, targetFlight)}
-                          />
-                        </td>
                         {/* Remove */}
                         <td className="px-2 py-2 text-center">
                           <button
@@ -2790,7 +2767,7 @@ function ScoreEntryPanel({
 // ── Member Pool (multi-select) ────────────────────────────────────────────────
 function MemberPool({
   poolMembersGrouped, poolTotalCount, poolSearch,
-  selectedPool, onToggle, onToggleGroup, onAddSelected, currentFlight
+  selectedPool, onToggle, onToggleGroup, onAddSelected
 }) {
   const selectedCount = selectedPool.size
 
@@ -2808,7 +2785,7 @@ function MemberPool({
           }`}
         >
           {selectedCount > 0
-            ? `Add ${selectedCount} Selected → ${currentFlight}`
+            ? `Add ${selectedCount} Selected to Assigned Flights`
             : 'Select players below'}
         </button>
       </div>
@@ -2872,36 +2849,6 @@ function MemberPool({
         )}
       </div>
     </div>
-  )
-}
-
-// ── Move to Flight Select ─────────────────────────────────────────────────────
-function MoveToFlightSelect({ currentFlight, allFlights, prevFlight, nextFlight, onMove }) {
-  const [val, setVal] = useState('')
-
-  const otherFlights = allFlights.filter(f => f !== currentFlight)
-
-  function handleChange(e) {
-    const target = e.target.value
-    setVal('')
-    if (target) onMove(target)
-  }
-
-  return (
-    <select
-      value={val}
-      onChange={handleChange}
-      className="border border-gray-200 rounded px-1 py-1 text-xs font-sans focus:outline-none focus:ring-1 focus:ring-forest text-gray-500 bg-white min-w-[110px]"
-    >
-      <option value="">Move to…</option>
-      {prevFlight && <option value={prevFlight}>↑ Promote → {prevFlight}</option>}
-      {nextFlight && <option value={nextFlight}>↓ Relegate → {nextFlight}</option>}
-      <optgroup label="Any flight">
-        {otherFlights.map(f => (
-          <option key={f} value={f}>{f}</option>
-        ))}
-      </optgroup>
-    </select>
   )
 }
 
