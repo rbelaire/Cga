@@ -206,10 +206,12 @@ async function withSaveState(setSaving, setSaveStatus, fn, setErrMsg = null) {
   try {
     await fn()
     setSaveStatus('ok')
+    return true
   } catch (e) {
     console.error('Firestore save error:', e)
     setSaveStatus('err')
     setErrMsg?.(e?.message || String(e) || 'Unknown error')
+    return false
   } finally {
     setSaving(false)
     setTimeout(() => setSaveStatus(null), 3000)
@@ -801,6 +803,8 @@ function AdminPanel() {
   const [paymentsSaveStatus, setPaymentsSaveStatus] = useState(null)
   const [publishSaving,  setPublishSaving]  = useState(false)
   const [publishSaveStatus, setPublishSaveStatus] = useState(null)
+  const [saveAllSaving, setSaveAllSaving] = useState(false)
+  const [saveAllStatus, setSaveAllStatus] = useState(null)
 
   // pairings manual mode
   const [manualPairings,   setManualPairings]   = useState(false)
@@ -1098,7 +1102,7 @@ function AdminPanel() {
 
   async function savePairings() {
     if (!tournament) return
-    await withSaveState(setPairingsSaving, setPairingsSaveStatus, () =>
+    return await withSaveState(setPairingsSaving, setPairingsSaveStatus, () =>
       DB.savePairings({ ...pairingsData }), setAdminError
     )
   }
@@ -1132,7 +1136,7 @@ function AdminPanel() {
       ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
       tee:    membersOverride[m.name]?.tee    ?? m.tee,
     }))
-    await withSaveState(setMembersSaving, setMembersSaveStatus, () =>
+    return await withSaveState(setMembersSaving, setMembersSaveStatus, () =>
       DB.saveMembers(updated), setAdminError
     )
   }
@@ -1155,7 +1159,7 @@ function AdminPanel() {
   }
 
   async function saveCredits() {
-    await withSaveState(setCreditsSaving, setCreditsSaveStatus, () =>
+    return await withSaveState(setCreditsSaving, setCreditsSaveStatus, () =>
       DB.saveCredits(credits), setAdminError
     )
   }
@@ -1188,7 +1192,7 @@ function AdminPanel() {
   }
 
   async function savePayments() {
-    await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, () =>
+    return await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, () =>
       DB.savePayments(payments), setAdminError
     )
   }
@@ -1244,21 +1248,100 @@ function AdminPanel() {
     })
   }, [membersData, membersOverride])
 
-  const unsavedDrafts = useMemo(() => {
-    const checks = [
-      { key: 'scores', label: 'Score Entry', dirty: stableSerialize(data) !== stableSerialize(cloudScores) },
-      { key: 'pairings', label: 'Pairings Builder', dirty: stableSerialize(pairingsData) !== stableSerialize(cloudPairings) },
-      { key: 'members', label: 'Member Management', dirty: membersDirty },
-      { key: 'credits', label: 'Credit on Books', dirty: stableSerialize(credits) !== stableSerialize(cloudCredits) },
-      { key: 'payments', label: 'Payments', dirty: stableSerialize(payments) !== stableSerialize(cloudPayments) },
-      {
-        key: 'tournament-info',
-        label: 'Tournament Info Drafts',
-        dirty: Object.values(tournamentInfoDrafts).some(d => d && Object.keys(d).length > 0),
-      },
-    ]
-    return checks.filter(c => c.dirty)
-  }, [data, cloudScores, pairingsData, cloudPairings, membersDirty, credits, cloudCredits, payments, cloudPayments, tournamentInfoDrafts])
+  const dirtyRegistry = useMemo(() => ([
+    {
+      key: 'scores',
+      label: 'Score Entry',
+      dirty: stableSerialize(data) !== stableSerialize(cloudScores),
+      saveAction: 'scores',
+      saving: scoresSaving,
+    },
+    {
+      key: 'pairings',
+      label: 'Pairings Builder',
+      dirty: stableSerialize(pairingsData) !== stableSerialize(cloudPairings),
+      saveAction: 'pairings',
+      saving: pairingsSaving,
+    },
+    {
+      key: 'members',
+      label: 'Member Management',
+      dirty: membersDirty,
+      saveAction: 'members',
+      saving: membersSaving,
+    },
+    {
+      key: 'credits',
+      label: 'Credit on Books',
+      dirty: stableSerialize(credits) !== stableSerialize(cloudCredits),
+      saveAction: 'credits',
+      saving: creditsSaving,
+    },
+    {
+      key: 'payments',
+      label: 'Payments',
+      dirty: stableSerialize(payments) !== stableSerialize(cloudPayments),
+      saveAction: 'payments',
+      saving: paymentsSaving,
+    },
+    {
+      key: 'tournament-info',
+      label: 'Tournament Info Drafts',
+      dirty: Object.values(tournamentInfoDrafts).some(d => d && Object.keys(d).length > 0),
+      saveAction: null,
+      saving: false,
+    },
+  ]), [
+    data, cloudScores, scoresSaving,
+    pairingsData, cloudPairings, pairingsSaving,
+    membersDirty, membersSaving,
+    credits, cloudCredits, creditsSaving,
+    payments, cloudPayments, paymentsSaving,
+    tournamentInfoDrafts,
+  ])
+
+  const unsavedDrafts = useMemo(
+    () => dirtyRegistry.filter(section => section.dirty),
+    [dirtyRegistry]
+  )
+  const savableUnsavedDrafts = useMemo(
+    () => unsavedDrafts.filter(section => section.saveAction),
+    [unsavedDrafts]
+  )
+  const unsavableUnsavedDrafts = useMemo(
+    () => unsavedDrafts.filter(section => !section.saveAction),
+    [unsavedDrafts]
+  )
+  const hasUnsavedDrafts = unsavedDrafts.length > 0
+  const anySectionSaving = useMemo(
+    () => dirtyRegistry.some(section => section.saving),
+    [dirtyRegistry]
+  )
+
+  async function saveAllDirtyDrafts() {
+    if (saveAllSaving || anySectionSaving || savableUnsavedDrafts.length === 0) return
+    setAdminError(null)
+    setSaveAllSaving(true)
+    setSaveAllStatus(null)
+    const failed = []
+    for (const section of savableUnsavedDrafts) {
+      let ok = false
+      if (section.saveAction === 'scores') ok = await saveScores()
+      if (section.saveAction === 'pairings') ok = await savePairings()
+      if (section.saveAction === 'members') ok = await saveMembers()
+      if (section.saveAction === 'credits') ok = await saveCredits()
+      if (section.saveAction === 'payments') ok = await savePayments()
+      if (!ok) failed.push(section.label)
+    }
+    if (failed.length > 0) {
+      setSaveAllStatus('err')
+      setAdminError(`Save All could not sync: ${failed.join(', ')}`)
+    } else {
+      setSaveAllStatus('ok')
+    }
+    setSaveAllSaving(false)
+    setTimeout(() => setSaveAllStatus(null), 3000)
+  }
 
   const paymentRoster = useMemo(() => {
     const search = paymentSearch.trim().toLowerCase()
@@ -1392,7 +1475,7 @@ function AdminPanel() {
 
   // ── Save scores draft to Firestore ───────────────────────────────────────────
   async function saveScores() {
-    await withSaveState(setScoresSaving, setScoresSaveStatus, () =>
+    return await withSaveState(setScoresSaving, setScoresSaveStatus, () =>
       DB.saveScores(data), setAdminError
     )
   }
@@ -1499,6 +1582,37 @@ function AdminPanel() {
         </div>
       </div>
 
+      {hasUnsavedDrafts && (
+        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-amber-900 font-sans text-sm font-semibold">Unsaved changes detected.</p>
+              <p className="text-amber-700 font-sans text-xs mt-0.5">
+                Local changes exist in: {unsavedDrafts.map(item => item.label).join(', ')}.
+              </p>
+              {unsavableUnsavedDrafts.length > 0 && (
+                <p className="text-amber-700 font-sans text-xs mt-0.5">
+                  Requires manual publish: {unsavableUnsavedDrafts.map(item => item.label).join(', ')}.
+                </p>
+              )}
+            </div>
+            <button
+              onClick={saveAllDirtyDrafts}
+              disabled={saveAllSaving || anySectionSaving || savableUnsavedDrafts.length === 0}
+              className="px-4 py-2 text-xs font-sans font-semibold rounded-md bg-forest text-white disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {saveAllSaving ? 'Saving All…' : 'Save All'}
+            </button>
+          </div>
+          {saveAllStatus === 'ok' && (
+            <p className="text-green-700 font-sans text-xs mt-2">All savable sections synced to cloud.</p>
+          )}
+          {saveAllStatus === 'err' && (
+            <p className="text-red-700 font-sans text-xs mt-2">Some sections failed to sync. Review the error banner and retry.</p>
+          )}
+        </div>
+      )}
+
       {/* Mode tabs */}
       <div className="flex gap-2 mb-5 flex-wrap">
         {[
@@ -1595,7 +1709,7 @@ function AdminPanel() {
           selectedTournament={dashboardTournament}
           workflow={dashboardWorkflow}
           lastPublishedTournament={lastPublishedTournament}
-          hasUnsavedDrafts={unsavedDrafts.length > 0}
+          hasUnsavedDrafts={hasUnsavedDrafts}
           unsavedDrafts={unsavedDrafts}
           onRepublish={async () => {
             if (!lastPublishedTournament) return
