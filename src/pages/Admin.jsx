@@ -860,6 +860,9 @@ function AdminPanel() {
     [effectiveMembers]
   )
 
+  // Payments for selected tournament
+  const paymentMap = payments[tid] ?? {}
+
   // Pool members (not yet in this tournament), grouped by season flight
   const poolMembersGrouped = useMemo(() => {
     const search   = poolSearch.trim().toLowerCase()
@@ -872,10 +875,11 @@ function AdminPanel() {
       const key = f ?? '__unassigned__'
       groups[key] = filtered
         .filter(m => f === null ? m.flight == null : m.flight === f)
+        .map(m => ({ ...m, isPaid: !!payments[tid]?.[m.name] }))
         .sort(compareByLastName)
     }
     return groups
-  }, [allAddedNames, poolSearch, effectiveMembers])
+  }, [allAddedNames, poolSearch, effectiveMembers, payments, tid])
 
   const poolTotalCount = useMemo(
     () => Object.values(poolMembersGrouped).reduce((s, g) => s + g.length, 0),
@@ -1218,7 +1222,6 @@ function AdminPanel() {
   }
 
   // Payments derived state
-  const paymentMap = payments[tid] ?? {}
   const paymentPaidCount = Object.keys(paymentMap).length
 
   const dashboardTid = tid || nextTournament?.id || ''
@@ -2707,9 +2710,20 @@ function MemberPool({
                         }`}
                       >
                         <span className="font-sans text-xs text-darktext truncate">{formatName(m.name)}</span>
-                        {m.ptm != null && (
-                          <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">PTM {m.ptm}</span>
-                        )}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {m.isPaid && (
+                            <span
+                              className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-100 text-green-700 border border-green-200 text-[10px] font-bold"
+                              title="Paid"
+                              aria-label={`${formatName(m.name)} paid`}
+                            >
+                              $
+                            </span>
+                          )}
+                          {m.ptm != null && (
+                            <span className="text-[10px] font-mono text-gray-400">PTM {m.ptm}</span>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
