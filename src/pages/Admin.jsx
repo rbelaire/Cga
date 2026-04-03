@@ -704,6 +704,7 @@ function AdminPanel() {
   const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
+  const [showTournamentInfoEditor, setShowTournamentInfoEditor] = useState(false)
   const TOURNAMENT_MODES = ['scores', 'pairings', 'payments']
   const showTournamentSelector = TOURNAMENT_MODES.includes(adminMode)
 
@@ -1789,8 +1790,39 @@ function AdminPanel() {
         <p className="text-gray-500 font-sans text-xs mb-4 leading-relaxed">
           Generate printable PDF documents for distribution.
         </p>
-        {tournamentInfo && (
-          <div className="mb-5 rounded-lg border border-gold/20 bg-gold/5 p-4">
+        <div className="flex flex-wrap gap-2">
+          <PdfBtn onClick={() => setShowTournamentInfoEditor(true)} disabled={!tournamentInfo}>
+            Tournament Info PDF
+          </PdfBtn>
+          <PdfBtn onClick={() => exportPtmPDF(membersData)}>
+            Points to Make (Full Roster)
+          </PdfBtn>
+          {totalPlayers > 0 && (
+            <PdfBtn onClick={() => exportResultsPDF(tournament, data[tid] ?? {})} disabled={!tournament}>
+              Tournament Results
+            </PdfBtn>
+          )}
+          {currentPairings.length > 0 && (
+            <PdfBtn onClick={() => exportPairingsPDF(tournament, currentPairings)} disabled={!tournament}>
+              Pairings
+            </PdfBtn>
+          )}
+          {Object.keys(credits).length > 0 && (
+            <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
+              Credit on Books
+            </PdfBtn>
+          )}
+          {paymentPaidCount > 0 && (
+            <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament}>
+              Payment Status
+            </PdfBtn>
+          )}
+        </div>
+      </div>
+
+      {showTournamentInfoEditor && tournamentInfo && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg border border-gold/20 bg-white p-5 shadow-xl">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
                 <h3 className="text-sm font-semibold text-forest font-sans">Tournament Info Editor</h3>
@@ -1798,13 +1830,22 @@ function AdminPanel() {
                   Edit details used for this session&apos;s Tournament Info PDF before exporting.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => resetTournamentInfoDraft(tournament.id)}
-                className="px-2.5 py-1.5 text-[11px] font-semibold font-sans rounded-md border border-gray-300 text-gray-600 hover:bg-white transition-colors"
-              >
-                Reset Draft
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => resetTournamentInfoDraft(tournament.id)}
+                  className="px-2.5 py-1.5 text-[11px] font-semibold font-sans rounded-md border border-gray-300 text-gray-600 hover:bg-white transition-colors"
+                >
+                  Reset Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTournamentInfoEditor(false)}
+                  className="px-2.5 py-1.5 text-[11px] font-semibold font-sans rounded-md border border-gray-300 text-gray-600 hover:bg-white transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
@@ -1874,40 +1915,17 @@ function AdminPanel() {
                 />
               </label>
             </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PdfBtn onClick={() => exportTournamentInfoPDF(tournamentInfo)}>
+                Export Selected Tournament Info
+              </PdfBtn>
+              <PdfBtn onClick={() => exportTournamentInfoPDF(nextTournamentInfo)} disabled={!nextTournamentInfo}>
+                Export Next Tournament Info
+              </PdfBtn>
+            </div>
           </div>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <PdfBtn onClick={() => exportTournamentInfoPDF(nextTournamentInfo)} disabled={!nextTournamentInfo}>
-            Next Tournament Info
-          </PdfBtn>
-          <PdfBtn onClick={() => exportTournamentInfoPDF(tournamentInfo)} disabled={!tournamentInfo}>
-            Selected Tournament Info
-          </PdfBtn>
-          <PdfBtn onClick={() => exportPtmPDF(membersData)}>
-            Points to Make (Full Roster)
-          </PdfBtn>
-          {totalPlayers > 0 && (
-            <PdfBtn onClick={() => exportResultsPDF(tournament, data[tid] ?? {})} disabled={!tournament}>
-              Tournament Results
-            </PdfBtn>
-          )}
-          {currentPairings.length > 0 && (
-            <PdfBtn onClick={() => exportPairingsPDF(tournament, currentPairings)} disabled={!tournament}>
-              Pairings
-            </PdfBtn>
-          )}
-          {Object.keys(credits).length > 0 && (
-            <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
-              Credit on Books
-            </PdfBtn>
-          )}
-          {paymentPaidCount > 0 && (
-            <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament}>
-              Payment Status
-            </PdfBtn>
-          )}
         </div>
-      </div>
+      )}
     </PageWrapper>
   )
 }
