@@ -700,6 +700,7 @@ function AdminPanel() {
   const [tid,          setTid]          = useState(schedule[0]?.id ?? '')
   const [flight,       setFlight]       = useState(FLIGHTS[0])
   const [poolSearch,   setPoolSearch]   = useState('')
+  const [selectedPool, setSelectedPool] = useState(new Set())
   const [adminMode,    setAdminMode]    = useState('scores')
   const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
@@ -840,16 +841,13 @@ function AdminPanel() {
     setData(prev => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [flight]: newList } }))
   }
 
-  function addPlayer(name) {
-    if (allAddedNames.has(name)) return
-    const ptm = ptmLookup[name] ?? ''
-    flightSet([...rawPlayers, { name, ptm: ptm !== null && ptm !== undefined ? ptm : '', score: '', eligible: true }])
-  }
-
   function addSelectedPlayers() {
     const toAdd = [...selectedPool].filter(n => !allAddedNames.has(n))
     if (!toAdd.length) return
-    flightSet([...rawPlayers, ...toAdd.map(name => ({ name, ptm: '', score: '', eligible: true }))])
+    flightSet([...rawPlayers, ...toAdd.map(name => {
+      const ptm = ptmLookup[name]
+      return { name, ptm: ptm !== null && ptm !== undefined ? ptm : '', score: '', eligible: true }
+    })])
     setSelectedPool(new Set())
   }
 
@@ -1394,7 +1392,7 @@ function AdminPanel() {
           <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Tournament</label>
           <select
             value={tid}
-            onChange={e => { setTid(e.target.value); setFlight(FLIGHTS[0]); setPoolSearch('') }}
+            onChange={e => { setTid(e.target.value); setFlight(FLIGHTS[0]); setPoolSearch(''); setSelectedPool(new Set()) }}
             className="border border-gray-300 rounded px-3 py-2 text-sm font-sans w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-forest"
           >
             {schedule.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
@@ -1414,7 +1412,7 @@ function AdminPanel() {
         <ScoreEntryPanel
           flights={ALL_SCORE_TABS}
           flight={flight}
-          setFlight={f => { setFlight(f); setPoolSearch('') }}
+          setFlight={f => { setFlight(f); setPoolSearch(''); setSelectedPool(new Set()) }}
           data={data}
           tid={tid}
           players={players}
@@ -1423,7 +1421,10 @@ function AdminPanel() {
           poolTotalCount={poolTotalCount}
           poolSearch={poolSearch}
           setPoolSearch={setPoolSearch}
-          addPlayer={addPlayer}
+          selectedPool={selectedPool}
+          togglePoolSelect={togglePoolSelect}
+          toggleGroupSelect={toggleGroupSelect}
+          addSelectedPlayers={addSelectedPlayers}
           removePlayer={removePlayer}
           updatePlayer={updatePlayer}
           clearFlight={clearFlight}
@@ -1943,7 +1944,8 @@ function SaveBtn({ onClick, saving, status, label = 'Save to Cloud', className =
 function ScoreEntryPanel({
   flights, flight, setFlight, data, tid, players, rawPlayers,
   poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
-  addPlayer, removePlayer, updatePlayer, clearFlight, movePlayerToFlight,
+  selectedPool, togglePoolSelect, toggleGroupSelect, addSelectedPlayers,
+  removePlayer, updatePlayer, clearFlight, movePlayerToFlight,
   prevFlight, nextFlight, fmtPM, fmtPOY, doExport,
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
@@ -1974,7 +1976,7 @@ function ScoreEntryPanel({
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-forest px-4 py-2.5">
               <p className="text-white font-sans text-sm font-semibold">Members</p>
-              <p className="text-white/50 text-xs font-sans mt-0.5">Tap a name, then tap "Add to Flight"</p>
+              <p className="text-white/50 text-xs font-sans mt-0.5">Select one or more names, then tap "Add Selected"</p>
             </div>
 
             <div className="px-3 py-2 border-b border-gray-100">
@@ -1991,7 +1993,10 @@ function ScoreEntryPanel({
               poolMembersGrouped={poolMembersGrouped}
               poolTotalCount={poolTotalCount}
               poolSearch={poolSearch}
-              onAdd={addPlayer}
+              selectedPool={selectedPool}
+              onToggle={togglePoolSelect}
+              onToggleGroup={toggleGroupSelect}
+              onAddSelected={addSelectedPlayers}
               currentFlight={flight}
             />
           </div>
@@ -2152,34 +2157,29 @@ function ScoreEntryPanel({
   )
 }
 
-// ── Member Pool (click-to-add) ────────────────────────────────────────────────
-function MemberPool({ poolMembersGrouped, poolTotalCount, poolSearch, onAdd, currentFlight }) {
-  const [selected, setSelected] = useState(null)
-
-  function handleSelect(name) {
-    setSelected(prev => prev === name ? null : name)
-  }
-
-  function handleAdd() {
-    if (!selected) return
-    onAdd(selected)
-    setSelected(null)
-  }
+// ── Member Pool (multi-select) ────────────────────────────────────────────────
+function MemberPool({
+  poolMembersGrouped, poolTotalCount, poolSearch,
+  selectedPool, onToggle, onToggleGroup, onAddSelected, currentFlight
+}) {
+  const selectedCount = selectedPool.size
 
   return (
     <div>
       {/* Sticky add bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-3 py-2">
         <button
-          onClick={handleAdd}
-          disabled={!selected}
+          onClick={onAddSelected}
+          disabled={selectedCount === 0}
           className={`w-full py-2 rounded text-xs font-sans font-semibold transition-colors ${
-            selected
+            selectedCount > 0
               ? 'bg-gold text-forest hover:bg-amber-400'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
           }`}
         >
-          {selected ? `Add ${formatName(selected)} → ${currentFlight}` : 'Select a player below'}
+          {selectedCount > 0
+            ? `Add ${selectedCount} Selected → ${currentFlight}`
+            : 'Select players below'}
         </button>
       </div>
 
@@ -2193,18 +2193,26 @@ function MemberPool({ poolMembersGrouped, poolTotalCount, poolSearch, onAdd, cur
             {[...Object.entries(poolMembersGrouped)].map(([key, group]) => {
               if (!group.length) return null
               const label = key === '__unassigned__' ? 'Unassigned' : key
+              const allInGroupSelected = group.every(m => selectedPool.has(m.name))
               return (
                 <div key={key} className="mb-2">
-                  <p className="px-1 pt-1 pb-0.5 text-[10px] font-sans font-semibold uppercase tracking-widest text-gray-400">
-                    {label}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onToggleGroup(group)}
+                    className={`w-full flex items-center justify-between px-1 pt-1 pb-0.5 text-[10px] font-sans font-semibold uppercase tracking-widest transition-colors ${
+                      allInGroupSelected ? 'text-forest' : 'text-gray-400 hover:text-forest'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className="normal-case tracking-normal text-[10px]">{allInGroupSelected ? 'Clear' : 'Select all'}</span>
+                  </button>
                   <ul className="space-y-0.5">
                     {group.map(m => (
                       <li
                         key={m.name}
-                        onClick={() => handleSelect(m.name)}
+                        onClick={() => onToggle(m.name)}
                         className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded cursor-pointer border transition-colors select-none ${
-                          selected === m.name
+                          selectedPool.has(m.name)
                             ? 'bg-gold/20 border-gold text-forest'
                             : 'bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border-transparent'
                         }`}
