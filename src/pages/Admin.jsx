@@ -25,6 +25,7 @@ const CREDITS_KEY  = 'cga_credits_v1'
 const PAYMENTS_KEY = 'cga_payments_v1'
 const TOURNAMENT_INFO_KEY = 'cga_tournament_info_v1'
 const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
+const MAX_RECENT_ACTIONS = 5
 
 const PDF_NAVY = [27,  59,  111]
 const PDF_GOLD = [201, 168, 76]
@@ -238,6 +239,10 @@ function stableSerialize(value) {
     return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${stableSerialize(value[k])}`).join(',')}}`
   }
   return JSON.stringify(value)
+}
+
+function cloneForUndo(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value))
 }
 
 // ── PDF utilities ──────────────────────────────────────────────────────────────
@@ -821,6 +826,29 @@ function AdminPanel() {
   const [importStatus,   setImportStatus]   = useState(null)   // null | 'ok' | 'err'
   const [importError,    setImportError]    = useState(null)   // error message | null
   const fileInputRef = useRef(null)
+  const [recentActions, setRecentActions] = useState([])
+  const [actionFeedback, setActionFeedback] = useState(null)
+
+  function registerUndoAction({ label, undo }) {
+    const action = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      label,
+      undo,
+      createdAt: Date.now(),
+    }
+    setRecentActions(prev => [action, ...prev].slice(0, MAX_RECENT_ACTIONS))
+    setActionFeedback(`Action saved: ${label}`)
+  }
+
+  function undoRecentAction(actionId) {
+    setRecentActions(prev => {
+      const action = prev.find(item => item.id === actionId)
+      if (!action) return prev
+      action.undo?.()
+      setActionFeedback(`Undid: ${action.label}`)
+      return prev.filter(item => item.id !== actionId)
+    })
+  }
 
   // Draft-cache to localStorage (unchanged — keeps data across page refreshes)
   useEffect(() => { localStorage.setItem(STORAGE_KEY,  JSON.stringify(data))            }, [data])
@@ -829,6 +857,11 @@ function AdminPanel() {
   useEffect(() => { localStorage.setItem(CREDITS_KEY,  JSON.stringify(credits))         }, [credits])
   useEffect(() => { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments))       }, [payments])
   useEffect(() => { localStorage.setItem(TOURNAMENT_INFO_KEY, JSON.stringify(tournamentInfoDrafts)) }, [tournamentInfoDrafts])
+  useEffect(() => {
+    if (!actionFeedback) return
+    const timer = setTimeout(() => setActionFeedback(null), 3500)
+    return () => clearTimeout(timer)
+  }, [actionFeedback])
 
   const tournament     = schedule.find(t => t.id === tid)
   const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
@@ -975,7 +1008,24 @@ function AdminPanel() {
   }
 
   function removePlayer(idx) {
-    const fl = [...rawPlayers]; fl.splice(idx, 1); flightSet(fl)
+    const removedPlayer = rawPlayers[idx]
+    if (!removedPlayer) return
+    const fl = [...rawPlayers]
+    fl.splice(idx, 1)
+    flightSet(fl)
+    registerUndoAction({
+      label: `Removed ${removedPlayer.name} from ${flight}`,
+      undo: () => {
+        setData(prev => {
+          const td = { ...(prev[tid] ?? {}) }
+          const playersInFlight = [...(td[flight] ?? [])]
+          const restoreIdx = Math.min(idx, playersInFlight.length)
+          playersInFlight.splice(restoreIdx, 0, removedPlayer)
+          td[flight] = playersInFlight
+          return { ...prev, [tid]: td }
+        })
+      },
+    })
   }
 
   function updatePlayer(idx, field, val) {
@@ -986,7 +1036,21 @@ function AdminPanel() {
 
   function clearFlight() {
     if (!window.confirm(`Clear all players from ${flight}?`)) return
+    const snapshot = cloneForUndo(rawPlayers)
     flightSet([])
+    if (!snapshot?.length) return
+    registerUndoAction({
+      label: `Cleared ${flight}`,
+      undo: () => {
+        setData(prev => ({
+          ...prev,
+          [tid]: {
+            ...(prev[tid] ?? {}),
+            [flight]: snapshot,
+          },
+        }))
+      },
+    })
   }
 
   // ── Pairings functions ────────────────────────────────────────────────────────
@@ -1061,12 +1125,27 @@ function AdminPanel() {
   }
 
   function removeGroupManual(cardIdx) {
+    if (!window.confirm('Remove this pairing group? Players will become unpaired.')) return
     const updated = currentPairings.map(c => ({ ...c, players: [...c.players] }))
+    const removedGroup = updated[cardIdx]
+    if (!removedGroup) return
     // Move players back to unpaired (just remove the group)
     updated.splice(cardIdx, 1)
     // Re-label
     updated.forEach((c, i) => { c.pairing = `Pairing ${i + 1}` })
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
+    registerUndoAction({
+      label: `Removed ${removedGroup.pairing}`,
+      undo: () => {
+        setPairingsData(prev => {
+          const existing = (prev[tid] ?? []).map(c => ({ ...c, players: [...c.players] }))
+          const restoreIdx = Math.min(cardIdx, existing.length)
+          existing.splice(restoreIdx, 0, removedGroup)
+          existing.forEach((c, i) => { c.pairing = `Pairing ${i + 1}` })
+          return { ...prev, [tid]: existing }
+        })
+      },
+    })
   }
 
   function assignUnpairedToGroup(cardIdx) {
@@ -1084,18 +1163,43 @@ function AdminPanel() {
 
   function clearPairings() {
     if (!window.confirm('Clear all pairings for this tournament?')) return
+    const snapshot = cloneForUndo(currentPairings)
     setPairingsData(prev => ({ ...prev, [tid]: [] }))
     setManualPairings(false)
     setSelectedUnpaired(null)
+    if (!snapshot?.length) return
+    registerUndoAction({
+      label: 'Cleared pairings',
+      undo: () => {
+        setPairingsData(prev => ({ ...prev, [tid]: snapshot }))
+      },
+    })
   }
 
   function removePairedPlayer(cardIdx, playerIdx) {
+    if (!window.confirm('Remove this player from the pairing?')) return
+    const removedPlayer = currentPairings[cardIdx]?.players?.[playerIdx]
+    if (!removedPlayer) return
     const updated = currentPairings.map((c, ci) =>
       ci === cardIdx
         ? { ...c, players: c.players.filter((_, pi) => pi !== playerIdx) }
         : c
     )
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
+    registerUndoAction({
+      label: `Removed ${removedPlayer.name} from ${currentPairings[cardIdx]?.pairing ?? 'pairing'}`,
+      undo: () => {
+        setPairingsData(prev => {
+          const existing = (prev[tid] ?? []).map(c => ({ ...c, players: [...c.players] }))
+          if (!existing[cardIdx]) return prev
+          const nextPlayers = [...existing[cardIdx].players]
+          const restoreIdx = Math.min(playerIdx, nextPlayers.length)
+          nextPlayers.splice(restoreIdx, 0, removedPlayer)
+          existing[cardIdx] = { ...existing[cardIdx], players: nextPlayers }
+          return { ...prev, [tid]: existing }
+        })
+      },
+    })
   }
 
   async function savePairings() {
@@ -1148,11 +1252,18 @@ function AdminPanel() {
   }
 
   function clearCredit(name) {
+    const previousCredit = credits[name]
+    if (previousCredit == null) return
     setCredits(prev => { const next = { ...prev }; delete next[name]; return next })
+    registerUndoAction({
+      label: `Cleared credit for ${name}`,
+      undo: () => setCredits(prev => ({ ...prev, [name]: previousCredit })),
+    })
   }
 
   function clearAllCredits() {
     if (!window.confirm('Clear ALL credit balances? This cannot be undone.')) return
+    setActionFeedback('Credits were cleared. Undo is not supported for bulk credit resets.')
     setCredits({})
   }
 
@@ -1182,10 +1293,21 @@ function AdminPanel() {
 
   function clearAllPayments(tournamentId) {
     if (!window.confirm('Clear all payment records for this tournament?')) return
+    const previous = cloneForUndo(payments[tournamentId] ?? {})
     setPayments(prev => {
       const next = { ...prev }
       delete next[tournamentId]
       return next
+    })
+    if (!Object.keys(previous).length) return
+    registerUndoAction({
+      label: `Cleared payments for ${tournamentId}`,
+      undo: () => {
+        setPayments(prev => ({
+          ...prev,
+          [tournamentId]: previous,
+        }))
+      },
     })
   }
 
@@ -1208,6 +1330,7 @@ function AdminPanel() {
 
   function resetTournamentInfoDraft(tournamentId) {
     if (!tournamentId) return
+    if (!window.confirm('Discard unsaved tournament info changes?')) return
     setTournamentInfoDrafts(prev => {
       const next = { ...prev }
       delete next[tournamentId]
@@ -1587,6 +1710,7 @@ function AdminPanel() {
     if (!publishPreview || publishSaving) return
     const ok = await publishTournament(publishPreview)
     if (ok) {
+      setActionFeedback(`Published ${publishPreview.targetTournament.name}. Undo is not available for published results.`)
       setPublishPreview(null)
     }
   }
@@ -1609,6 +1733,39 @@ function AdminPanel() {
           <h1 className="section-title text-3xl">Tournament Admin</h1>
           <div className="gold-divider" />
         </div>
+      </div>
+
+      {actionFeedback && (
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm font-sans text-blue-800">
+          {actionFeedback}
+        </div>
+      )}
+
+      <div className="mb-5 bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-semibold font-sans text-darktext">Recent Admin Actions</h2>
+          <span className="text-xs font-sans text-gray-500">Last {MAX_RECENT_ACTIONS}</span>
+        </div>
+        {!recentActions.length ? (
+          <p className="text-xs text-gray-500 font-sans">No undoable actions yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {recentActions.map(action => (
+              <div key={action.id} className="flex items-center justify-between gap-2 border border-gray-100 rounded-md px-3 py-2">
+                <div>
+                  <p className="text-sm font-sans text-darktext">{action.label}</p>
+                  <p className="text-[11px] font-sans text-gray-500">{new Date(action.createdAt).toLocaleTimeString()}</p>
+                </div>
+                <button
+                  onClick={() => undoRecentAction(action.id)}
+                  className="text-xs font-sans px-2.5 py-1 rounded border border-blue-200 text-blue-700 hover:bg-blue-50"
+                >
+                  Undo
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {hasUnsavedDrafts && (
