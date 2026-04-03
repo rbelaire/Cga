@@ -391,6 +391,7 @@ async function exportPairingsPDF(tournament, pairings) {
 async function exportPtmPDF(membersList) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   let y = await buildPdfHeader(doc, 'Points to Make', 'CGA 2026 Season — Full Roster by Flight')
+  const displayPtm = (ptm) => (typeof ptm === 'number' ? Math.round(ptm) : (ptm ?? '—'))
 
   const grouped = FLIGHTS.reduce((acc, f) => ({ ...acc, [f]: [] }), {})
   const unassigned = []
@@ -413,7 +414,7 @@ async function exportPtmPDF(membersList) {
     autoTable(doc, {
       head: [['#', 'Player', 'PTM', 'Tee']],
       body: members.slice().sort((a, b) => a.name.localeCompare(b.name))
-                   .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
+                   .map((m, i) => [i + 1, m.name, displayPtm(m.ptm), m.tee ?? '—']),
       startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [245, 248, 252] },
@@ -429,7 +430,7 @@ async function exportPtmPDF(membersList) {
     autoTable(doc, {
       head: [['#', 'Player', 'PTM', 'Tee']],
       body: unassigned.slice().sort((a, b) => a.name.localeCompare(b.name))
-                      .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
+                      .map((m, i) => [i + 1, m.name, displayPtm(m.ptm), m.tee ?? '—']),
       startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: [110, 110, 110], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [248, 248, 248] },
