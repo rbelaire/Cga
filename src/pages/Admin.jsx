@@ -2508,11 +2508,17 @@ function ScoreEntryPanel({
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
 }) {
-  const scoreInputRefs = useRef([])
+  const scoreInputRefs = useRef({ mobile: [], desktop: [] })
   const lastFocusContextRef = useRef(null)
 
+  const setScoreInputRef = (layout, idx, el) => {
+    scoreInputRefs.current[layout][idx] = el
+  }
+
   const focusScoreAt = (idx) => {
-    const target = scoreInputRefs.current[idx]
+    const mobileTarget = scoreInputRefs.current.mobile[idx]
+    const desktopTarget = scoreInputRefs.current.desktop[idx]
+    const target = [mobileTarget, desktopTarget].find((el) => el && el.offsetParent !== null) || mobileTarget || desktopTarget
     if (!target) return
     target.focus()
     target.select?.()
@@ -2636,94 +2642,175 @@ function ScoreEntryPanel({
             </div>
 
             {players.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="table-header text-gray-400 text-left">Rank</th>
-                      <th className="table-header text-gray-400 text-left">Player</th>
-                      <th className="table-header text-gray-400 text-center">PTM</th>
-                      <th className="table-header text-gray-400 text-center">Score</th>
-                      <th className="table-header text-gray-400 text-center">+/-</th>
-                      <th className="table-header text-gray-400 text-center">POY</th>
-                      <th className="table-header text-gray-400 text-center">Elig.</th>
-                      <th className="table-header text-gray-400 w-8"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {players.map((p, idx) => (
-                      <tr
-                        key={p.name}
-                        className={`border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50 ${
-                          idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                        }`}
-                      >
-                        {/* Rank */}
-                        <td className="px-3 py-2">
-                          <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
-                            {p.rank ?? '—'}
-                          </span>
-                        </td>
-                        {/* Name */}
-                        <td className="px-3 py-2 font-sans text-sm text-darktext whitespace-nowrap">
-                          {formatName(p.name)}
-                        </td>
-                        {/* PTM */}
-                        <td className="px-2 py-1.5 text-center">
-                          <input type="number" value={p.ptm} onChange={e => updatePlayer(idx, 'ptm', e.target.value)}
-                            className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                          />
-                        </td>
-                        {/* Score */}
-                        <td className="px-2 py-1.5 text-center">
+              <div>
+                {/* Mobile cards */}
+                <div className="sm:hidden space-y-2 p-2">
+                  {players.map((p, idx) => (
+                    <div
+                      key={p.name}
+                      className={`border border-gray-200 rounded-lg p-3 ${
+                        idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-sans text-sm font-semibold text-darktext truncate">{formatName(p.name)}</p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
+                              Rank {p.rank ?? '—'}
+                            </span>
+                            <span className={`stat-number text-xs font-semibold ${
+                              p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
+                            }`}>
+                              {fmtPM(p.plusMinus)}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removePlayer(idx)}
+                          title="Remove player from this tournament"
+                          className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors px-1"
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <label className="block">
+                          <span className="text-[11px] font-sans text-gray-400">PTM</span>
                           <input
-                            ref={(el) => { scoreInputRefs.current[idx] = el }}
+                            type="number"
+                            inputMode="numeric"
+                            value={p.ptm}
+                            onChange={e => updatePlayer(idx, 'ptm', e.target.value)}
+                            className="mt-1 w-full border border-gray-200 rounded px-2 py-2 text-sm font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-[11px] font-sans text-gray-400">Score</span>
+                          <input
+                            ref={(el) => setScoreInputRef('mobile', idx, el)}
                             type="number"
                             inputMode="numeric"
                             value={p.score}
                             onChange={e => updatePlayer(idx, 'score', e.target.value)}
                             onKeyDown={e => handleScoreInputKeyDown(e, idx)}
                             aria-label={`Score for ${formatName(p.name)}`}
-                            className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                            className="mt-1 w-full border border-gray-200 rounded px-2 py-2 text-sm font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                           />
-                        </td>
-                        {/* +/- */}
-                        <td className="px-3 py-2 text-center">
-                          <span className={`stat-number text-xs font-semibold ${
-                            p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
-                          }`}>
-                            {fmtPM(p.plusMinus)}
-                          </span>
-                        </td>
-                        {/* POY */}
-                        <td className="px-3 py-2 text-center">
-                          <span className={`stat-number text-xs font-semibold ${
-                            p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
-                          }`}>
-                            {fmtPOY(p)}
-                          </span>
-                        </td>
-                        {/* Eligible */}
-                        <td className="px-3 py-2 text-center">
-                          <input type="checkbox" checked={p.eligible !== false}
+                        </label>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className={`stat-number text-xs font-semibold ${
+                          p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
+                        }`}>
+                          POY: {fmtPOY(p)}
+                        </span>
+                        <label className="flex items-center gap-1.5 text-xs font-sans text-gray-500">
+                          <input
+                            type="checkbox"
+                            checked={p.eligible !== false}
                             onChange={e => updatePlayer(idx, 'eligible', e.target.checked)}
                             className="accent-forest cursor-pointer w-4 h-4"
                           />
-                        </td>
-                        {/* Remove */}
-                        <td className="px-2 py-2 text-center">
-                          <button
-                            onClick={() => removePlayer(idx)}
-                            title="Remove player from this tournament"
-                            className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors"
-                          >
-                            ×
-                          </button>
-                        </td>
+                          Eligible
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="table-header text-gray-400 text-left">Rank</th>
+                        <th className="table-header text-gray-400 text-left">Player</th>
+                        <th className="table-header text-gray-400 text-center">PTM</th>
+                        <th className="table-header text-gray-400 text-center">Score</th>
+                        <th className="table-header text-gray-400 text-center">+/-</th>
+                        <th className="table-header text-gray-400 text-center">POY</th>
+                        <th className="table-header text-gray-400 text-center">Elig.</th>
+                        <th className="table-header text-gray-400 w-8"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {players.map((p, idx) => (
+                        <tr
+                          key={p.name}
+                          className={`border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50 ${
+                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                          }`}
+                        >
+                          {/* Rank */}
+                          <td className="px-3 py-2">
+                            <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
+                              {p.rank ?? '—'}
+                            </span>
+                          </td>
+                          {/* Name */}
+                          <td className="px-3 py-2 font-sans text-sm text-darktext whitespace-nowrap">
+                            {formatName(p.name)}
+                          </td>
+                          {/* PTM */}
+                          <td className="px-2 py-1.5 text-center">
+                            <input type="number" value={p.ptm} onChange={e => updatePlayer(idx, 'ptm', e.target.value)}
+                              className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                            />
+                          </td>
+                          {/* Score */}
+                          <td className="px-2 py-1.5 text-center">
+                            <input
+                              ref={(el) => setScoreInputRef('desktop', idx, el)}
+                              type="number"
+                              inputMode="numeric"
+                              value={p.score}
+                              onChange={e => updatePlayer(idx, 'score', e.target.value)}
+                              onKeyDown={e => handleScoreInputKeyDown(e, idx)}
+                              aria-label={`Score for ${formatName(p.name)}`}
+                              className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                            />
+                          </td>
+                          {/* +/- */}
+                          <td className="px-3 py-2 text-center">
+                            <span className={`stat-number text-xs font-semibold ${
+                              p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
+                            }`}>
+                              {fmtPM(p.plusMinus)}
+                            </span>
+                          </td>
+                          {/* POY */}
+                          <td className="px-3 py-2 text-center">
+                            <span className={`stat-number text-xs font-semibold ${
+                              p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
+                            }`}>
+                              {fmtPOY(p)}
+                            </span>
+                          </td>
+                          {/* Eligible */}
+                          <td className="px-3 py-2 text-center">
+                            <input type="checkbox" checked={p.eligible !== false}
+                              onChange={e => updatePlayer(idx, 'eligible', e.target.checked)}
+                              className="accent-forest cursor-pointer w-4 h-4"
+                            />
+                          </td>
+                          {/* Remove */}
+                          <td className="px-2 py-2 text-center">
+                            <button
+                              onClick={() => removePlayer(idx)}
+                              title="Remove player from this tournament"
+                              className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors"
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed m-4 rounded-lg border-gray-200">
