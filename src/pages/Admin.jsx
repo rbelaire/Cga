@@ -2378,6 +2378,60 @@ function ScoreEntryPanel({
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
 }) {
+  const scoreInputRefs = useRef([])
+  const lastFocusContextRef = useRef(null)
+
+  const focusScoreAt = (idx) => {
+    const target = scoreInputRefs.current[idx]
+    if (!target) return
+    target.focus()
+    target.select?.()
+  }
+
+  useEffect(() => {
+    const contextKey = `${tid ?? ''}::${flight ?? ''}`
+    if (lastFocusContextRef.current === contextKey) return
+    lastFocusContextRef.current = contextKey
+
+    const rafId = requestAnimationFrame(() => {
+      const firstEmptyIdx = players.findIndex((player) => player.score == null || player.score === '')
+      const targetIdx = firstEmptyIdx >= 0 ? firstEmptyIdx : 0
+      focusScoreAt(targetIdx)
+    })
+    return () => cancelAnimationFrame(rafId)
+  }, [tid, flight, players])
+
+  const handleScoreInputKeyDown = (e, idx) => {
+    const { key, shiftKey } = e
+
+    if (key === 'ArrowDown') {
+      e.preventDefault()
+      focusScoreAt(idx + 1)
+      return
+    }
+    if (key === 'ArrowUp') {
+      e.preventDefault()
+      focusScoreAt(Math.max(0, idx - 1))
+      return
+    }
+
+    if (key === 'Enter') {
+      e.preventDefault()
+      focusScoreAt(idx + 1)
+      return
+    }
+
+    if (key === 'Tab') {
+      if (shiftKey) {
+        e.preventDefault()
+        focusScoreAt(Math.max(0, idx - 1))
+      } else {
+        e.preventDefault()
+        focusScoreAt(idx + 1)
+      }
+    }
+  }
+
   return (
     <>
       {/* Flight tabs */}
@@ -2494,7 +2548,14 @@ function ScoreEntryPanel({
                         </td>
                         {/* Score */}
                         <td className="px-2 py-1.5 text-center">
-                          <input type="number" value={p.score} onChange={e => updatePlayer(idx, 'score', e.target.value)}
+                          <input
+                            ref={(el) => { scoreInputRefs.current[idx] = el }}
+                            type="number"
+                            inputMode="numeric"
+                            value={p.score}
+                            onChange={e => updatePlayer(idx, 'score', e.target.value)}
+                            onKeyDown={e => handleScoreInputKeyDown(e, idx)}
+                            aria-label={`Score for ${formatName(p.name)}`}
                             className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                           />
                         </td>
