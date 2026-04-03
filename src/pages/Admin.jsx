@@ -3,6 +3,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { signInWithEmailAndPassword } from 'firebase/auth'
+import { Link } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import { formatName, compareByLastName } from '../utils/formatName'
@@ -10,6 +11,7 @@ import { DB } from '../db'
 import { auth } from '../firebase'
 import { useFireData } from '../hooks/useFireData'
 import TeeTag from '../components/ui/TeeTag'
+import CountdownTimer from '../components/ui/CountdownTimer'
 import cgaPayVenmo from '../../cga-pay-venmo.jpg'
 
 const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
@@ -227,8 +229,16 @@ function fmtDateShort(iso) {
   })
 }
 
+function stableSerialize(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${stableSerialize(value[k])}`).join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
 // ── PDF utilities ──────────────────────────────────────────────────────────────
-async function loadAssetBase64(path) {
+async function loadAssetBase64() {
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}cga-logo.png`)
     if (!res.ok) return null
@@ -726,6 +736,11 @@ function AdminPanel() {
   const { data: membersData = [] } = useFireData(DB.listenMembers, [])
   const { data: currentStandings } = useFireData(DB.listenStandings, { flights: {} })
   const { data: livePtmData } = useFireData(DB.listenPtm, [])
+  const { data: cloudScores = {} } = useFireData(DB.listenScores, {})
+  const { data: cloudPairings = {} } = useFireData(DB.listenPairings, {})
+  const { data: cloudPayments = {} } = useFireData(DB.listenPayments, {})
+  const { data: cloudCredits = {} } = useFireData(DB.listenCredits, {})
+  const { data: allResults = {} } = useFireData(DB.listenResults, {})
 
   // Tournament score entry data
   const [data, setData] = useState(() => {
@@ -761,12 +776,12 @@ function AdminPanel() {
   const [flight,       setFlight]       = useState(FLIGHTS[0])
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
-  const [adminMode,    setAdminMode]    = useState('scores')
+  const [adminMode,    setAdminMode]    = useState('dashboard')
   const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
   const [showTournamentInfoEditor, setShowTournamentInfoEditor] = useState(false)
-  const TOURNAMENT_MODES = ['scores', 'pairings', 'payments']
+  const TOURNAMENT_MODES = ['dashboard', 'scores', 'pairings', 'payments']
   const showTournamentSelector = TOURNAMENT_MODES.includes(adminMode)
 
   // Global save error banner
@@ -902,10 +917,38 @@ function AdminPanel() {
     setData(prev => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [flight]: newList } }))
   }
 
-  function addPlayer(name) {
-    if (allAddedNames.has(name)) return
-    const ptm = ptmLookup[name] ?? ''
-    flightSet([...rawPlayers, { name, ptm: ptm !== null && ptm !== undefined ? ptm : '', score: '', eligible: true }])
+  function togglePoolSelect(name) {
+    setSelectedPool(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  function toggleGroupSelect(groupKey) {
+    const group = poolMembersGrouped[groupKey] ?? []
+    if (!group.length) return
+    setSelectedPool(prev => {
+      const next = new Set(prev)
+      const allSelected = group.every(m => next.has(m.name))
+      if (allSelected) group.forEach(m => next.delete(m.name))
+      else group.forEach(m => next.add(m.name))
+      return next
+    })
+  }
+
+  function addSelectedPlayers() {
+    const names = [...selectedPool].filter(name => !allAddedNames.has(name))
+    if (!names.length) return
+    const entries = names.map(name => ({
+      name,
+      ptm: ptmLookup[name] ?? '',
+      score: '',
+      eligible: true,
+    }))
+    flightSet([...rawPlayers, ...entries])
+    setSelectedPool(new Set())
   }
 
   function removePlayer(idx) {
@@ -1173,6 +1216,44 @@ function AdminPanel() {
   const paymentMap = payments[tid] ?? {}
   const paymentPaidCount = Object.keys(paymentMap).length
 
+  const dashboardTid = tid || nextTournament?.id || ''
+  const dashboardTournament = schedule.find(t => t.id === dashboardTid) ?? nextTournament ?? null
+  const dashboardEntered = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[dashboardTid]?.[f]?.length ?? 0), 0)
+  const dashboardPaid = Object.keys(payments[dashboardTid] ?? {}).length
+  const dashboardPairingsPosted = (pairingsData[dashboardTid] ?? []).length > 0
+  const lastPublishedTournament = useMemo(() => (
+    [...schedule]
+      .filter(t => allResults?.[t.id])
+      .sort((a, b) => (new Date(b.date)) - (new Date(a.date)))[0] ?? null
+  ), [allResults])
+
+  const membersDirty = useMemo(() => {
+    const cloudLookup = Object.fromEntries(membersData.map(m => [m.name, m]))
+    const overrideNames = Object.keys(membersOverride)
+    return overrideNames.some(name => {
+      const local = membersOverride[name] ?? {}
+      const cloud = cloudLookup[name]
+      if (!cloud) return true
+      return (local.flight ?? null) !== (cloud.flight ?? null) || (local.ptm ?? null) !== (cloud.ptm ?? null)
+    })
+  }, [membersData, membersOverride])
+
+  const unsavedDrafts = useMemo(() => {
+    const checks = [
+      { key: 'scores', label: 'Score Entry', dirty: stableSerialize(data) !== stableSerialize(cloudScores) },
+      { key: 'pairings', label: 'Pairings Builder', dirty: stableSerialize(pairingsData) !== stableSerialize(cloudPairings) },
+      { key: 'members', label: 'Member Management', dirty: membersDirty },
+      { key: 'credits', label: 'Credit on Books', dirty: stableSerialize(credits) !== stableSerialize(cloudCredits) },
+      { key: 'payments', label: 'Payments', dirty: stableSerialize(payments) !== stableSerialize(cloudPayments) },
+      {
+        key: 'tournament-info',
+        label: 'Tournament Info Drafts',
+        dirty: Object.values(tournamentInfoDrafts).some(d => d && Object.keys(d).length > 0),
+      },
+    ]
+    return checks.filter(c => c.dirty)
+  }, [data, cloudScores, pairingsData, cloudPairings, membersDirty, credits, cloudCredits, payments, cloudPayments, tournamentInfoDrafts])
+
   const paymentRoster = useMemo(() => {
     const search = paymentSearch.trim().toLowerCase()
     return membersData
@@ -1311,12 +1392,13 @@ function AdminPanel() {
   }
 
   // ── Publish tournament results to Firestore ───────────────────────────────────
-  async function doExport() {
-    if (!tournament) return
+  async function publishTournament(targetTid = tid) {
+    const targetTournament = schedule.find(t => t.id === targetTid)
+    if (!targetTournament) return
     await withSaveState(setPublishSaving, setPublishSaveStatus, async () => {
       const flightWinners = [], leaderboard = {}
       for (const fl of FLIGHTS) {
-        const ps      = calcFlightPOY(data[tid]?.[fl] ?? [])
+        const ps      = calcFlightPOY(data[targetTid]?.[fl] ?? [])
         const ranked  = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
         const allRows = [...ranked, ...ps.filter(p => p.rank == null)]
         leaderboard[fl] = allRows.map(p => ({
@@ -1327,7 +1409,7 @@ function AdminPanel() {
       }
 
       // Include New Players in leaderboard (poy: 0) so scratch standings count them
-      const newPlayerRows = (data[tid]?.['New Players'] ?? []).filter(p => p.name && p.score != null && p.score !== '')
+      const newPlayerRows = (data[targetTid]?.['New Players'] ?? []).filter(p => p.name && p.score != null && p.score !== '')
       if (newPlayerRows.length) {
         leaderboard['New Players'] = newPlayerRows.map(p => ({
           rank: 0, name: p.name, poy: 0,
@@ -1338,7 +1420,7 @@ function AdminPanel() {
       }
 
       const resultDoc = {
-        id: tid, name: tournament.name, date: tournament.date, course: tournament.course,
+        id: targetTid, name: targetTournament.name, date: targetTournament.date, course: targetTournament.course,
         format: 'Individual Stroke Play', status: 'completed', flightWinners, leaderboard,
       }
 
@@ -1354,7 +1436,7 @@ function AdminPanel() {
 
       const newPoy = { flights: {} }
       for (const fl of FLIGHTS) {
-        const ps = calcFlightPOY(data[tid]?.[fl] ?? [])
+        const ps = calcFlightPOY(data[targetTid]?.[fl] ?? [])
         newPoy.flights[fl] = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
           .map((p, i) => {
             const prevEvents = prevStandingsLookup[p.name]?.events ?? 0
@@ -1364,7 +1446,7 @@ function AdminPanel() {
 
       const newStandings = { flights: {} }
       for (const fl of FLIGHTS) {
-        const ps     = calcFlightPOY(data[tid]?.[fl] ?? [])
+        const ps     = calcFlightPOY(data[targetTid]?.[fl] ?? [])
         const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
         newStandings.flights[fl] = sorted.map((p, i) => {
           const newPtm     = ptmLookup[p.name] ?? (Number(p.ptm) || null)
@@ -1377,14 +1459,14 @@ function AdminPanel() {
           const trend      = newPoyVal > prevPoy ? 'up' : newPoyVal < prevPoy ? 'down' : 'stable'
           return {
             rank: i + 1, name: p.name, poy: newPoyVal, ptm: newPtm, ptmDelta,
-            latestScore: Number(p.score) || null, latestTournament: tournament.name,
+            latestScore: Number(p.score) || null, latestTournament: targetTournament.name,
             events: prevEvents + 1, trend,
           }
         })
       }
 
       await Promise.all([
-        DB.saveResult(tid, resultDoc),
+        DB.saveResult(targetTid, resultDoc),
         DB.savePoy(newPoy),
         DB.saveStandings(newStandings),
       ])
@@ -1414,6 +1496,7 @@ function AdminPanel() {
       {/* Mode tabs */}
       <div className="flex gap-2 mb-5 flex-wrap">
         {[
+          ['dashboard', 'Dashboard'],
           ['scores',   'Score Entry'],
           ['pairings', 'Pairings Builder'],
           ['flights',  'Member Management'],
@@ -1487,7 +1570,7 @@ function AdminPanel() {
           nextFlight={nextFlight}
           fmtPM={fmtPM}
           fmtPOY={fmtPOY}
-          doExport={doExport}
+          doExport={() => publishTournament(tid)}
           publishSaving={publishSaving}
           publishSaveStatus={publishSaveStatus}
           saveScores={saveScores}
@@ -1497,6 +1580,25 @@ function AdminPanel() {
           tournament={tournament}
           totalPlayers={totalPlayers}
           onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
+        />
+      )}
+
+      {adminMode === 'dashboard' && (
+        <DashboardPanel
+          nextTournament={nextTournamentInfo}
+          selectedTournament={dashboardTournament}
+          enteredCount={dashboardEntered}
+          paidCount={dashboardPaid}
+          pairingsPosted={dashboardPairingsPosted}
+          lastPublishedTournament={lastPublishedTournament}
+          hasUnsavedDrafts={unsavedDrafts.length > 0}
+          unsavedDrafts={unsavedDrafts}
+          onRepublish={async () => {
+            if (!lastPublishedTournament) return
+            setTid(lastPublishedTournament.id)
+            await publishTournament(lastPublishedTournament.id)
+          }}
+          publishSaving={publishSaving}
         />
       )}
 
@@ -1981,6 +2083,89 @@ function AdminPanel() {
         </div>
       )}
     </PageWrapper>
+  )
+}
+
+function DashboardPanel({
+  nextTournament, selectedTournament, enteredCount, paidCount, pairingsPosted,
+  lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
+}) {
+  return (
+    <div className="space-y-5">
+      <section className="bg-white border border-gray-200 rounded-lg p-5">
+        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Next Tournament</p>
+        {nextTournament ? (
+          <>
+            <h2 className="text-darktext font-serif text-2xl font-semibold mb-1">{nextTournament.name}</h2>
+            <p className="text-gray-500 font-sans text-sm mb-4">{fmtDate(nextTournament.date)}</p>
+            <CountdownTimer targetDate={nextTournament.date} />
+          </>
+        ) : (
+          <p className="text-gray-500 font-sans text-sm">No upcoming tournaments on schedule.</p>
+        )}
+      </section>
+
+      {hasUnsavedDrafts && (
+        <section className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <h3 className="text-amber-800 font-sans font-semibold text-sm mb-1">Unsaved Drafts Detected</h3>
+          <p className="text-amber-700 font-sans text-xs">
+            Local-only changes exist in: {unsavedDrafts.map(item => item.label).join(', ')}.
+          </p>
+        </section>
+      )}
+
+      <section className="bg-white border border-gray-200 rounded-lg p-5">
+        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest">Selected Tournament Snapshot</p>
+        <h3 className="text-darktext font-serif text-xl font-semibold">{selectedTournament?.name ?? 'No tournament selected'}</h3>
+        {selectedTournament?.date && <p className="text-gray-500 font-sans text-sm mb-4">{fmtDateShort(selectedTournament.date)}</p>}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Players Entered</p>
+            <p className="stat-number text-3xl text-forest">{enteredCount}</p>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Players Paid</p>
+            <p className="stat-number text-3xl text-forest">{paidCount}</p>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Pairings</p>
+            <p className={`font-sans text-sm font-semibold mt-1 ${pairingsPosted ? 'text-green-700' : 'text-gray-500'}`}>
+              {pairingsPosted ? 'Posted' : 'Not posted'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white border border-gray-200 rounded-lg p-5">
+        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Last Published Tournament</p>
+        {lastPublishedTournament ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-darktext font-serif text-xl font-semibold">{lastPublishedTournament.name}</h3>
+              <p className="text-gray-500 font-sans text-sm">{fmtDateShort(lastPublishedTournament.date)}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/results"
+                state={{ expand: lastPublishedTournament.id }}
+                className="px-3 py-2 text-xs font-sans font-semibold rounded-md bg-white text-gray-600 border border-gray-300 hover:text-forest hover:border-forest"
+              >
+                View Results
+              </Link>
+              <button
+                onClick={onRepublish}
+                disabled={publishSaving}
+                className="px-3 py-2 text-xs font-sans font-semibold rounded-md bg-forest text-white disabled:opacity-60"
+              >
+                {publishSaving ? 'Publishing…' : 'Re-publish'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-gray-500 font-sans text-sm">No published tournament results found.</p>
+        )}
+      </section>
+    </div>
   )
 }
 

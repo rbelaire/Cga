@@ -9,10 +9,10 @@ import { useState, useEffect } from 'react'
  */
 export function useFireData(listenFn, staticFallback) {
   const [data,   setData]   = useState(staticFallback)
-  const [status, setStatus] = useState('loading') // 'loading' | 'live' | 'static'
+  const [status, setStatus] = useState(listenFn ? 'loading' : 'static') // 'loading' | 'live' | 'static'
 
   useEffect(() => {
-    if (!listenFn) { setStatus('static'); return }
+    if (!listenFn) return
     let cancelled = false
     let unsub
     try {
@@ -26,7 +26,9 @@ export function useFireData(listenFn, staticFallback) {
         }
       })
     } catch {
-      setStatus('static')
+      queueMicrotask(() => {
+        if (!cancelled) setStatus('static')
+      })
     }
     return () => {
       cancelled = true
