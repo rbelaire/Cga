@@ -34,7 +34,7 @@ export default function Header() {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
             <img
-              src={`${import.meta.env.BASE_URL}cga-logo.jpg`}
+              src={`${import.meta.env.BASE_URL}cga-logo.png`}
               alt="CGA Logo"
               className="h-10 w-10 object-contain"
             />

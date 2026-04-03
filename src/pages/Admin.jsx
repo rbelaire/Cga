@@ -10,14 +10,17 @@ import { DB } from '../db'
 import { auth } from '../firebase'
 import { useFireData } from '../hooks/useFireData'
 import TeeTag from '../components/ui/TeeTag'
+import cgaPayVenmo from '../../cga-pay-venmo.jpg'
 
 const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const ALL_SCORE_TABS   = [...FLIGHTS, 'New Players']
+const DEFAULT_PAIRING_ROWS = 15
 const STORAGE_KEY  = 'cga_admin_v1'
 const PAIRINGS_KEY = 'cga_pairings_v1'
 const MEMBERS_KEY  = 'cga_members_v1'
 const CREDITS_KEY  = 'cga_credits_v1'
 const PAYMENTS_KEY = 'cga_payments_v1'
+const TOURNAMENT_INFO_KEY = 'cga_tournament_info_v1'
 const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
 
 const PDF_NAVY = [27,  59,  111]
@@ -225,18 +228,81 @@ function fmtDateShort(iso) {
 }
 
 // ── PDF utilities ──────────────────────────────────────────────────────────────
-async function loadLogoBase64() {
+async function loadAssetBase64(path) {
   try {
-    const res = await fetch('/cga-logo.jpg')
+    const res = await fetch(`${import.meta.env.BASE_URL}cga-logo.png`)
     if (!res.ok) return null
     const blob = await res.blob()
     return new Promise(resolve => {
       const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result)
+      reader.onloadend = () => resolve({
+        data: reader.result,
+        format: blob.type === 'image/png' ? 'PNG' : 'JPEG',
+      })
       reader.onerror   = () => resolve(null)
       reader.readAsDataURL(blob)
     })
   } catch { return null }
+}
+
+async function loadLogoBase64() {
+  return loadAssetBase64()
+}
+
+async function loadVenmoBase64() {
+  return loadAssetBase64(cgaPayVenmo)
+}
+
+function ensurePdfSpace(doc, y, neededHeight, topY = 46) {
+  const ph = doc.internal.pageSize.getHeight()
+  const bottomSafeY = ph - 22
+  if (y + neededHeight <= bottomSafeY) return y
+  doc.addPage()
+  return topY
+}
+
+function drawVenmoPaymentBlock(doc, venmoImage, y) {
+  if (!venmoImage) return y
+  const pw = doc.internal.pageSize.getWidth()
+  const ph = doc.internal.pageSize.getHeight()
+  const x = 14
+  const contentWidth = pw - 28
+  const maxImageHeight = 52
+
+  y = ensurePdfSpace(doc, y, 66)
+
+  doc.setDrawColor(210, 215, 225)
+  doc.setLineWidth(0.3)
+  doc.line(x, y, pw - 14, y)
+  y += 7
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(...PDF_NAVY)
+  doc.text('PAYMENT', x, y)
+  y += 5
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(55, 55, 55)
+  doc.text('Scan to pay on Venmo.', x, y)
+  y += 4
+
+  const props = doc.getImageProperties(venmoImage)
+  const ratio = props.width / props.height
+  let imageWidth = contentWidth
+  let imageHeight = imageWidth / ratio
+  if (imageHeight > maxImageHeight) {
+    imageHeight = maxImageHeight
+    imageWidth = imageHeight * ratio
+  }
+  if (y + imageHeight > ph - 22) {
+    y = ensurePdfSpace(doc, y, imageHeight + 4)
+  }
+  const imageX = x + (contentWidth - imageWidth) / 2
+  doc.addImage(venmoImage, 'JPEG', imageX, y, imageWidth, imageHeight)
+
+  return y + imageHeight + 6
 }
 
 async function buildPdfHeader(doc, title, subtitle = '') {
@@ -246,7 +312,7 @@ async function buildPdfHeader(doc, title, subtitle = '') {
   doc.setFillColor(...PDF_NAVY)
   doc.rect(0, 0, pw, 38, 'F')
 
-  if (logo) doc.addImage(logo, 'JPEG', 10, 4, 30, 30)
+  if (logo) doc.addImage(logo.data, logo.format, 10, 4, 30, 30)
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(16)
@@ -341,8 +407,12 @@ async function exportTournamentInfoPDF(tournament) {
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...PDF_NAVY)
   doc.text('ADDITIONAL NOTES', 14, y); y += 6
   for (let i = 0; i < 4; i++) {
+    y = ensurePdfSpace(doc, y, 8)
     doc.setDrawColor(190, 195, 205); doc.setLineWidth(0.2); doc.line(14, y, pw - 14, y); y += 8
   }
+
+  const venmoImage = await loadVenmoBase64()
+  y = drawVenmoPaymentBlock(doc, venmoImage, y)
 
   addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
   doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-tournament-info.pdf`)
@@ -382,6 +452,7 @@ async function exportPairingsPDF(tournament, pairings) {
 async function exportPtmPDF(membersList) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   let y = await buildPdfHeader(doc, 'Points to Make', 'CGA 2026 Season — Full Roster by Flight')
+  const displayPtm = (ptm) => (typeof ptm === 'number' ? Math.round(ptm) : (ptm ?? '—'))
 
   const grouped = FLIGHTS.reduce((acc, f) => ({ ...acc, [f]: [] }), {})
   const unassigned = []
@@ -404,7 +475,7 @@ async function exportPtmPDF(membersList) {
     autoTable(doc, {
       head: [['#', 'Player', 'PTM', 'Tee']],
       body: members.slice().sort((a, b) => a.name.localeCompare(b.name))
-                   .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
+                   .map((m, i) => [i + 1, m.name, displayPtm(m.ptm), m.tee ?? '—']),
       startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [245, 248, 252] },
@@ -420,7 +491,7 @@ async function exportPtmPDF(membersList) {
     autoTable(doc, {
       head: [['#', 'Player', 'PTM', 'Tee']],
       body: unassigned.slice().sort((a, b) => a.name.localeCompare(b.name))
-                      .map((m, i) => [i + 1, m.name, m.ptm ?? '—', m.tee ?? '—']),
+                      .map((m, i) => [i + 1, m.name, displayPtm(m.ptm), m.tee ?? '—']),
       startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: [110, 110, 110], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [248, 248, 248] },
@@ -578,7 +649,7 @@ async function exportPaymentsPDF(tournament, paymentMap, membersList) {
     alternateRowStyles: { fillColor: [245, 248, 252] },
     styles:             { fontSize: 8, cellPadding: 2.5 },
     columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'center', cellWidth: 25 } },
-    margin: { left: 14, right: 14 },
+    margin: { left: 14, right: 14, bottom: 22 },
     didParseCell(data) {
       if (data.section !== 'body') return
       const m = active[data.row.index]
@@ -593,6 +664,10 @@ async function exportPaymentsPDF(tournament, paymentMap, membersList) {
       }
     },
   })
+  const venmoImage = await loadVenmoBase64()
+  const paymentsFinalY = doc.lastAutoTable?.finalY ?? y
+  drawVenmoPaymentBlock(doc, venmoImage, paymentsFinalY + 4)
+
   addPdfFooter(doc, `${paidCount} paid · ${unpaidCount} unpaid · Generated ${new Date().toLocaleDateString()} · CGA`)
   doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-payment-status.pdf`)
 }
@@ -678,14 +753,21 @@ function AdminPanel() {
   const [payments, setPayments] = useState(() => {
     try { return JSON.parse(localStorage.getItem(PAYMENTS_KEY)) || {} } catch { return {} }
   })
+  const [tournamentInfoDrafts, setTournamentInfoDrafts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(TOURNAMENT_INFO_KEY)) || {} } catch { return {} }
+  })
 
   const [tid,          setTid]          = useState(schedule[0]?.id ?? '')
   const [flight,       setFlight]       = useState(FLIGHTS[0])
   const [poolSearch,   setPoolSearch]   = useState('')
+  const [selectedPool, setSelectedPool] = useState(new Set())
   const [adminMode,    setAdminMode]    = useState('scores')
   const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
+  const [showTournamentInfoEditor, setShowTournamentInfoEditor] = useState(false)
+  const TOURNAMENT_MODES = ['scores', 'pairings', 'payments']
+  const showTournamentSelector = TOURNAMENT_MODES.includes(adminMode)
 
   // Global save error banner
   const [adminError, setAdminError] = useState(null)  // string | null
@@ -725,9 +807,12 @@ function AdminPanel() {
   useEffect(() => { localStorage.setItem(MEMBERS_KEY,  JSON.stringify(membersOverride)) }, [membersOverride])
   useEffect(() => { localStorage.setItem(CREDITS_KEY,  JSON.stringify(credits))         }, [credits])
   useEffect(() => { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments))       }, [payments])
+  useEffect(() => { localStorage.setItem(TOURNAMENT_INFO_KEY, JSON.stringify(tournamentInfoDrafts)) }, [tournamentInfoDrafts])
 
   const tournament     = schedule.find(t => t.id === tid)
   const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
+  const tournamentInfo = tournament ? { ...tournament, ...(tournamentInfoDrafts[tournament.id] ?? {}) } : null
+  const nextTournamentInfo = nextTournament ? { ...nextTournament, ...(tournamentInfoDrafts[nextTournament.id] ?? {}) } : null
   const rawPlayers     = data[tid]?.[flight] ?? []
   const players      = useMemo(() => calcFlightPOY(rawPlayers), [rawPlayers])
   const totalPlayers = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
@@ -788,7 +873,7 @@ function AdminPanel() {
       (data[tid]?.[fl] ?? [])
         .filter(p => !pairedNames.has(p.name))
         .map(p => ({ name: p.name, flight: fl }))
-    ),
+    ).sort((a, b) => compareByLastName(a, b)),
     [data, tid, pairedNames]
   )
 
@@ -913,7 +998,7 @@ function AdminPanel() {
   function startManualPairings() {
     // Initialize with empty groups if none exist
     if (!currentPairings.length) {
-      const numGroups = Math.ceil(totalPlayers / 4) || 1
+      const numGroups = Math.max(DEFAULT_PAIRING_ROWS, Math.ceil(totalPlayers / 4) || 1)
       const empty = Array.from({ length: numGroups }, (_, i) => ({ pairing: `Pairing ${i + 1}`, players: [] }))
       setPairingsData(prev => ({ ...prev, [tid]: empty }))
     }
@@ -1062,6 +1147,26 @@ function AdminPanel() {
     await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, () =>
       DB.savePayments(payments), setAdminError
     )
+  }
+
+  function updateTournamentInfoDraft(tournamentId, field, value) {
+    if (!tournamentId) return
+    setTournamentInfoDrafts(prev => ({
+      ...prev,
+      [tournamentId]: {
+        ...(prev[tournamentId] ?? {}),
+        [field]: value,
+      },
+    }))
+  }
+
+  function resetTournamentInfoDraft(tournamentId) {
+    if (!tournamentId) return
+    setTournamentInfoDrafts(prev => {
+      const next = { ...prev }
+      delete next[tournamentId]
+      return next
+    })
   }
 
   // Payments derived state
@@ -1306,29 +1411,12 @@ function AdminPanel() {
         </div>
       </div>
 
-      {/* Tournament selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-        <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Tournament</label>
-        <select
-          value={tid}
-          onChange={e => { setTid(e.target.value); setFlight(FLIGHTS[0]); setPoolSearch('') }}
-          className="border border-gray-300 rounded px-3 py-2 text-sm font-sans w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-forest"
-        >
-          {schedule.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
-        </select>
-        {tournament && (
-          <p className="text-xs text-gray-400 font-sans mt-1.5">
-            {tournament.course} · {tournament.format} · {totalPlayers} player{totalPlayers !== 1 ? 's' : ''} entered
-          </p>
-        )}
-      </div>
-
       {/* Mode tabs */}
       <div className="flex gap-2 mb-5 flex-wrap">
         {[
           ['scores',   'Score Entry'],
           ['pairings', 'Pairings Builder'],
-          ['flights',  'Flight Management'],
+          ['flights',  'Member Management'],
           ['credits',  'Credit on Books'],
           ['payments', 'Payments'],
         ].map(([mode, label]) => (
@@ -1352,6 +1440,25 @@ function AdminPanel() {
         ))}
       </div>
 
+      {/* Tournament selector (only where tournament-scoped data is edited) */}
+      {showTournamentSelector && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+          <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Tournament</label>
+          <select
+            value={tid}
+            onChange={e => { setTid(e.target.value); setFlight(FLIGHTS[0]); setPoolSearch(''); setSelectedPool(new Set()) }}
+            className="border border-gray-300 rounded px-3 py-2 text-sm font-sans w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-forest"
+          >
+            {schedule.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
+          </select>
+          {tournament && (
+            <p className="text-xs text-gray-400 font-sans mt-1.5">
+              {tournament.course} · {tournament.format} · {totalPlayers} player{totalPlayers !== 1 ? 's' : ''} entered
+            </p>
+          )}
+        </div>
+      )}
+
       {/* ══════════════════════════════════════════════════════════════════════════
           SCORE ENTRY MODE
       ══════════════════════════════════════════════════════════════════════════ */}
@@ -1359,7 +1466,7 @@ function AdminPanel() {
         <ScoreEntryPanel
           flights={ALL_SCORE_TABS}
           flight={flight}
-          setFlight={f => { setFlight(f); setPoolSearch('') }}
+          setFlight={f => { setFlight(f); setPoolSearch(''); setSelectedPool(new Set()) }}
           data={data}
           tid={tid}
           players={players}
@@ -1368,7 +1475,10 @@ function AdminPanel() {
           poolTotalCount={poolTotalCount}
           poolSearch={poolSearch}
           setPoolSearch={setPoolSearch}
-          addPlayer={addPlayer}
+          selectedPool={selectedPool}
+          togglePoolSelect={togglePoolSelect}
+          toggleGroupSelect={toggleGroupSelect}
+          addSelectedPlayers={addSelectedPlayers}
           removePlayer={removePlayer}
           updatePlayer={updatePlayer}
           clearFlight={clearFlight}
@@ -1735,11 +1845,8 @@ function AdminPanel() {
           Generate printable PDF documents for distribution.
         </p>
         <div className="flex flex-wrap gap-2">
-          <PdfBtn onClick={() => exportTournamentInfoPDF(nextTournament)} disabled={!nextTournament}>
-            Next Tournament Info
-          </PdfBtn>
-          <PdfBtn onClick={() => exportTournamentInfoPDF(tournament)} disabled={!tournament}>
-            Selected Tournament Info
+          <PdfBtn onClick={() => setShowTournamentInfoEditor(true)} disabled={!tournamentInfo}>
+            Tournament Info PDF
           </PdfBtn>
           <PdfBtn onClick={() => exportPtmPDF(membersData)}>
             Points to Make (Full Roster)
@@ -1766,6 +1873,113 @@ function AdminPanel() {
           )}
         </div>
       </div>
+
+      {showTournamentInfoEditor && tournamentInfo && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg border border-gold/20 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-forest font-sans">Tournament Info Editor</h3>
+                <p className="text-xs text-gray-500 font-sans mt-1">
+                  Edit details used for this session&apos;s Tournament Info PDF before exporting.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => resetTournamentInfoDraft(tournament.id)}
+                  className="px-2.5 py-1.5 text-[11px] font-semibold font-sans rounded-md border border-gray-300 text-gray-600 hover:bg-white transition-colors"
+                >
+                  Reset Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTournamentInfoEditor(false)}
+                  className="px-2.5 py-1.5 text-[11px] font-semibold font-sans rounded-md border border-gray-300 text-gray-600 hover:bg-white transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Tournament Name</span>
+                <input
+                  value={tournamentInfo.name ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'name', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Course</span>
+                <input
+                  value={tournamentInfo.course ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'course', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Date (YYYY-MM-DD)</span>
+                <input
+                  value={tournamentInfo.date ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'date', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Registration Deadline (YYYY-MM-DD)</span>
+                <input
+                  value={tournamentInfo.dueDate ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'dueDate', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Tee Time</span>
+                <input
+                  value={tournamentInfo.teeTime ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'teeTime', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Entry Fee</span>
+                <input
+                  value={tournamentInfo.entryFee ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'entryFee', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Format</span>
+                <input
+                  value={tournamentInfo.format ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'format', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Admin Notes</span>
+                <textarea
+                  value={tournamentInfo.notes ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'notes', e.target.value)}
+                  rows={3}
+                  placeholder="Add optional notes to include on the Tournament Info PDF…"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PdfBtn onClick={() => exportTournamentInfoPDF(tournamentInfo)}>
+                Export Selected Tournament Info
+              </PdfBtn>
+              <PdfBtn onClick={() => exportTournamentInfoPDF(nextTournamentInfo)} disabled={!nextTournamentInfo}>
+                Export Next Tournament Info
+              </PdfBtn>
+            </div>
+          </div>
+        </div>
+      )}
     </PageWrapper>
   )
 }
@@ -1801,7 +2015,8 @@ function SaveBtn({ onClick, saving, status, label = 'Save to Cloud', className =
 function ScoreEntryPanel({
   flights, flight, setFlight, data, tid, players, rawPlayers,
   poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
-  addPlayer, removePlayer, updatePlayer, clearFlight, movePlayerToFlight,
+  selectedPool, togglePoolSelect, toggleGroupSelect, addSelectedPlayers,
+  removePlayer, updatePlayer, clearFlight, movePlayerToFlight,
   prevFlight, nextFlight, fmtPM, fmtPOY, doExport,
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
@@ -1832,7 +2047,7 @@ function ScoreEntryPanel({
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-forest px-4 py-2.5">
               <p className="text-white font-sans text-sm font-semibold">Members</p>
-              <p className="text-white/50 text-xs font-sans mt-0.5">Tap a name, then tap "Add to Flight"</p>
+              <p className="text-white/50 text-xs font-sans mt-0.5">Select one or more names, then tap "Add Selected"</p>
             </div>
 
             <div className="px-3 py-2 border-b border-gray-100">
@@ -1849,7 +2064,10 @@ function ScoreEntryPanel({
               poolMembersGrouped={poolMembersGrouped}
               poolTotalCount={poolTotalCount}
               poolSearch={poolSearch}
-              onAdd={addPlayer}
+              selectedPool={selectedPool}
+              onToggle={togglePoolSelect}
+              onToggleGroup={toggleGroupSelect}
+              onAddSelected={addSelectedPlayers}
               currentFlight={flight}
             />
           </div>
@@ -2010,34 +2228,29 @@ function ScoreEntryPanel({
   )
 }
 
-// ── Member Pool (click-to-add) ────────────────────────────────────────────────
-function MemberPool({ poolMembersGrouped, poolTotalCount, poolSearch, onAdd, currentFlight }) {
-  const [selected, setSelected] = useState(null)
-
-  function handleSelect(name) {
-    setSelected(prev => prev === name ? null : name)
-  }
-
-  function handleAdd() {
-    if (!selected) return
-    onAdd(selected)
-    setSelected(null)
-  }
+// ── Member Pool (multi-select) ────────────────────────────────────────────────
+function MemberPool({
+  poolMembersGrouped, poolTotalCount, poolSearch,
+  selectedPool, onToggle, onToggleGroup, onAddSelected, currentFlight
+}) {
+  const selectedCount = selectedPool.size
 
   return (
     <div>
       {/* Sticky add bar */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-3 py-2">
         <button
-          onClick={handleAdd}
-          disabled={!selected}
+          onClick={onAddSelected}
+          disabled={selectedCount === 0}
           className={`w-full py-2 rounded text-xs font-sans font-semibold transition-colors ${
-            selected
+            selectedCount > 0
               ? 'bg-gold text-forest hover:bg-amber-400'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
           }`}
         >
-          {selected ? `Add ${formatName(selected)} → ${currentFlight}` : 'Select a player below'}
+          {selectedCount > 0
+            ? `Add ${selectedCount} Selected → ${currentFlight}`
+            : 'Select players below'}
         </button>
       </div>
 
@@ -2051,18 +2264,26 @@ function MemberPool({ poolMembersGrouped, poolTotalCount, poolSearch, onAdd, cur
             {[...Object.entries(poolMembersGrouped)].map(([key, group]) => {
               if (!group.length) return null
               const label = key === '__unassigned__' ? 'Unassigned' : key
+              const allInGroupSelected = group.every(m => selectedPool.has(m.name))
               return (
                 <div key={key} className="mb-2">
-                  <p className="px-1 pt-1 pb-0.5 text-[10px] font-sans font-semibold uppercase tracking-widest text-gray-400">
-                    {label}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onToggleGroup(group)}
+                    className={`w-full flex items-center justify-between px-1 pt-1 pb-0.5 text-[10px] font-sans font-semibold uppercase tracking-widest transition-colors ${
+                      allInGroupSelected ? 'text-forest' : 'text-gray-400 hover:text-forest'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className="normal-case tracking-normal text-[10px]">{allInGroupSelected ? 'Clear' : 'Select all'}</span>
+                  </button>
                   <ul className="space-y-0.5">
                     {group.map(m => (
                       <li
                         key={m.name}
-                        onClick={() => handleSelect(m.name)}
+                        onClick={() => onToggle(m.name)}
                         className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded cursor-pointer border transition-colors select-none ${
-                          selected === m.name
+                          selectedPool.has(m.name)
                             ? 'bg-gold/20 border-gold text-forest'
                             : 'bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border-transparent'
                         }`}
@@ -2147,6 +2368,16 @@ function PairingsPanel({
               </button>
             </>
           )}
+          {manualPairings && currentPairings.length > 0 && (
+            <>
+              <button
+                onClick={addGroupManual}
+                className="px-3 py-1.5 text-xs font-sans rounded border border-dashed border-forest text-forest hover:bg-forest/5 transition-colors"
+              >
+                + Add Pairing
+              </button>
+            </>
+          )}
           {currentPairings.length > 0 && (
             <>
               <SaveBtn onClick={savePairings} saving={pairingsSaving} status={pairingsSaveStatus} label="Save Pairings" />
@@ -2172,38 +2403,92 @@ function PairingsPanel({
         </div>
       )}
 
-      {/* Manual build: unpaired pool */}
-      {manualPairings && unpairedPlayers.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-          <p className="text-xs font-sans font-semibold text-forest uppercase tracking-widest mb-3">
-            Unassigned Players — select one, then click a pairing group below
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {unpairedPlayers.map(p => (
-              <button
-                key={p.name}
-                onClick={() => setSelectedUnpaired(prev => prev === p.name ? null : p.name)}
-                className={`text-xs border px-3 py-1.5 rounded-full font-sans transition-colors ${
-                  selectedUnpaired === p.name
-                    ? 'bg-gold border-gold text-forest font-semibold'
-                    : (flightTagStyles[p.flight] ?? flightTagStyles.Unassigned)
-                }`}
-              >
-                {formatName(p.name)}
-                <span className="ml-1 opacity-60 text-[10px]">{p.flight}</span>
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={addGroupManual}
-            className="mt-3 px-3 py-1.5 text-xs font-sans rounded border border-dashed border-forest text-forest hover:bg-forest/5 transition-colors"
-          >
-            + Add New Pairing Group
-          </button>
+      {/* Empty state */}
+      {currentPairings.length === 0 && totalPlayers > 0 && (
+        <div className="border-2 border-dashed border-gray-200 rounded-lg py-16 flex flex-col items-center justify-center">
+          <p className="text-gray-400 font-sans text-sm mb-4">No pairings yet. Choose Auto-Generate or Build Your Own above.</p>
         </div>
       )}
 
-      {/* Auto-mode unpaired banner */}
+      {manualPairings && currentPairings.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)] gap-4 items-start">
+          <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-sans font-semibold text-forest uppercase tracking-widest">Players</h3>
+              <span className="text-[11px] font-mono text-gray-500">{unpairedPlayers.length} unassigned</span>
+            </div>
+            <ul className="max-h-[65vh] overflow-auto divide-y divide-gray-100">
+              {unpairedPlayers.length === 0 && (
+                <li className="px-4 py-6 text-center text-gray-400 text-xs font-sans">All players are assigned.</li>
+              )}
+              {unpairedPlayers.map(p => (
+                <li key={p.name} className="px-3 py-2">
+                  <button
+                    onClick={() => setSelectedUnpaired(prev => prev === p.name ? null : p.name)}
+                    className={`w-full text-left rounded border px-3 py-2 transition-colors ${
+                      selectedUnpaired === p.name
+                        ? 'bg-gold/20 border-gold text-forest'
+                        : 'border-gray-200 hover:border-forest/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-sans text-sm text-darktext truncate">{formatName(p.name)}</span>
+                      <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[p.flight] ?? flightTagStyles.Unassigned}`}>
+                        {p.flight}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-sans font-semibold text-forest uppercase tracking-widest">Pairings</h3>
+              <span className="text-[11px] font-mono text-gray-500">{currentPairings.length} rows</span>
+            </div>
+            <div className="max-h-[65vh] overflow-auto divide-y divide-gray-100">
+              {currentPairings.map((card, cardIdx) => (
+                <div key={cardIdx} className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-forest">{card.pairing}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono text-gray-500">{card.players.length}/4</span>
+                      <button onClick={() => removeGroupManual(cardIdx)} className="text-gray-300 hover:text-red-400 text-base leading-none" title="Remove pairing">×</button>
+                    </div>
+                  </div>
+                  <ul className="space-y-1">
+                    {card.players.map((player, playerIdx) => (
+                      <li key={player.name} className="flex items-center justify-between gap-2 border border-gray-100 rounded px-2.5 py-1.5">
+                        <span className="font-sans text-sm text-darktext truncate">{formatName(player.name)}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[player.flight] ?? flightTagStyles.Unassigned}`}>
+                            {player.flight}
+                          </span>
+                          <button onClick={() => removePairedPlayer(cardIdx, playerIdx)} className="text-gray-300 hover:text-red-400 text-base leading-none" title="Remove from pairing">×</button>
+                        </div>
+                      </li>
+                    ))}
+                    {card.players.length === 0 && (
+                      <li className="text-gray-300 text-xs italic font-sans px-1 py-0.5">Empty pairing</li>
+                    )}
+                  </ul>
+                  {selectedUnpaired && card.players.length < 4 && (
+                    <button
+                      onClick={() => assignUnpairedToGroup(cardIdx)}
+                      className="mt-2 w-full py-1.5 text-xs rounded bg-gold/10 text-amber-700 hover:bg-gold/20 font-sans font-semibold transition-colors"
+                    >
+                      Add {formatName(selectedUnpaired)}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
       {!manualPairings && unpairedPlayers.length > 0 && currentPairings.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex flex-wrap items-center gap-3">
           <span className="text-amber-700 font-sans text-xs font-semibold uppercase tracking-widest flex-shrink-0">
@@ -2219,19 +2504,12 @@ function PairingsPanel({
         </div>
       )}
 
-      {/* Empty state */}
-      {currentPairings.length === 0 && totalPlayers > 0 && (
-        <div className="border-2 border-dashed border-gray-200 rounded-lg py-16 flex flex-col items-center justify-center">
-          <p className="text-gray-400 font-sans text-sm mb-4">No pairings yet. Choose Auto-Generate or Build Your Own above.</p>
-        </div>
-      )}
-
-      {/* Pairing cards grid */}
-      {currentPairings.length > 0 && (
+      {/* Pairing cards grid (auto mode) */}
+      {!manualPairings && currentPairings.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {currentPairings.map((card, cardIdx) => (
+          {currentPairings.map((card) => (
             <div
-              key={cardIdx}
+              key={card.pairing}
               className="bg-white border border-gray-200 rounded-lg overflow-hidden"
             >
               <div className="bg-forest px-4 py-2 flex items-center justify-between">
@@ -2240,19 +2518,10 @@ function PairingsPanel({
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-white/50 font-mono text-xs">{card.players.length} players</span>
-                  {manualPairings && (
-                    <button
-                      onClick={() => removeGroupManual(cardIdx)}
-                      className="text-white/40 hover:text-red-300 text-sm leading-none transition-colors"
-                      title="Remove this group"
-                    >
-                      ×
-                    </button>
-                  )}
                 </div>
               </div>
               <ul className="divide-y divide-gray-100 min-h-[60px]">
-                {card.players.map((player, playerIdx) => (
+                {card.players.map((player) => (
                   <li
                     key={player.name}
                     className="px-3 py-2.5 flex items-center justify-between gap-2"
@@ -2264,13 +2533,6 @@ function PairingsPanel({
                       <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[player.flight] ?? flightTagStyles.Unassigned}`}>
                         {player.flight}
                       </span>
-                      <button
-                        onClick={() => removePairedPlayer(cardIdx, playerIdx)}
-                        className="text-gray-300 hover:text-red-400 text-base leading-none transition-colors ml-0.5"
-                        title="Remove from pairing"
-                      >
-                        ×
-                      </button>
                     </div>
                   </li>
                 ))}
@@ -2280,16 +2542,6 @@ function PairingsPanel({
                   </li>
                 )}
               </ul>
-              {manualPairings && selectedUnpaired && card.players.length < 4 && (
-                <div className="border-t border-dashed border-gold/40 p-2">
-                  <button
-                    onClick={() => assignUnpairedToGroup(cardIdx)}
-                    className="w-full py-1.5 text-xs rounded bg-gold/10 text-amber-700 hover:bg-gold/20 font-sans font-semibold transition-colors"
-                  >
-                    Add {formatName(selectedUnpaired)} here
-                  </button>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -2305,6 +2557,7 @@ function PairingsPanel({
     </div>
   )
 }
+
 
 // ── Flight Management Panel ───────────────────────────────────────────────────
 const TEE_OPTIONS = ['Back', 'Senior', 'Front']
