@@ -13,6 +13,7 @@ import TeeTag from '../components/ui/TeeTag'
 
 const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const ALL_SCORE_TABS   = [...FLIGHTS, 'New Players']
+const DEFAULT_PAIRING_ROWS = 15
 const STORAGE_KEY  = 'cga_admin_v1'
 const PAIRINGS_KEY = 'cga_pairings_v1'
 const MEMBERS_KEY  = 'cga_members_v1'
@@ -797,7 +798,7 @@ function AdminPanel() {
       (data[tid]?.[fl] ?? [])
         .filter(p => !pairedNames.has(p.name))
         .map(p => ({ name: p.name, flight: fl }))
-    ),
+    ).sort((a, b) => compareByLastName(a, b)),
     [data, tid, pairedNames]
   )
 
@@ -943,7 +944,7 @@ function AdminPanel() {
   function startManualPairings() {
     // Initialize with empty groups if none exist
     if (!currentPairings.length) {
-      const numGroups = Math.ceil(totalPlayers / 4) || 1
+      const numGroups = Math.max(DEFAULT_PAIRING_ROWS, Math.ceil(totalPlayers / 4) || 1)
       const empty = Array.from({ length: numGroups }, (_, i) => ({ pairing: `Pairing ${i + 1}`, players: [] }))
       setPairingsData(prev => ({ ...prev, [tid]: empty }))
     }
@@ -2166,6 +2167,16 @@ function PairingsPanel({
               </button>
             </>
           )}
+          {manualPairings && currentPairings.length > 0 && (
+            <>
+              <button
+                onClick={addGroupManual}
+                className="px-3 py-1.5 text-xs font-sans rounded border border-dashed border-forest text-forest hover:bg-forest/5 transition-colors"
+              >
+                + Add Pairing
+              </button>
+            </>
+          )}
           {currentPairings.length > 0 && (
             <>
               <SaveBtn onClick={savePairings} saving={pairingsSaving} status={pairingsSaveStatus} label="Save Pairings" />
@@ -2191,38 +2202,92 @@ function PairingsPanel({
         </div>
       )}
 
-      {/* Manual build: unpaired pool */}
-      {manualPairings && unpairedPlayers.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-          <p className="text-xs font-sans font-semibold text-forest uppercase tracking-widest mb-3">
-            Unassigned Players — select one, then click a pairing group below
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {unpairedPlayers.map(p => (
-              <button
-                key={p.name}
-                onClick={() => setSelectedUnpaired(prev => prev === p.name ? null : p.name)}
-                className={`text-xs border px-3 py-1.5 rounded-full font-sans transition-colors ${
-                  selectedUnpaired === p.name
-                    ? 'bg-gold border-gold text-forest font-semibold'
-                    : (flightTagStyles[p.flight] ?? flightTagStyles.Unassigned)
-                }`}
-              >
-                {formatName(p.name)}
-                <span className="ml-1 opacity-60 text-[10px]">{p.flight}</span>
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={addGroupManual}
-            className="mt-3 px-3 py-1.5 text-xs font-sans rounded border border-dashed border-forest text-forest hover:bg-forest/5 transition-colors"
-          >
-            + Add New Pairing Group
-          </button>
+      {/* Empty state */}
+      {currentPairings.length === 0 && totalPlayers > 0 && (
+        <div className="border-2 border-dashed border-gray-200 rounded-lg py-16 flex flex-col items-center justify-center">
+          <p className="text-gray-400 font-sans text-sm mb-4">No pairings yet. Choose Auto-Generate or Build Your Own above.</p>
         </div>
       )}
 
-      {/* Auto-mode unpaired banner */}
+      {manualPairings && currentPairings.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)] gap-4 items-start">
+          <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-sans font-semibold text-forest uppercase tracking-widest">Players</h3>
+              <span className="text-[11px] font-mono text-gray-500">{unpairedPlayers.length} unassigned</span>
+            </div>
+            <ul className="max-h-[65vh] overflow-auto divide-y divide-gray-100">
+              {unpairedPlayers.length === 0 && (
+                <li className="px-4 py-6 text-center text-gray-400 text-xs font-sans">All players are assigned.</li>
+              )}
+              {unpairedPlayers.map(p => (
+                <li key={p.name} className="px-3 py-2">
+                  <button
+                    onClick={() => setSelectedUnpaired(prev => prev === p.name ? null : p.name)}
+                    className={`w-full text-left rounded border px-3 py-2 transition-colors ${
+                      selectedUnpaired === p.name
+                        ? 'bg-gold/20 border-gold text-forest'
+                        : 'border-gray-200 hover:border-forest/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-sans text-sm text-darktext truncate">{formatName(p.name)}</span>
+                      <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[p.flight] ?? flightTagStyles.Unassigned}`}>
+                        {p.flight}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-sans font-semibold text-forest uppercase tracking-widest">Pairings</h3>
+              <span className="text-[11px] font-mono text-gray-500">{currentPairings.length} rows</span>
+            </div>
+            <div className="max-h-[65vh] overflow-auto divide-y divide-gray-100">
+              {currentPairings.map((card, cardIdx) => (
+                <div key={cardIdx} className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-forest">{card.pairing}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono text-gray-500">{card.players.length}/4</span>
+                      <button onClick={() => removeGroupManual(cardIdx)} className="text-gray-300 hover:text-red-400 text-base leading-none" title="Remove pairing">×</button>
+                    </div>
+                  </div>
+                  <ul className="space-y-1">
+                    {card.players.map((player, playerIdx) => (
+                      <li key={player.name} className="flex items-center justify-between gap-2 border border-gray-100 rounded px-2.5 py-1.5">
+                        <span className="font-sans text-sm text-darktext truncate">{formatName(player.name)}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[player.flight] ?? flightTagStyles.Unassigned}`}>
+                            {player.flight}
+                          </span>
+                          <button onClick={() => removePairedPlayer(cardIdx, playerIdx)} className="text-gray-300 hover:text-red-400 text-base leading-none" title="Remove from pairing">×</button>
+                        </div>
+                      </li>
+                    ))}
+                    {card.players.length === 0 && (
+                      <li className="text-gray-300 text-xs italic font-sans px-1 py-0.5">Empty pairing</li>
+                    )}
+                  </ul>
+                  {selectedUnpaired && card.players.length < 4 && (
+                    <button
+                      onClick={() => assignUnpairedToGroup(cardIdx)}
+                      className="mt-2 w-full py-1.5 text-xs rounded bg-gold/10 text-amber-700 hover:bg-gold/20 font-sans font-semibold transition-colors"
+                    >
+                      Add {formatName(selectedUnpaired)}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
       {!manualPairings && unpairedPlayers.length > 0 && currentPairings.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex flex-wrap items-center gap-3">
           <span className="text-amber-700 font-sans text-xs font-semibold uppercase tracking-widest flex-shrink-0">
@@ -2238,19 +2303,12 @@ function PairingsPanel({
         </div>
       )}
 
-      {/* Empty state */}
-      {currentPairings.length === 0 && totalPlayers > 0 && (
-        <div className="border-2 border-dashed border-gray-200 rounded-lg py-16 flex flex-col items-center justify-center">
-          <p className="text-gray-400 font-sans text-sm mb-4">No pairings yet. Choose Auto-Generate or Build Your Own above.</p>
-        </div>
-      )}
-
-      {/* Pairing cards grid */}
-      {currentPairings.length > 0 && (
+      {/* Pairing cards grid (auto mode) */}
+      {!manualPairings && currentPairings.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {currentPairings.map((card, cardIdx) => (
+          {currentPairings.map((card) => (
             <div
-              key={cardIdx}
+              key={card.pairing}
               className="bg-white border border-gray-200 rounded-lg overflow-hidden"
             >
               <div className="bg-forest px-4 py-2 flex items-center justify-between">
@@ -2259,19 +2317,10 @@ function PairingsPanel({
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-white/50 font-mono text-xs">{card.players.length} players</span>
-                  {manualPairings && (
-                    <button
-                      onClick={() => removeGroupManual(cardIdx)}
-                      className="text-white/40 hover:text-red-300 text-sm leading-none transition-colors"
-                      title="Remove this group"
-                    >
-                      ×
-                    </button>
-                  )}
                 </div>
               </div>
               <ul className="divide-y divide-gray-100 min-h-[60px]">
-                {card.players.map((player, playerIdx) => (
+                {card.players.map((player) => (
                   <li
                     key={player.name}
                     className="px-3 py-2.5 flex items-center justify-between gap-2"
@@ -2283,13 +2332,6 @@ function PairingsPanel({
                       <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[player.flight] ?? flightTagStyles.Unassigned}`}>
                         {player.flight}
                       </span>
-                      <button
-                        onClick={() => removePairedPlayer(cardIdx, playerIdx)}
-                        className="text-gray-300 hover:text-red-400 text-base leading-none transition-colors ml-0.5"
-                        title="Remove from pairing"
-                      >
-                        ×
-                      </button>
                     </div>
                   </li>
                 ))}
@@ -2299,16 +2341,6 @@ function PairingsPanel({
                   </li>
                 )}
               </ul>
-              {manualPairings && selectedUnpaired && card.players.length < 4 && (
-                <div className="border-t border-dashed border-gold/40 p-2">
-                  <button
-                    onClick={() => assignUnpairedToGroup(cardIdx)}
-                    className="w-full py-1.5 text-xs rounded bg-gold/10 text-amber-700 hover:bg-gold/20 font-sans font-semibold transition-colors"
-                  >
-                    Add {formatName(selectedUnpaired)} here
-                  </button>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -2324,6 +2356,7 @@ function PairingsPanel({
     </div>
   )
 }
+
 
 // ── Flight Management Panel ───────────────────────────────────────────────────
 const TEE_OPTIONS = ['Back', 'Senior', 'Front']
