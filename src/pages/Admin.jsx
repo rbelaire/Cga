@@ -10,6 +10,7 @@ import { formatName, compareByLastName } from '../utils/formatName'
 import { DB } from '../db'
 import { auth } from '../firebase'
 import { useFireData } from '../hooks/useFireData'
+import { computeTournamentWorkflowState } from '../utils/tournamentWorkflow'
 import TeeTag from '../components/ui/TeeTag'
 import CountdownTimer from '../components/ui/CountdownTimer'
 import cgaPayVenmo from '../../cga-pay-venmo.jpg'
@@ -1218,9 +1219,14 @@ function AdminPanel() {
 
   const dashboardTid = tid || nextTournament?.id || ''
   const dashboardTournament = schedule.find(t => t.id === dashboardTid) ?? nextTournament ?? null
-  const dashboardEntered = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[dashboardTid]?.[f]?.length ?? 0), 0)
-  const dashboardPaid = Object.keys(payments[dashboardTid] ?? {}).length
-  const dashboardPairingsPosted = (pairingsData[dashboardTid] ?? []).length > 0
+  const dashboardWorkflow = useMemo(() => computeTournamentWorkflowState({
+    tournamentId: dashboardTid,
+    scoresByTournament: data,
+    pairingsByTournament: pairingsData,
+    paymentsByTournament: payments,
+    resultsByTournament: allResults,
+    scoreFlights: ALL_SCORE_TABS,
+  }), [dashboardTid, data, pairingsData, payments, allResults])
   const lastPublishedTournament = useMemo(() => (
     [...schedule]
       .filter(t => allResults?.[t.id])
@@ -1587,9 +1593,7 @@ function AdminPanel() {
         <DashboardPanel
           nextTournament={nextTournamentInfo}
           selectedTournament={dashboardTournament}
-          enteredCount={dashboardEntered}
-          paidCount={dashboardPaid}
-          pairingsPosted={dashboardPairingsPosted}
+          workflow={dashboardWorkflow}
           lastPublishedTournament={lastPublishedTournament}
           hasUnsavedDrafts={unsavedDrafts.length > 0}
           unsavedDrafts={unsavedDrafts}
@@ -2087,7 +2091,7 @@ function AdminPanel() {
 }
 
 function DashboardPanel({
-  nextTournament, selectedTournament, enteredCount, paidCount, pairingsPosted,
+  nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
 }) {
   return (
@@ -2118,22 +2122,23 @@ function DashboardPanel({
         <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest">Selected Tournament Snapshot</p>
         <h3 className="text-darktext font-serif text-xl font-semibold">{selectedTournament?.name ?? 'No tournament selected'}</h3>
         {selectedTournament?.date && <p className="text-gray-500 font-sans text-sm mb-4">{fmtDateShort(selectedTournament.date)}</p>}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
             <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Players Entered</p>
-            <p className="stat-number text-3xl text-forest">{enteredCount}</p>
+            <p className="stat-number text-3xl text-forest">{workflow.counts.enteredCount}</p>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
             <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Players Paid</p>
-            <p className="stat-number text-3xl text-forest">{paidCount}</p>
+            <p className="stat-number text-3xl text-forest">{workflow.counts.paidCount}</p>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
             <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Pairings</p>
-            <p className={`font-sans text-sm font-semibold mt-1 ${pairingsPosted ? 'text-green-700' : 'text-gray-500'}`}>
-              {pairingsPosted ? 'Posted' : 'Not posted'}
+            <p className={`font-sans text-sm font-semibold mt-1 ${workflow.counts.pairingsCount > 0 ? 'text-green-700' : 'text-gray-500'}`}>
+              {workflow.counts.pairingsCount > 0 ? 'Posted' : 'Not posted'}
             </p>
           </div>
         </div>
+        <TournamentWorkflowTracker workflow={workflow} />
       </section>
 
       <section className="bg-white border border-gray-200 rounded-lg p-5">
@@ -2165,6 +2170,59 @@ function DashboardPanel({
           <p className="text-gray-500 font-sans text-sm">No published tournament results found.</p>
         )}
       </section>
+    </div>
+  )
+}
+
+function TournamentWorkflowTracker({ workflow }) {
+  const statusStyles = {
+    complete: {
+      dot: 'bg-green-500',
+      card: 'bg-green-50 border-green-200',
+      title: 'text-green-800',
+      text: 'text-green-700',
+      badge: 'Done',
+      badgeStyle: 'bg-green-100 text-green-700',
+    },
+    partial: {
+      dot: 'bg-amber-500',
+      card: 'bg-amber-50 border-amber-200',
+      title: 'text-amber-800',
+      text: 'text-amber-700',
+      badge: 'Partial',
+      badgeStyle: 'bg-amber-100 text-amber-700',
+    },
+    not_started: {
+      dot: 'bg-gray-300',
+      card: 'bg-gray-50 border-gray-200',
+      title: 'text-gray-700',
+      text: 'text-gray-500',
+      badge: 'Not started',
+      badgeStyle: 'bg-gray-200 text-gray-600',
+    },
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Tournament Workflow</p>
+      <ol className="grid grid-cols-1 lg:grid-cols-5 gap-2">
+        {workflow.steps.map((step, idx) => {
+          const style = statusStyles[step.status]
+          return (
+            <li key={step.key} className={`border rounded-lg p-3 ${style.card}`}>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${style.dot}`} />
+                  <span className="text-[11px] font-sans font-semibold text-gray-500">{idx + 1}</span>
+                </div>
+                <span className={`text-[10px] font-sans font-semibold uppercase px-1.5 py-0.5 rounded ${style.badgeStyle}`}>{style.badge}</span>
+              </div>
+              <p className={`text-xs font-sans font-semibold leading-snug ${style.title}`}>{step.title}</p>
+              <p className={`text-xs font-sans mt-1 ${style.text}`}>{step.label}</p>
+            </li>
+          )
+        })}
+      </ol>
     </div>
   )
 }
