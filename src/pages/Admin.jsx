@@ -10,7 +10,6 @@ import { DB } from '../db'
 import { auth } from '../firebase'
 import { useFireData } from '../hooks/useFireData'
 import TeeTag from '../components/ui/TeeTag'
-import cgaLogo from '../../cga-logo.png'
 import cgaPayVenmo from '../../cga-pay-venmo.jpg'
 
 const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
@@ -256,7 +255,7 @@ async function loadAssetBase64(path) {
 }
 
 async function loadLogoBase64() {
-  return loadAssetBase64(cgaLogo)
+  return loadAssetBase64()
 }
 
 async function loadVenmoBase64() {
