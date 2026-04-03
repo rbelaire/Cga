@@ -18,6 +18,7 @@ const PAIRINGS_KEY = 'cga_pairings_v1'
 const MEMBERS_KEY  = 'cga_members_v1'
 const CREDITS_KEY  = 'cga_credits_v1'
 const PAYMENTS_KEY = 'cga_payments_v1'
+const TOURNAMENT_INFO_KEY = 'cga_tournament_info_v1'
 const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
 
 const PDF_NAVY = [27,  59,  111]
@@ -688,6 +689,9 @@ function AdminPanel() {
   const [payments, setPayments] = useState(() => {
     try { return JSON.parse(localStorage.getItem(PAYMENTS_KEY)) || {} } catch { return {} }
   })
+  const [tournamentInfoDrafts, setTournamentInfoDrafts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(TOURNAMENT_INFO_KEY)) || {} } catch { return {} }
+  })
 
   const [tid,          setTid]          = useState(schedule[0]?.id ?? '')
   const [flight,       setFlight]       = useState(FLIGHTS[0])
@@ -735,9 +739,12 @@ function AdminPanel() {
   useEffect(() => { localStorage.setItem(MEMBERS_KEY,  JSON.stringify(membersOverride)) }, [membersOverride])
   useEffect(() => { localStorage.setItem(CREDITS_KEY,  JSON.stringify(credits))         }, [credits])
   useEffect(() => { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments))       }, [payments])
+  useEffect(() => { localStorage.setItem(TOURNAMENT_INFO_KEY, JSON.stringify(tournamentInfoDrafts)) }, [tournamentInfoDrafts])
 
   const tournament     = schedule.find(t => t.id === tid)
   const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
+  const tournamentInfo = tournament ? { ...tournament, ...(tournamentInfoDrafts[tournament.id] ?? {}) } : null
+  const nextTournamentInfo = nextTournament ? { ...nextTournament, ...(tournamentInfoDrafts[nextTournament.id] ?? {}) } : null
   const rawPlayers     = data[tid]?.[flight] ?? []
   const players      = useMemo(() => calcFlightPOY(rawPlayers), [rawPlayers])
   const totalPlayers = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
@@ -1093,6 +1100,26 @@ function AdminPanel() {
     await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, () =>
       DB.savePayments(payments), setAdminError
     )
+  }
+
+  function updateTournamentInfoDraft(tournamentId, field, value) {
+    if (!tournamentId) return
+    setTournamentInfoDrafts(prev => ({
+      ...prev,
+      [tournamentId]: {
+        ...(prev[tournamentId] ?? {}),
+        [field]: value,
+      },
+    }))
+  }
+
+  function resetTournamentInfoDraft(tournamentId) {
+    if (!tournamentId) return
+    setTournamentInfoDrafts(prev => {
+      const next = { ...prev }
+      delete next[tournamentId]
+      return next
+    })
   }
 
   // Payments derived state
@@ -1754,11 +1781,98 @@ function AdminPanel() {
         <p className="text-gray-500 font-sans text-xs mb-4 leading-relaxed">
           Generate printable PDF documents for distribution.
         </p>
+        {tournamentInfo && (
+          <div className="mb-5 rounded-lg border border-gold/20 bg-gold/5 p-4">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-forest font-sans">Tournament Info Editor</h3>
+                <p className="text-xs text-gray-500 font-sans mt-1">
+                  Edit details used for this session&apos;s Tournament Info PDF before exporting.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => resetTournamentInfoDraft(tournament.id)}
+                className="px-2.5 py-1.5 text-[11px] font-semibold font-sans rounded-md border border-gray-300 text-gray-600 hover:bg-white transition-colors"
+              >
+                Reset Draft
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Tournament Name</span>
+                <input
+                  value={tournamentInfo.name ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'name', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Course</span>
+                <input
+                  value={tournamentInfo.course ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'course', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Date (YYYY-MM-DD)</span>
+                <input
+                  value={tournamentInfo.date ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'date', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Registration Deadline (YYYY-MM-DD)</span>
+                <input
+                  value={tournamentInfo.dueDate ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'dueDate', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Tee Time</span>
+                <input
+                  value={tournamentInfo.teeTime ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'teeTime', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Entry Fee</span>
+                <input
+                  value={tournamentInfo.entryFee ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'entryFee', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Format</span>
+                <input
+                  value={tournamentInfo.format ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'format', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 font-sans">Admin Notes</span>
+                <textarea
+                  value={tournamentInfo.notes ?? ''}
+                  onChange={e => updateTournamentInfoDraft(tournament.id, 'notes', e.target.value)}
+                  rows={3}
+                  placeholder="Add optional notes to include on the Tournament Info PDF…"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm font-sans text-darktext focus:outline-none focus:ring-2 focus:ring-forest/30"
+                />
+              </label>
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
-          <PdfBtn onClick={() => exportTournamentInfoPDF(nextTournament)} disabled={!nextTournament}>
+          <PdfBtn onClick={() => exportTournamentInfoPDF(nextTournamentInfo)} disabled={!nextTournamentInfo}>
             Next Tournament Info
           </PdfBtn>
-          <PdfBtn onClick={() => exportTournamentInfoPDF(tournament)} disabled={!tournament}>
+          <PdfBtn onClick={() => exportTournamentInfoPDF(tournamentInfo)} disabled={!tournamentInfo}>
             Selected Tournament Info
           </PdfBtn>
           <PdfBtn onClick={() => exportPtmPDF(membersData)}>
