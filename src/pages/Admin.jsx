@@ -238,12 +238,15 @@ function fmtDateShort(iso) {
 // ── PDF utilities ──────────────────────────────────────────────────────────────
 async function loadLogoBase64() {
   try {
-    const res = await fetch('/cga-logo.jpg')
+    const res = await fetch(`${import.meta.env.BASE_URL}cga-logo.png`)
     if (!res.ok) return null
     const blob = await res.blob()
     return new Promise(resolve => {
       const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result)
+      reader.onloadend = () => resolve({
+        data: reader.result,
+        format: blob.type === 'image/png' ? 'PNG' : 'JPEG',
+      })
       reader.onerror   = () => resolve(null)
       reader.readAsDataURL(blob)
     })
@@ -257,7 +260,7 @@ async function buildPdfHeader(doc, title, subtitle = '') {
   doc.setFillColor(...PDF_NAVY)
   doc.rect(0, 0, pw, 38, 'F')
 
-  if (logo) doc.addImage(logo, 'JPEG', 10, 4, 30, 30)
+  if (logo) doc.addImage(logo.data, logo.format, 10, 4, 30, 30)
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(16)
