@@ -10,6 +10,8 @@ import { DB } from '../db'
 import { auth } from '../firebase'
 import { useFireData } from '../hooks/useFireData'
 import TeeTag from '../components/ui/TeeTag'
+import cgaLogo from '../../cga-logo.png'
+import cgaPayVenmo from '../../cga-pay-venmo.jpg'
 
 const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const ALL_SCORE_TABS   = [...FLIGHTS, 'New Players']
@@ -236,7 +238,7 @@ function fmtDateShort(iso) {
 }
 
 // ── PDF utilities ──────────────────────────────────────────────────────────────
-async function loadLogoBase64() {
+async function loadAssetBase64(path) {
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}cga-logo.png`)
     if (!res.ok) return null
@@ -251,6 +253,66 @@ async function loadLogoBase64() {
       reader.readAsDataURL(blob)
     })
   } catch { return null }
+}
+
+async function loadLogoBase64() {
+  return loadAssetBase64(cgaLogo)
+}
+
+async function loadVenmoBase64() {
+  return loadAssetBase64(cgaPayVenmo)
+}
+
+function ensurePdfSpace(doc, y, neededHeight, topY = 46) {
+  const ph = doc.internal.pageSize.getHeight()
+  const bottomSafeY = ph - 22
+  if (y + neededHeight <= bottomSafeY) return y
+  doc.addPage()
+  return topY
+}
+
+function drawVenmoPaymentBlock(doc, venmoImage, y) {
+  if (!venmoImage) return y
+  const pw = doc.internal.pageSize.getWidth()
+  const ph = doc.internal.pageSize.getHeight()
+  const x = 14
+  const contentWidth = pw - 28
+  const maxImageHeight = 52
+
+  y = ensurePdfSpace(doc, y, 66)
+
+  doc.setDrawColor(210, 215, 225)
+  doc.setLineWidth(0.3)
+  doc.line(x, y, pw - 14, y)
+  y += 7
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(...PDF_NAVY)
+  doc.text('PAYMENT', x, y)
+  y += 5
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(55, 55, 55)
+  doc.text('Scan to pay on Venmo.', x, y)
+  y += 4
+
+  const props = doc.getImageProperties(venmoImage)
+  const ratio = props.width / props.height
+  let imageWidth = contentWidth
+  let imageHeight = imageWidth / ratio
+  if (imageHeight > maxImageHeight) {
+    imageHeight = maxImageHeight
+    imageWidth = imageHeight * ratio
+  }
+  if (y + imageHeight > ph - 22) {
+    y = ensurePdfSpace(doc, y, imageHeight + 4)
+  }
+  const imageX = x + (contentWidth - imageWidth) / 2
+  doc.addImage(venmoImage, 'JPEG', imageX, y, imageWidth, imageHeight)
+
+  return y + imageHeight + 6
 }
 
 async function buildPdfHeader(doc, title, subtitle = '') {
@@ -355,8 +417,12 @@ async function exportTournamentInfoPDF(tournament) {
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...PDF_NAVY)
   doc.text('ADDITIONAL NOTES', 14, y); y += 6
   for (let i = 0; i < 4; i++) {
+    y = ensurePdfSpace(doc, y, 8)
     doc.setDrawColor(190, 195, 205); doc.setLineWidth(0.2); doc.line(14, y, pw - 14, y); y += 8
   }
+
+  const venmoImage = await loadVenmoBase64()
+  y = drawVenmoPaymentBlock(doc, venmoImage, y)
 
   addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
   doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-tournament-info.pdf`)
@@ -593,7 +659,7 @@ async function exportPaymentsPDF(tournament, paymentMap, membersList) {
     alternateRowStyles: { fillColor: [245, 248, 252] },
     styles:             { fontSize: 8, cellPadding: 2.5 },
     columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'center', cellWidth: 25 } },
-    margin: { left: 14, right: 14 },
+    margin: { left: 14, right: 14, bottom: 22 },
     didParseCell(data) {
       if (data.section !== 'body') return
       const m = active[data.row.index]
@@ -608,6 +674,10 @@ async function exportPaymentsPDF(tournament, paymentMap, membersList) {
       }
     },
   })
+  const venmoImage = await loadVenmoBase64()
+  const paymentsFinalY = doc.lastAutoTable?.finalY ?? y
+  drawVenmoPaymentBlock(doc, venmoImage, paymentsFinalY + 4)
+
   addPdfFooter(doc, `${paidCount} paid · ${unpaidCount} unpaid · Generated ${new Date().toLocaleDateString()} · CGA`)
   doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-payment-status.pdf`)
 }
