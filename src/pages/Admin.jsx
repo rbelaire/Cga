@@ -240,12 +240,15 @@ function fmtDateShort(iso) {
 // ── PDF utilities ──────────────────────────────────────────────────────────────
 async function loadAssetBase64(path) {
   try {
-    const res = await fetch(path)
+    const res = await fetch(`${import.meta.env.BASE_URL}cga-logo.png`)
     if (!res.ok) return null
     const blob = await res.blob()
     return new Promise(resolve => {
       const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result)
+      reader.onloadend = () => resolve({
+        data: reader.result,
+        format: blob.type === 'image/png' ? 'PNG' : 'JPEG',
+      })
       reader.onerror   = () => resolve(null)
       reader.readAsDataURL(blob)
     })
@@ -319,7 +322,7 @@ async function buildPdfHeader(doc, title, subtitle = '') {
   doc.setFillColor(...PDF_NAVY)
   doc.rect(0, 0, pw, 38, 'F')
 
-  if (logo) doc.addImage(logo, 'JPEG', 10, 4, 30, 30)
+  if (logo) doc.addImage(logo.data, logo.format, 10, 4, 30, 30)
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(16)
@@ -771,6 +774,8 @@ function AdminPanel() {
   const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
+  const TOURNAMENT_MODES = ['scores', 'pairings', 'payments']
+  const showTournamentSelector = TOURNAMENT_MODES.includes(adminMode)
 
   // Global save error banner
   const [adminError, setAdminError] = useState(null)  // string | null
@@ -1424,29 +1429,12 @@ function AdminPanel() {
         </div>
       </div>
 
-      {/* Tournament selector */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-        <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Tournament</label>
-        <select
-          value={tid}
-          onChange={e => { setTid(e.target.value); setFlight(FLIGHTS[0]); setPoolSearch('') }}
-          className="border border-gray-300 rounded px-3 py-2 text-sm font-sans w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-forest"
-        >
-          {schedule.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
-        </select>
-        {tournament && (
-          <p className="text-xs text-gray-400 font-sans mt-1.5">
-            {tournament.course} · {tournament.format} · {totalPlayers} player{totalPlayers !== 1 ? 's' : ''} entered
-          </p>
-        )}
-      </div>
-
       {/* Mode tabs */}
       <div className="flex gap-2 mb-5 flex-wrap">
         {[
           ['scores',   'Score Entry'],
           ['pairings', 'Pairings Builder'],
-          ['flights',  'Flight Management'],
+          ['flights',  'Member Management'],
           ['credits',  'Credit on Books'],
           ['payments', 'Payments'],
         ].map(([mode, label]) => (
@@ -1469,6 +1457,25 @@ function AdminPanel() {
           </button>
         ))}
       </div>
+
+      {/* Tournament selector (only where tournament-scoped data is edited) */}
+      {showTournamentSelector && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+          <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Tournament</label>
+          <select
+            value={tid}
+            onChange={e => { setTid(e.target.value); setFlight(FLIGHTS[0]); setPoolSearch('') }}
+            className="border border-gray-300 rounded px-3 py-2 text-sm font-sans w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-forest"
+          >
+            {schedule.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
+          </select>
+          {tournament && (
+            <p className="text-xs text-gray-400 font-sans mt-1.5">
+              {tournament.course} · {tournament.format} · {totalPlayers} player{totalPlayers !== 1 ? 's' : ''} entered
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════════
           SCORE ENTRY MODE
