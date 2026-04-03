@@ -13,6 +13,7 @@ import { useFireData } from '../hooks/useFireData'
 import { computeTournamentWorkflowState } from '../utils/tournamentWorkflow'
 import TeeTag from '../components/ui/TeeTag'
 import CountdownTimer from '../components/ui/CountdownTimer'
+import { getCurrentTournaments, getPastTournaments } from '../utils/tournamentFilters'
 import cgaPayVenmo from '../../cga-pay-venmo.jpg'
 
 const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
@@ -29,6 +30,16 @@ const MAX_RECENT_ACTIONS = 5
 
 const PDF_NAVY = [27,  59,  111]
 const PDF_GOLD = [201, 168, 76]
+
+
+const ADMIN_TAB_CONFIG = [
+  { mode: 'scores', label: 'Score Entry', priority: 'primary', icon: '📝' },
+  { mode: 'pairings', label: 'Pairings', priority: 'primary', icon: '👥' },
+  { mode: 'payments', label: 'Payments', priority: 'primary', icon: '💳' },
+  { mode: 'dashboard', label: 'Dashboard', priority: 'secondary' },
+  { mode: 'flights', label: 'Settings', priority: 'secondary' },
+  { mode: 'credits', label: 'Admin Tools', priority: 'secondary' },
+]
 
 const flightTagStyles = {
   Championship: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -780,7 +791,11 @@ function AdminPanel() {
     try { return JSON.parse(localStorage.getItem(TOURNAMENT_INFO_KEY)) || {} } catch { return {} }
   })
 
-  const [tid,          setTid]          = useState(schedule[0]?.id ?? '')
+  const currentTournaments = useMemo(() => getCurrentTournaments(schedule), [])
+  const pastTournaments = useMemo(() => getPastTournaments(schedule), [])
+  const defaultTournamentId = currentTournaments[0]?.id ?? pastTournaments[0]?.id ?? schedule[0]?.id ?? ''
+
+  const [tid,          setTid]          = useState(defaultTournamentId)
   const [flight,       setFlight]       = useState(FLIGHTS[0])
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
@@ -789,6 +804,7 @@ function AdminPanel() {
   const [paymentSearch, setPaymentSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
   const [showTournamentInfoEditor, setShowTournamentInfoEditor] = useState(false)
+  const [showPastTournaments, setShowPastTournaments] = useState(false)
   const TOURNAMENT_MODES = ['dashboard', 'scores', 'pairings', 'payments']
   const showTournamentSelector = TOURNAMENT_MODES.includes(adminMode)
 
@@ -864,7 +880,7 @@ function AdminPanel() {
   }, [actionFeedback])
 
   const tournament     = schedule.find(t => t.id === tid)
-  const nextTournament = schedule.find(t => t.status === 'upcoming') ?? schedule[schedule.length - 1]
+  const nextTournament = currentTournaments[0] ?? pastTournaments[0] ?? null
   const tournamentInfo = tournament ? { ...tournament, ...(tournamentInfoDrafts[tournament.id] ?? {}) } : null
   const nextTournamentInfo = nextTournament ? { ...nextTournament, ...(tournamentInfoDrafts[nextTournament.id] ?? {}) } : null
   const rawPlayers     = data[tid]?.[flight] ?? []
@@ -900,6 +916,16 @@ function AdminPanel() {
   )
 
   // Payments for selected tournament
+
+  useEffect(() => {
+    if (!tid) {
+      setTid(defaultTournamentId)
+      return
+    }
+    const exists = schedule.some(t => t.id === tid)
+    if (!exists) setTid(defaultTournamentId)
+  }, [tid, defaultTournamentId])
+
   const paymentMap = payments[tid] ?? {}
 
   // Pool members (not yet in this tournament), grouped by season flight
@@ -1838,49 +1864,102 @@ function AdminPanel() {
       )}
 
       {/* Mode tabs */}
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {[
-          ['dashboard', 'Dashboard'],
-          ['scores',   'Score Entry'],
-          ['pairings', 'Pairings Builder'],
-          ['flights',  'Member Management'],
-          ['credits',  'Credit on Books'],
-          ['payments', 'Payments'],
-        ].map(([mode, label]) => (
-          <button
-            key={mode}
-            onClick={() => setAdminMode(mode)}
-            className={`px-4 py-2 text-xs font-sans font-semibold rounded-md transition-colors ${
-              adminMode === mode
-                ? 'bg-forest text-white'
-                : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-forest'
-            }`}
-          >
-            {label}
-            {mode === 'credits' && creditNonZero > 0 && (
-              <span className="ml-1.5 bg-gold text-forest rounded-full px-1.5 py-0.5 text-[10px] font-bold">{creditNonZero}</span>
-            )}
-            {mode === 'payments' && paymentPaidCount > 0 && (
-              <span className="ml-1.5 bg-green-500 text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold">{paymentPaidCount}</span>
-            )}
-          </button>
-        ))}
+      <div className="sticky top-2 z-30 mb-5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur p-3 shadow-sm">
+        <div className="overflow-x-auto pb-1">
+          <div className="flex gap-2 min-w-max md:min-w-0 md:flex-wrap">
+            {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'primary').map(tab => (
+              <button
+                key={tab.mode}
+                onClick={() => setAdminMode(tab.mode)}
+                className={`min-h-[44px] px-4 py-2.5 text-sm font-sans font-semibold rounded-lg transition-all border ${
+                  adminMode === tab.mode
+                    ? 'bg-forest text-white border-forest shadow'
+                    : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:border-forest hover:text-forest'
+                }`}
+              >
+                <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                  {tab.icon && <span aria-hidden="true">{tab.icon}</span>}
+                  <span>{tab.label}</span>
+                  {tab.mode === 'payments' && paymentPaidCount > 0 && (
+                    <span className="bg-green-500 text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold">{paymentPaidCount}</span>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-2 overflow-x-auto">
+          <div className="flex gap-2 min-w-max md:min-w-0 md:flex-wrap">
+            {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'secondary').map(tab => (
+              <button
+                key={tab.mode}
+                onClick={() => setAdminMode(tab.mode)}
+                className={`min-h-[44px] px-3.5 py-2 text-xs font-sans font-semibold rounded-md transition-colors border ${
+                  adminMode === tab.mode
+                    ? 'bg-slate-800 text-white border-slate-800'
+                    : 'bg-white text-gray-600 border-gray-300 hover:text-forest hover:border-forest'
+                }`}
+              >
+                {tab.label}
+                {tab.mode === 'credits' && creditNonZero > 0 && (
+                  <span className="ml-1.5 bg-gold text-forest rounded-full px-1.5 py-0.5 text-[10px] font-bold">{creditNonZero}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Tournament selector (only where tournament-scoped data is edited) */}
       {showTournamentSelector && (
         <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-          <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Tournament</label>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest">Tournament</label>
+            <button
+              type="button"
+              onClick={() => setShowPastTournaments(prev => !prev)}
+              className="text-xs font-sans font-semibold px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:border-forest hover:text-forest"
+            >
+              {showPastTournaments ? 'Hide Past Tournaments' : 'Past Tournaments'}
+            </button>
+          </div>
           <select
             value={tid}
             onChange={e => { setTid(e.target.value); setFlight(FLIGHTS[0]); setPoolSearch(''); setSelectedPool(new Set()) }}
             className="border border-gray-300 rounded px-3 py-2 text-sm font-sans w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-forest"
           >
-            {schedule.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
+            {currentTournaments.length > 0 && (
+              <optgroup label="Current & Upcoming">
+                {currentTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
+              </optgroup>
+            )}
+            {!showPastTournaments && pastTournaments.some(t => t.id === tid) && (
+              <optgroup label="Selected Past Tournament">
+                {pastTournaments.filter(t => t.id === tid).map(t => (
+                  <option key={t.id} value={t.id}>{t.name} — {t.date}</option>
+                ))}
+              </optgroup>
+            )}
+            {currentTournaments.length === 0 && pastTournaments[0] && (
+              <optgroup label="Most Recent">
+                <option value={pastTournaments[0].id}>{pastTournaments[0].name} — {pastTournaments[0].date}</option>
+              </optgroup>
+            )}
+            {showPastTournaments && pastTournaments.length > 0 && (
+              <optgroup label="Past Tournaments">
+                {pastTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
+              </optgroup>
+            )}
           </select>
           {tournament && (
             <p className="text-xs text-gray-400 font-sans mt-1.5">
               {tournament.course} · {tournament.format} · {totalPlayers} player{totalPlayers !== 1 ? 's' : ''} entered
+            </p>
+          )}
+          {!showPastTournaments && pastTournaments.length > 0 && (
+            <p className="text-[11px] text-gray-500 font-sans mt-2">
+              Viewing current schedule by default. Past tournaments are available via the button above.
             </p>
           )}
         </div>
