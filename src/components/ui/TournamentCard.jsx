@@ -10,7 +10,6 @@ const statusStyles = {
 export default function TournamentCard({ tournament, compact = false }) {
   const { id, name, date, course, format, entryFee, flights, status, notes } = tournament
   const isPast = status === 'completed'
-  const hasPairings = id === '2026-01'
 
   return (
     <div
@@ -67,20 +66,18 @@ export default function TournamentCard({ tournament, compact = false }) {
         {status === 'completed' && (
           <div className="mt-3 flex flex-wrap items-center gap-4">
             <Link
-              to="/schedule"
+              to="/results"
               state={{ expand: id }}
               className="inline-block text-forest text-sm font-sans font-medium hover:text-gold transition-colors"
             >
               View Results →
             </Link>
-            {hasPairings && (
-              <Link
-                to={`/pairings/${id}`}
-                className="inline-block text-forest text-sm font-sans font-medium hover:text-gold transition-colors"
-              >
-                View Pairings →
-              </Link>
-            )}
+            <Link
+              to={`/pairings/${id}`}
+              className="inline-block text-forest text-sm font-sans font-medium hover:text-gold transition-colors"
+            >
+              View Pairings →
+            </Link>
           </div>
         )}
       </div>

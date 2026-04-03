@@ -5,6 +5,7 @@ import schedule from '../data/schedule.json'
 import { formatDateLong } from '../utils/formatDate'
 import StandingsTable from '../components/ui/StandingsTable'
 import { formatName } from '../utils/formatName'
+import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 
 export default function Results() {
@@ -13,19 +14,8 @@ export default function Results() {
   const { state } = useLocation()
   const [expanded, setExpanded] = useState(state?.expand ?? completed[0]?.id ?? null)
 
-  // Live results from Firestore
-  const [liveResults, setLiveResults] = useState({})
-  useEffect(() => {
-    if (!completed.length) return
-    const unsubs = completed.map(t =>
-      DB.listenResult(t.id, (data) => {
-        if (data) setLiveResults(prev => ({ ...prev, [t.id]: data }))
-      })
-    )
-    return () => unsubs.forEach(u => u?.())
-  }, []) // completed derives from static schedule.json — stable
-
-  const resultFiles = liveResults
+  // Single listener for all results
+  const { data: allResults, status: resultsStatus } = useFireData(DB.listenResults, {})
 
   return (
     <PageWrapper>
@@ -49,7 +39,7 @@ export default function Results() {
       ) : (
         <div className="space-y-4">
           {completed.map((t) => {
-            const result = resultFiles[t.id]
+            const result = allResults[t.id]
             const isOpen = expanded === t.id
             return (
               <div key={t.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -75,6 +65,13 @@ export default function Results() {
                     </svg>
                   </div>
                 </button>
+
+                {/* Loading state */}
+                {isOpen && !result && resultsStatus === 'loading' && (
+                  <div className="border-t border-gray-100 p-5 text-center py-10">
+                    <p className="text-gray-400 font-sans text-sm">Loading results…</p>
+                  </div>
+                )}
 
                 {/* Expanded detail */}
                 {isOpen && result && (

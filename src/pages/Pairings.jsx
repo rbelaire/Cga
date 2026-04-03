@@ -57,7 +57,7 @@ export default function Pairings() {
         <h1 className="section-title text-3xl sm:text-4xl">{data.tournament} Pairings</h1>
         <div className="gold-divider" />
         <p className="text-gray-500 font-sans text-sm">
-          Source: {data.source}
+          {data.source ? `Source: ${data.source}` : ''}
         </p>
       </div>
 

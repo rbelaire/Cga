@@ -12,7 +12,7 @@
  */
 import { db } from './firebase'
 import {
-  doc, getDoc, setDoc, onSnapshot, collection, getDocs,
+  doc, getDoc, setDoc, onSnapshot,
 } from 'firebase/firestore'
 
 const REF = (path) => doc(db, path)

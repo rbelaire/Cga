@@ -15,10 +15,6 @@ const TEE_CONFIG = {
   Sr:     { label: 'Senior', short: 'S', classes: 'bg-amber-500  text-white' },
 }
 
-export const TEE_STYLES = Object.fromEntries(
-  Object.entries(TEE_CONFIG).map(([k, v]) => [k, v.classes])
-)
-
 export default function TeeTag({ tee, className = '' }) {
   if (!tee) return null
   const cfg = TEE_CONFIG[tee]

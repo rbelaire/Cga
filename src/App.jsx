@@ -1,4 +1,4 @@
-import { HashRouter as BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
 import Header from './components/layout/Header'
 import Footer from './components/layout/Footer'
 import Home from './pages/Home'
@@ -6,7 +6,6 @@ import Schedule from './pages/Schedule'
 import Results from './pages/Results'
 import PointsToMake from './pages/PointsToMake'
 import Standings from './pages/Standings'
-import PlayerOfTheYear from './pages/PlayerOfTheYear'
 import Members from './pages/Members'
 import Eligibility from './pages/Eligibility'
 import Board from './pages/Board'
@@ -28,7 +27,7 @@ function NotFound() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <div className="flex flex-col min-h-screen">
         <Header />
         <Routes>
@@ -37,7 +36,7 @@ export default function App() {
           <Route path="/results" element={<Results />} />
           <Route path="/points-to-make" element={<PointsToMake />} />
           <Route path="/standings" element={<Standings />} />
-          <Route path="/poy" element={<PlayerOfTheYear />} />
+          <Route path="/poy" element={<Navigate to="/standings" replace />} />
           <Route path="/members" element={<Members />} />
           <Route path="/eligibility" element={<Eligibility />} />
           <Route path="/board" element={<Board />} />
@@ -49,6 +48,6 @@ export default function App() {
         </Routes>
         <Footer />
       </div>
-    </BrowserRouter>
+    </HashRouter>
   )
 }

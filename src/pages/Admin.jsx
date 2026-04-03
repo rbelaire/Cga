@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
@@ -68,15 +68,6 @@ function calcFlightPOY(players) {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const fmtPM  = pm => pm == null ? '—' : pm > 0 ? `+${pm}` : `${pm}`
 const fmtPOY = p  => p.poy == null ? '—' : p.eligible === false ? 'X' : p.poy % 1 === 0 ? String(p.poy) : p.poy.toFixed(1)
-
-// Keep downloadJSON for PDF-adjacent uses (e.g. debug), but primary flow is Firestore.
-function downloadJSON(obj, filename) {
-  const a = Object.assign(document.createElement('a'), {
-    href:     URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' })),
-    download: filename,
-  })
-  a.click()
-}
 
 // ── Excel roster parsing ──────────────────────────────────────────────────────
 function normalizeTee(t) {
@@ -911,33 +902,10 @@ function AdminPanel() {
     setData(prev => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [flight]: newList } }))
   }
 
-  function addSelectedPlayers() {
-    const toAdd = [...selectedPool].filter(n => !allAddedNames.has(n))
-    if (!toAdd.length) return
-    flightSet([...rawPlayers, ...toAdd.map(name => {
-      const ptm = ptmLookup[name]
-      return { name, ptm: ptm !== null && ptm !== undefined ? ptm : '', score: '', eligible: true }
-    })])
-    setSelectedPool(new Set())
-  }
-
-  function togglePoolSelect(name) {
-    setSelectedPool(prev => {
-      const next = new Set(prev)
-      next.has(name) ? next.delete(name) : next.add(name)
-      return next
-    })
-  }
-
-  function toggleGroupSelect(members) {
-    const names     = members.map(m => m.name)
-    const allChosen = names.every(n => selectedPool.has(n))
-    setSelectedPool(prev => {
-      const next = new Set(prev)
-      if (allChosen) names.forEach(n => next.delete(n))
-      else           names.forEach(n => next.add(n))
-      return next
-    })
+  function addPlayer(name) {
+    if (allAddedNames.has(name)) return
+    const ptm = ptmLookup[name] ?? ''
+    flightSet([...rawPlayers, { name, ptm: ptm !== null && ptm !== undefined ? ptm : '', score: '', eligible: true }])
   }
 
   function removePlayer(idx) {
@@ -1009,8 +977,13 @@ function AdminPanel() {
       if (!pick) break
       currentGroup.push(pick.shift())
       if (currentGroup.length >= 4) {
-        groupIdx++
-        if (groupIdx >= numGroups) groupIdx = numGroups - 1
+        groupIdx = (groupIdx + 1) % numGroups
+        // Skip past any already-full groups
+        let checked = 0
+        while (groups[groupIdx].length >= 4 && checked < numGroups) {
+          groupIdx = (groupIdx + 1) % numGroups
+          checked++
+        }
       }
     }
 
@@ -1197,8 +1170,7 @@ function AdminPanel() {
   }
 
   // Payments derived state
-  const paymentTid = tid
-  const paymentMap = payments[paymentTid] ?? {}
+  const paymentMap = payments[tid] ?? {}
   const paymentPaidCount = Object.keys(paymentMap).length
 
   const paymentRoster = useMemo(() => {
@@ -1370,18 +1342,24 @@ function AdminPanel() {
         format: 'Individual Stroke Play', status: 'completed', flightWinners, leaderboard,
       }
 
+      // Build lookups from previous standings for cumulative fields
+      const prevStandingsLookup = {}
+      const prevPtmLookup = {}
+      for (const fl of FLIGHTS) {
+        for (const p of (currentStandings.flights[fl] ?? [])) {
+          prevStandingsLookup[p.name] = p
+          if (p.ptm != null) prevPtmLookup[p.name] = p.ptm
+        }
+      }
+
       const newPoy = { flights: {} }
       for (const fl of FLIGHTS) {
         const ps = calcFlightPOY(data[tid]?.[fl] ?? [])
         newPoy.flights[fl] = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
-          .map((p, i) => ({ rank: i + 1, name: p.name, points: p.poy ?? 0, events: 1 }))
-      }
-
-      const prevPtmLookup = {}
-      for (const fl of FLIGHTS) {
-        for (const p of (currentStandings.flights[fl] ?? [])) {
-          if (p.ptm != null) prevPtmLookup[p.name] = p.ptm
-        }
+          .map((p, i) => {
+            const prevEvents = prevStandingsLookup[p.name]?.events ?? 0
+            return { rank: i + 1, name: p.name, points: p.poy ?? 0, events: prevEvents + 1 }
+          })
       }
 
       const newStandings = { flights: {} }
@@ -1389,12 +1367,18 @@ function AdminPanel() {
         const ps     = calcFlightPOY(data[tid]?.[fl] ?? [])
         const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
         newStandings.flights[fl] = sorted.map((p, i) => {
-          const newPtm   = ptmLookup[p.name] ?? (Number(p.ptm) || null)
-          const oldPtm   = prevPtmLookup[p.name] ?? null
-          const ptmDelta = (newPtm != null && oldPtm != null) ? +(newPtm - oldPtm).toFixed(2) : 0
+          const newPtm     = ptmLookup[p.name] ?? (Number(p.ptm) || null)
+          const oldPtm     = prevPtmLookup[p.name] ?? null
+          const ptmDelta   = (newPtm != null && oldPtm != null) ? +(newPtm - oldPtm).toFixed(2) : 0
+          const prev       = prevStandingsLookup[p.name]
+          const prevEvents = prev?.events ?? 0
+          const prevPoy    = prev?.poy ?? 0
+          const newPoyVal  = p.poy ?? 0
+          const trend      = newPoyVal > prevPoy ? 'up' : newPoyVal < prevPoy ? 'down' : 'stable'
           return {
-            rank: i + 1, name: p.name, poy: p.poy ?? 0, ptm: newPtm, ptmDelta,
-            latestScore: Number(p.score) || null, latestTournament: tournament.name, events: 1, trend: 'up',
+            rank: i + 1, name: p.name, poy: newPoyVal, ptm: newPtm, ptmDelta,
+            latestScore: Number(p.score) || null, latestTournament: tournament.name,
+            events: prevEvents + 1, trend,
           }
         })
       }
@@ -1746,7 +1730,7 @@ function AdminPanel() {
               </PdfBtn>
               {paymentPaidCount > 0 && (
                 <button
-                  onClick={() => clearAllPayments(paymentTid)}
+                  onClick={() => clearAllPayments(tid)}
                   className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
                 >
                   Clear All
@@ -1766,7 +1750,7 @@ function AdminPanel() {
             {/* Bulk actions */}
             <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center gap-2">
               <button
-                onClick={() => markAllPaid(paymentTid, paymentRoster.filter(m => !paymentMap[m.name]).map(m => m.name))}
+                onClick={() => markAllPaid(tid, paymentRoster.filter(m => !paymentMap[m.name]).map(m => m.name))}
                 disabled={paymentRoster.every(m => paymentMap[m.name])}
                 className="px-3 py-1 text-xs font-sans font-medium rounded border border-green-200 text-green-600 bg-green-50 hover:bg-green-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -1799,7 +1783,7 @@ function AdminPanel() {
                       return (
                         <tr
                           key={m.name}
-                          onClick={() => togglePayment(paymentTid, m.name)}
+                          onClick={() => togglePayment(tid, m.name)}
                           className={`border-b border-gray-100 last:border-0 transition-colors cursor-pointer ${
                             isPaid ? 'bg-green-50/60 hover:bg-green-100/60' : 'hover:bg-gray-50'
                           } ${!isPaid && idx % 2 === 0 ? 'bg-white' : ''} ${!isPaid && idx % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
