@@ -803,6 +803,7 @@ function AdminPanel() {
   const [paymentsSaveStatus, setPaymentsSaveStatus] = useState(null)
   const [publishSaving,  setPublishSaving]  = useState(false)
   const [publishSaveStatus, setPublishSaveStatus] = useState(null)
+  const [publishPreview, setPublishPreview] = useState(null)
   const [saveAllSaving, setSaveAllSaving] = useState(false)
   const [saveAllStatus, setSaveAllStatus] = useState(null)
 
@@ -1484,85 +1485,117 @@ function AdminPanel() {
   }
 
   // ── Publish tournament results to Firestore ───────────────────────────────────
-  async function publishTournament(targetTid = tid) {
+  function buildPublishPayload(targetTid = tid) {
     const targetTournament = schedule.find(t => t.id === targetTid)
-    if (!targetTournament) return
-    await withSaveState(setPublishSaving, setPublishSaveStatus, async () => {
-      const flightWinners = [], leaderboard = {}
-      for (const fl of FLIGHTS) {
-        const ps      = calcFlightPOY(data[targetTid]?.[fl] ?? [])
-        const ranked  = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
-        const allRows = [...ranked, ...ps.filter(p => p.rank == null)]
-        leaderboard[fl] = allRows.map(p => ({
-          rank: p.rank ?? 0, name: p.name, poy: p.poy ?? 0,
-          points: Number(p.score) || 0, ptm: Number(p.ptm) || 0, plusMinus: p.plusMinus ?? 0,
-        }))
-        if (ranked[0]) flightWinners.push({ flight: fl, winner: ranked[0].name, points: ranked[0].poy ?? 0 })
-      }
+    if (!targetTournament) return null
+    const flightWinners = [], leaderboard = {}
+    for (const fl of FLIGHTS) {
+      const ps      = calcFlightPOY(data[targetTid]?.[fl] ?? [])
+      const ranked  = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
+      const allRows = [...ranked, ...ps.filter(p => p.rank == null)]
+      leaderboard[fl] = allRows.map(p => ({
+        rank: p.rank ?? 0, name: p.name, poy: p.poy ?? 0,
+        points: Number(p.score) || 0, ptm: Number(p.ptm) || 0, plusMinus: p.plusMinus ?? 0,
+      }))
+      if (ranked[0]) flightWinners.push({ flight: fl, winner: ranked[0].name, points: ranked[0].poy ?? 0 })
+    }
 
-      // Include New Players in leaderboard (poy: 0) so scratch standings count them
-      const newPlayerRows = (data[targetTid]?.['New Players'] ?? []).filter(p => p.name && p.score != null && p.score !== '')
-      if (newPlayerRows.length) {
-        leaderboard['New Players'] = newPlayerRows.map(p => ({
-          rank: 0, name: p.name, poy: 0,
-          points: Number(p.score) || 0, ptm: Number(p.ptm) || 0,
-          plusMinus: (p.ptm != null && p.ptm !== '' && p.score != null && p.score !== '')
-            ? Number(p.score) - Number(p.ptm) : 0,
-        }))
-      }
+    // Include New Players in leaderboard (poy: 0) so scratch standings count them
+    const newPlayerRows = (data[targetTid]?.['New Players'] ?? []).filter(p => p.name && p.score != null && p.score !== '')
+    if (newPlayerRows.length) {
+      leaderboard['New Players'] = newPlayerRows.map(p => ({
+        rank: 0, name: p.name, poy: 0,
+        points: Number(p.score) || 0, ptm: Number(p.ptm) || 0,
+        plusMinus: (p.ptm != null && p.ptm !== '' && p.score != null && p.score !== '')
+          ? Number(p.score) - Number(p.ptm) : 0,
+      }))
+    }
 
-      const resultDoc = {
-        id: targetTid, name: targetTournament.name, date: targetTournament.date, course: targetTournament.course,
-        format: 'Individual Stroke Play', status: 'completed', flightWinners, leaderboard,
-      }
+    const resultDoc = {
+      id: targetTid, name: targetTournament.name, date: targetTournament.date, course: targetTournament.course,
+      format: 'Individual Stroke Play', status: 'completed', flightWinners, leaderboard,
+    }
 
-      // Build lookups from previous standings for cumulative fields
-      const prevStandingsLookup = {}
-      const prevPtmLookup = {}
-      for (const fl of FLIGHTS) {
-        for (const p of (currentStandings.flights[fl] ?? [])) {
-          prevStandingsLookup[p.name] = p
-          if (p.ptm != null) prevPtmLookup[p.name] = p.ptm
-        }
+    // Build lookups from previous standings for cumulative fields
+    const prevStandingsLookup = {}
+    const prevPtmLookup = {}
+    for (const fl of FLIGHTS) {
+      for (const p of (currentStandings.flights[fl] ?? [])) {
+        prevStandingsLookup[p.name] = p
+        if (p.ptm != null) prevPtmLookup[p.name] = p.ptm
       }
+    }
 
-      const newPoy = { flights: {} }
-      for (const fl of FLIGHTS) {
-        const ps = calcFlightPOY(data[targetTid]?.[fl] ?? [])
-        newPoy.flights[fl] = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
-          .map((p, i) => {
-            const prevEvents = prevStandingsLookup[p.name]?.events ?? 0
-            return { rank: i + 1, name: p.name, points: p.poy ?? 0, events: prevEvents + 1 }
-          })
-      }
-
-      const newStandings = { flights: {} }
-      for (const fl of FLIGHTS) {
-        const ps     = calcFlightPOY(data[targetTid]?.[fl] ?? [])
-        const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
-        newStandings.flights[fl] = sorted.map((p, i) => {
-          const newPtm     = ptmLookup[p.name] ?? (Number(p.ptm) || null)
-          const oldPtm     = prevPtmLookup[p.name] ?? null
-          const ptmDelta   = (newPtm != null && oldPtm != null) ? +(newPtm - oldPtm).toFixed(2) : 0
-          const prev       = prevStandingsLookup[p.name]
-          const prevEvents = prev?.events ?? 0
-          const prevPoy    = prev?.poy ?? 0
-          const newPoyVal  = p.poy ?? 0
-          const trend      = newPoyVal > prevPoy ? 'up' : newPoyVal < prevPoy ? 'down' : 'stable'
-          return {
-            rank: i + 1, name: p.name, poy: newPoyVal, ptm: newPtm, ptmDelta,
-            latestScore: Number(p.score) || null, latestTournament: targetTournament.name,
-            events: prevEvents + 1, trend,
-          }
+    const newPoy = { flights: {} }
+    for (const fl of FLIGHTS) {
+      const ps = calcFlightPOY(data[targetTid]?.[fl] ?? [])
+      newPoy.flights[fl] = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
+        .map((p, i) => {
+          const prevEvents = prevStandingsLookup[p.name]?.events ?? 0
+          return { rank: i + 1, name: p.name, points: p.poy ?? 0, events: prevEvents + 1 }
         })
-      }
+    }
 
+    const newStandings = { flights: {} }
+    for (const fl of FLIGHTS) {
+      const ps     = calcFlightPOY(data[targetTid]?.[fl] ?? [])
+      const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
+      newStandings.flights[fl] = sorted.map((p, i) => {
+        const newPtm     = ptmLookup[p.name] ?? (Number(p.ptm) || null)
+        const oldPtm     = prevPtmLookup[p.name] ?? null
+        const ptmDelta   = (newPtm != null && oldPtm != null) ? +(newPtm - oldPtm).toFixed(2) : 0
+        const prev       = prevStandingsLookup[p.name]
+        const prevEvents = prev?.events ?? 0
+        const prevPoy    = prev?.poy ?? 0
+        const newPoyVal  = p.poy ?? 0
+        const trend      = newPoyVal > prevPoy ? 'up' : newPoyVal < prevPoy ? 'down' : 'stable'
+        return {
+          rank: i + 1, name: p.name, poy: newPoyVal, ptm: newPtm, ptmDelta,
+          latestScore: Number(p.score) || null, latestTournament: targetTournament.name,
+          events: prevEvents + 1, trend,
+        }
+      })
+    }
+
+    const totalPlayersAffected = FLIGHTS.reduce(
+      (sum, fl) => sum + (newStandings.flights[fl]?.length ?? 0), 0
+    )
+    const flightSummaries = FLIGHTS.map(fl => ({
+      flight: fl,
+      winner: flightWinners.find(w => w.flight === fl) ?? null,
+      topRows: (resultDoc.leaderboard[fl] ?? []).filter(row => row.rank > 0).slice(0, 3),
+    }))
+
+    return { targetTid, targetTournament, resultDoc, newPoy, newStandings, preview: { totalPlayersAffected, flightSummaries } }
+  }
+
+  async function publishTournament(payloadOrTid = tid) {
+    const payload = typeof payloadOrTid === 'string'
+      ? buildPublishPayload(payloadOrTid)
+      : payloadOrTid
+    if (!payload?.resultDoc) return
+
+    return await withSaveState(setPublishSaving, setPublishSaveStatus, async () => {
       await Promise.all([
-        DB.saveResult(targetTid, resultDoc),
-        DB.savePoy(newPoy),
-        DB.saveStandings(newStandings),
+        DB.saveResult(payload.targetTid, payload.resultDoc),
+        DB.savePoy(payload.newPoy),
+        DB.saveStandings(payload.newStandings),
       ])
     }, setAdminError)
+  }
+
+  function openPublishPreview(targetTid = tid) {
+    const payload = buildPublishPayload(targetTid)
+    if (!payload) return
+    setPublishPreview(payload)
+  }
+
+  async function confirmPublishPreview() {
+    if (!publishPreview || publishSaving) return
+    const ok = await publishTournament(publishPreview)
+    if (ok) {
+      setPublishPreview(null)
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -1693,7 +1726,7 @@ function AdminPanel() {
           nextFlight={nextFlight}
           fmtPM={fmtPM}
           fmtPOY={fmtPOY}
-          doExport={() => publishTournament(tid)}
+          onOpenPublishPreview={() => openPublishPreview(tid)}
           publishSaving={publishSaving}
           publishSaveStatus={publishSaveStatus}
           saveScores={saveScores}
@@ -1717,9 +1750,19 @@ function AdminPanel() {
           onRepublish={async () => {
             if (!lastPublishedTournament) return
             setTid(lastPublishedTournament.id)
-            await publishTournament(lastPublishedTournament.id)
+            openPublishPreview(lastPublishedTournament.id)
           }}
           publishSaving={publishSaving}
+        />
+      )}
+
+      {publishPreview && (
+        <PublishConfirmModal
+          preview={publishPreview}
+          publishSaving={publishSaving}
+          publishSaveStatus={publishSaveStatus}
+          onCancel={() => !publishSaving && setPublishPreview(null)}
+          onConfirm={confirmPublishPreview}
         />
       )}
 
@@ -2371,13 +2414,108 @@ function SaveBtn({ onClick, saving, status, label = 'Save to Cloud', className =
   )
 }
 
+function PublishConfirmModal({ preview, publishSaving, publishSaveStatus, onCancel, onConfirm }) {
+  const { targetTournament, preview: previewData } = preview
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-3xl bg-white rounded-xl border border-gray-200 shadow-2xl max-h-[90vh] overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-darktext font-serif text-2xl">Confirm Publish Results</h2>
+          <p className="text-gray-500 font-sans text-sm mt-1">
+            This will overwrite live standings and POY with the results below.
+          </p>
+        </div>
+
+        <div className="px-5 py-4 overflow-y-auto max-h-[58vh]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
+              <p className="text-[11px] uppercase tracking-widest font-semibold text-forest font-sans">Tournament</p>
+              <p className="text-darktext font-sans font-semibold mt-1">{targetTournament.name}</p>
+              <p className="text-gray-500 text-xs font-sans mt-1">{fmtDateShort(targetTournament.date)}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
+              <p className="text-[11px] uppercase tracking-widest font-semibold text-forest font-sans">Players Affected</p>
+              <p className="text-darktext font-sans font-semibold mt-1">
+                {previewData.totalPlayersAffected} player{previewData.totalPlayersAffected !== 1 ? 's' : ''}
+              </p>
+              <p className="text-gray-500 text-xs font-sans mt-1">Based on publishable flights only.</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {previewData.flightSummaries.map(summary => (
+              <div key={summary.flight} className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 border-b border-gray-100 px-3 py-2 flex items-center justify-between">
+                  <p className="text-sm font-sans font-semibold text-darktext">{summary.flight}</p>
+                  <p className="text-xs font-sans text-gray-500">
+                    Winner:{' '}
+                    <span className="text-forest font-semibold">
+                      {summary.winner ? formatName(summary.winner.winner) : 'No scored winner'}
+                    </span>
+                  </p>
+                </div>
+                {summary.topRows.length > 0 ? (
+                  <table className="w-full text-xs font-sans">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-gray-400">
+                        <th className="text-left px-3 py-2">Rank</th>
+                        <th className="text-left px-3 py-2">Player</th>
+                        <th className="text-center px-3 py-2">+/-</th>
+                        <th className="text-center px-3 py-2">POY</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summary.topRows.map(row => (
+                        <tr key={`${summary.flight}-${row.rank}-${row.name}`} className="border-b border-gray-50 last:border-b-0">
+                          <td className="px-3 py-2 font-semibold text-darktext">{row.rank}</td>
+                          <td className="px-3 py-2 text-darktext">{formatName(row.name)}</td>
+                          <td className="px-3 py-2 text-center text-gray-500">{fmtPM(row.plusMinus)}</td>
+                          <td className="px-3 py-2 text-center text-gray-500">{row.poy}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="px-3 py-3 text-xs font-sans text-gray-400">No scored results available for preview.</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {publishSaveStatus === 'err' && (
+            <p className="mt-4 text-sm font-sans text-red-600">Publish failed. Nothing was written. Fix issues and retry.</p>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+          <button
+            onClick={onCancel}
+            disabled={publishSaving}
+            className="px-4 py-2 rounded-md border border-gray-300 text-gray-600 text-sm font-sans font-semibold disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={publishSaving}
+            className="px-4 py-2 rounded-md bg-gold text-forest text-sm font-sans font-semibold disabled:opacity-60"
+          >
+            {publishSaving ? 'Publishing…' : 'Confirm & Publish Live Results'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Score Entry Panel ─────────────────────────────────────────────────────────
 function ScoreEntryPanel({
   flights, flight, setFlight, data, tid, players, rawPlayers,
   poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
   selectedPool, togglePoolSelect, toggleGroupSelect, addSelectedPlayers,
   removePlayer, updatePlayer, clearFlight, movePlayerToFlight,
-  prevFlight, nextFlight, fmtPM, fmtPOY, doExport,
+  prevFlight, nextFlight, fmtPM, fmtPOY, onOpenPublishPreview,
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
 }) {
@@ -2631,7 +2769,7 @@ function ScoreEntryPanel({
         <div className="flex flex-wrap gap-2">
           <SaveBtn onClick={saveScores} saving={scoresSaving} status={scoresSaveStatus} label="Save Draft" />
           <SaveBtn
-            onClick={doExport}
+            onClick={onOpenPublishPreview}
             saving={publishSaving}
             status={publishSaveStatus}
             label="Publish Results"
