@@ -1150,15 +1150,53 @@ function AdminPanel() {
 
   function assignUnpairedToGroup(cardIdx) {
     if (!selectedUnpaired) return
-    const player = unpairedPlayers.find(p => p.name === selectedUnpaired)
-    if (!player) return
-    const updated = currentPairings.map((c, ci) =>
-      ci === cardIdx
-        ? { ...c, players: [...c.players, { name: player.name, flight: player.flight }] }
-        : c
+    movePlayerManual(
+      { type: 'unassigned', name: selectedUnpaired },
+      { cardIdx }
     )
-    setPairingsData(prev => ({ ...prev, [tid]: updated }))
     setSelectedUnpaired(null)
+  }
+
+  function movePlayerManual(source, destination) {
+    if (!source || !destination) return
+    const targetCard = Number(destination.cardIdx)
+    if (!Number.isInteger(targetCard) || targetCard < 0 || targetCard >= currentPairings.length) return
+
+    const updated = currentPairings.map(card => ({ ...card, players: [...card.players] }))
+    let movingPlayer = null
+    let sourceCardIdx = null
+    let sourcePlayerIdx = null
+
+    if (source.type === 'unassigned') {
+      const player = unpairedPlayers.find(p => p.name === source.name)
+      if (!player) return
+      movingPlayer = { name: player.name, flight: player.flight }
+    } else if (source.type === 'group') {
+      sourceCardIdx = Number(source.cardIdx)
+      sourcePlayerIdx = Number(source.playerIdx)
+      if (!Number.isInteger(sourceCardIdx) || !Number.isInteger(sourcePlayerIdx)) return
+      movingPlayer = updated[sourceCardIdx]?.players?.[sourcePlayerIdx]
+      if (!movingPlayer) return
+      updated[sourceCardIdx].players.splice(sourcePlayerIdx, 1)
+    } else {
+      return
+    }
+
+    if (!updated[targetCard]) return
+    const destinationContainsPlayer = updated[targetCard].players.some(p => p.name === movingPlayer.name)
+    if (destinationContainsPlayer) return
+
+    const targetPlayers = updated[targetCard].players
+    let insertAt = Number.isInteger(destination.playerIdx) ? Number(destination.playerIdx) : targetPlayers.length
+
+    if (source.type === 'group' && sourceCardIdx === targetCard && sourcePlayerIdx < insertAt) {
+      insertAt -= 1
+    }
+    insertAt = Math.max(0, Math.min(insertAt, targetPlayers.length))
+
+    if (targetPlayers.length >= 4) return
+    targetPlayers.splice(insertAt, 0, movingPlayer)
+    setPairingsData(prev => ({ ...prev, [tid]: updated }))
   }
 
   function clearPairings() {
@@ -1929,6 +1967,7 @@ function AdminPanel() {
           addGroupManual={addGroupManual}
           removeGroupManual={removeGroupManual}
           assignUnpairedToGroup={assignUnpairedToGroup}
+          movePlayerManual={movePlayerManual}
           clearPairings={clearPairings}
           removePairedPlayer={removePairedPlayer}
           savePairings={savePairings}
@@ -3101,10 +3140,59 @@ function PairingsPanel({
   totalPlayers, currentPairings, unpairedPlayers, manualPairings,
   selectedUnpaired, setSelectedUnpaired,
   generatePairings, startManualPairings, addGroupManual, removeGroupManual,
-  assignUnpairedToGroup, clearPairings, removePairedPlayer, savePairings,
+  assignUnpairedToGroup, movePlayerManual, clearPairings, removePairedPlayer, savePairings,
   pairingsSaving, pairingsSaveStatus, onExportPairingsPDF, tournament,
   flightTagStyles,
 }) {
+  const [draggedPlayer, setDraggedPlayer] = useState(null)
+  const [dropTarget, setDropTarget] = useState(null)
+
+  function encodeDragPayload(payload) {
+    return JSON.stringify(payload)
+  }
+
+  function decodeDragPayload(event) {
+    try {
+      const raw = event.dataTransfer.getData('application/x-cga-pairing-player') || event.dataTransfer.getData('text/plain')
+      if (!raw) return null
+      const payload = JSON.parse(raw)
+      if (!payload || (payload.type !== 'unassigned' && payload.type !== 'group')) return null
+      return payload
+    } catch {
+      return null
+    }
+  }
+
+  function handleDragStart(event, payload) {
+    const encoded = encodeDragPayload(payload)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('application/x-cga-pairing-player', encoded)
+    event.dataTransfer.setData('text/plain', encoded)
+    setDraggedPlayer(payload)
+  }
+
+  function handleDragEnd() {
+    setDraggedPlayer(null)
+    setDropTarget(null)
+  }
+
+  function handleDropOnGroup(event, cardIdx) {
+    event.preventDefault()
+    const source = decodeDragPayload(event)
+    if (!source) return
+    movePlayerManual(source, { cardIdx })
+    setDropTarget(null)
+  }
+
+  function handleDropOnPlayer(event, cardIdx, playerIdx) {
+    event.preventDefault()
+    event.stopPropagation()
+    const source = decodeDragPayload(event)
+    if (!source) return
+    movePlayerManual(source, { cardIdx, playerIdx })
+    setDropTarget(null)
+  }
+
   return (
     <div>
       {/* Controls */}
@@ -3185,12 +3273,16 @@ function PairingsPanel({
               {unpairedPlayers.map(p => (
                 <li key={p.name} className="px-3 py-2">
                   <button
+                    draggable
+                    onDragStart={(event) => handleDragStart(event, { type: 'unassigned', name: p.name })}
+                    onDragEnd={handleDragEnd}
                     onClick={() => setSelectedUnpaired(prev => prev === p.name ? null : p.name)}
-                    className={`w-full text-left rounded border px-3 py-2 transition-colors ${
+                    className={`w-full text-left rounded border px-3 py-2 transition-colors cursor-grab active:cursor-grabbing ${
                       selectedUnpaired === p.name
                         ? 'bg-gold/20 border-gold text-forest'
                         : 'border-gray-200 hover:border-forest/30'
-                    }`}
+                    } ${draggedPlayer?.type === 'unassigned' && draggedPlayer.name === p.name ? 'opacity-55' : ''}`}
+                    aria-label={`Drag or click ${formatName(p.name)} to assign`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-sans text-sm text-darktext truncate">{formatName(p.name)}</span>
@@ -3211,7 +3303,23 @@ function PairingsPanel({
             </div>
             <div className="max-h-[65vh] overflow-auto divide-y divide-gray-100">
               {currentPairings.map((card, cardIdx) => (
-                <div key={cardIdx} className="px-4 py-3">
+                <div
+                  key={cardIdx}
+                  className={`px-4 py-3 transition-colors ${
+                    dropTarget?.type === 'group' && dropTarget.cardIdx === cardIdx
+                      ? 'bg-emerald-50/60'
+                      : ''
+                  }`}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                    setDropTarget({ type: 'group', cardIdx })
+                  }}
+                  onDragLeave={() => setDropTarget(current => (
+                    current?.type === 'group' && current.cardIdx === cardIdx ? null : current
+                  ))}
+                  onDrop={(event) => handleDropOnGroup(event, cardIdx)}
+                >
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <span className="text-xs font-semibold uppercase tracking-widest text-forest">{card.pairing}</span>
                     <div className="flex items-center gap-2">
@@ -3221,7 +3329,31 @@ function PairingsPanel({
                   </div>
                   <ul className="space-y-1">
                     {card.players.map((player, playerIdx) => (
-                      <li key={player.name} className="flex items-center justify-between gap-2 border border-gray-100 rounded px-2.5 py-1.5">
+                      <li
+                        key={player.name}
+                        draggable
+                        onDragStart={(event) => handleDragStart(event, { type: 'group', cardIdx, playerIdx })}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          event.dataTransfer.dropEffect = 'move'
+                          setDropTarget({ type: 'player', cardIdx, playerIdx })
+                        }}
+                        onDragLeave={() => setDropTarget(current => (
+                          current?.type === 'player' && current.cardIdx === cardIdx && current.playerIdx === playerIdx ? null : current
+                        ))}
+                        onDrop={(event) => handleDropOnPlayer(event, cardIdx, playerIdx)}
+                        className={`flex items-center justify-between gap-2 border rounded px-2.5 py-1.5 cursor-grab active:cursor-grabbing transition-colors ${
+                          dropTarget?.type === 'player' && dropTarget.cardIdx === cardIdx && dropTarget.playerIdx === playerIdx
+                            ? 'border-emerald-300 bg-emerald-50'
+                            : 'border-gray-100'
+                        } ${
+                          draggedPlayer?.type === 'group' && draggedPlayer.cardIdx === cardIdx && draggedPlayer.playerIdx === playerIdx
+                            ? 'opacity-55'
+                            : ''
+                        }`}
+                      >
                         <span className="font-sans text-sm text-darktext truncate">{formatName(player.name)}</span>
                         <div className="flex items-center gap-1.5">
                           <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[player.flight] ?? flightTagStyles.Unassigned}`}>
