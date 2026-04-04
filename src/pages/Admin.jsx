@@ -257,9 +257,9 @@ function cloneForUndo(value) {
 }
 
 // ── PDF utilities ──────────────────────────────────────────────────────────────
-async function loadAssetBase64() {
+async function loadAssetBase64(url = `${import.meta.env.BASE_URL}cga-logo.png`) {
   try {
-    const res = await fetch(`${import.meta.env.BASE_URL}cga-logo.png`)
+    const res = await fetch(url)
     if (!res.ok) return null
     const blob = await res.blob()
     return new Promise(resolve => {
@@ -317,7 +317,7 @@ function drawVenmoPaymentBlock(doc, venmoImage, y) {
   doc.text('Scan to pay on Venmo.', x, y)
   y += 4
 
-  const props = doc.getImageProperties(venmoImage)
+  const props = doc.getImageProperties(venmoImage.data)
   const ratio = props.width / props.height
   let imageWidth = contentWidth
   let imageHeight = imageWidth / ratio
@@ -329,7 +329,7 @@ function drawVenmoPaymentBlock(doc, venmoImage, y) {
     y = ensurePdfSpace(doc, y, imageHeight + 4)
   }
   const imageX = x + (contentWidth - imageWidth) / 2
-  doc.addImage(venmoImage, 'JPEG', imageX, y, imageWidth, imageHeight)
+  doc.addImage(venmoImage.data, venmoImage.format, imageX, y, imageWidth, imageHeight)
 
   return y + imageHeight + 6
 }
