@@ -948,7 +948,6 @@ function AdminPanel({ currentUser }) {
   const defaultTournamentId = currentTournaments[0]?.id ?? pastTournaments[0]?.id ?? schedule[0]?.id ?? ''
 
   const [tid,          setTid]          = useState(defaultTournamentId)
-  const [flight,       setFlight]       = useState(FLIGHTS[0])
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
   const [adminMode,    setAdminMode]    = useState('dashboard')
@@ -1008,9 +1007,10 @@ function AdminPanel({ currentUser }) {
   }
 
   function logChange(action, details = '') {
+    const ts = Date.now()
     const entry = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      ts: Date.now(),
+      id: `${ts}-${Math.random().toString(16).slice(2, 8)}`,
+      ts,
       action,
       details,
       tid: tid || null,
@@ -1057,8 +1057,6 @@ function AdminPanel({ currentUser }) {
   const nextTournament = currentTournaments[0] ?? pastTournaments[0] ?? null
   const tournamentInfo = tournament ? { ...tournament, ...(tournamentInfoDrafts[tournament.id] ?? {}) } : null
   const nextTournamentInfo = nextTournament ? { ...nextTournament, ...(tournamentInfoDrafts[nextTournament.id] ?? {}) } : null
-  const rawPlayers     = data[tid]?.[flight] ?? []
-  const players      = useMemo(() => calcFlightPOY(rawPlayers), [rawPlayers])
   const totalPlayers = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
 
   // All names entered for this tournament across all flights
@@ -1161,10 +1159,6 @@ function AdminPanel({ currentUser }) {
   )
 
   // ── Score data mutations ──────────────────────────────────────────────────────
-  function flightSet(newList) {
-    setData(prev => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [flight]: newList } }))
-  }
-
   function togglePoolSelect(name) {
     setSelectedPool(prev => {
       const next = new Set(prev)
@@ -1205,52 +1199,6 @@ function AdminPanel({ currentUser }) {
       return { ...prev, [tid]: td }
     })
     setSelectedPool(new Set())
-  }
-
-  function removePlayer(idx) {
-    const removedPlayer = rawPlayers[idx]
-    if (!removedPlayer) return
-    const fl = [...rawPlayers]
-    fl.splice(idx, 1)
-    flightSet(fl)
-    registerUndoAction({
-      label: `Removed ${removedPlayer.name} from ${flight}`,
-      undo: () => {
-        setData(prev => {
-          const td = { ...(prev[tid] ?? {}) }
-          const playersInFlight = [...(td[flight] ?? [])]
-          const restoreIdx = Math.min(idx, playersInFlight.length)
-          playersInFlight.splice(restoreIdx, 0, removedPlayer)
-          td[flight] = playersInFlight
-          return { ...prev, [tid]: td }
-        })
-      },
-    })
-  }
-
-  function updatePlayer(idx, field, val) {
-    const fl = [...rawPlayers]
-    fl[idx]  = { ...fl[idx], [field]: val }
-    flightSet(fl)
-  }
-
-  async function clearFlight() {
-    if (!await openConfirm(`Clear all players from ${flight}?`)) return
-    const snapshot = cloneForUndo(rawPlayers)
-    flightSet([])
-    if (!snapshot?.length) return
-    registerUndoAction({
-      label: `Cleared ${flight}`,
-      undo: () => {
-        setData(prev => ({
-          ...prev,
-          [tid]: {
-            ...(prev[tid] ?? {}),
-            [flight]: snapshot,
-          },
-        }))
-      },
-    })
   }
 
   function removePlayerFromFlight(flightName, idx) {
@@ -2238,7 +2186,7 @@ function AdminPanel({ currentUser }) {
           </div>
           <select
             value={tid}
-            onChange={e => { setTid(e.target.value); setFlight(FLIGHTS[0]); setPoolSearch(''); setSelectedPool(new Set()) }}
+            onChange={e => { setTid(e.target.value); setPoolSearch(''); setSelectedPool(new Set()) }}
             className="border border-gray-300 rounded px-3 py-2 text-sm font-sans w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-forest"
           >
             {currentTournaments.length > 0 && (
@@ -3205,7 +3153,7 @@ function PublishConfirmModal({ preview, publishSaving, publishSaveStatus, onCanc
 
 // ── Tournament Step Guide ─────────────────────────────────────────────────────
 function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournament }) {
-  const { counts = {}, steps = [] } = workflow ?? {}
+  const { counts = {} } = workflow ?? {}
   const { enteredCount = 0, scoredCount = 0, pairingsCount = 0, resultsPublished = false } = counts
 
   const guideSteps = [
