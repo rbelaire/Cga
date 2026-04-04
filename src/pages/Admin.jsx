@@ -17,6 +17,18 @@ import { getCurrentTournaments, getPastTournaments } from '../utils/tournamentFi
 import cgaPayVenmo from '../../cga-pay-venmo.jpg'
 import { createAdminAuditEntry } from '../services/admin/auditService'
 import { buildPublishPayload } from '../services/admin/publishService'
+import { createSnapshotEntry, getSnapshotLabel } from '../services/admin/snapshotService'
+import {
+  formatValidationErrors,
+  validateCredits,
+  validateMembers,
+  validatePairingsForTournament,
+  validatePayments,
+  validatePublishPayload,
+  validateScoresForTournament,
+  validateTournamentId,
+  validateUsers,
+} from '../services/admin/validation'
 
 const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const ALL_SCORE_TABS   = [...FLIGHTS, 'New Players']
@@ -941,6 +953,7 @@ function AdminPanel({ currentUser }) {
   // Live data from Firebase
   const { data: membersData = [] } = useFireData(DB.listenMembers, [])
   const { data: currentStandings } = useFireData(DB.listenStandings, { flights: {} })
+  const { data: currentPoy } = useFireData(DB.listenPoy, { flights: {} })
   const { data: livePtmData } = useFireData(DB.listenPtm, [])
   const { data: cloudScores = {} } = useFireData(DB.listenScores, {})
   const { data: cloudPairings = {} } = useFireData(DB.listenPairings, {})
@@ -949,6 +962,7 @@ function AdminPanel({ currentUser }) {
   const { data: cloudUsers = [] } = useFireData(DB.listenUsers, [])
   const { data: allResults = {} } = useFireData(DB.listenResults, {})
   const { data: changelog = [] } = useFireData(DB.listenChangelog, [])
+  const { data: snapshots = [] } = useFireData(DB.listenSnapshots, [])
 
   // Tournament score entry data
   const [data, setData] = useState(() => {
@@ -1059,6 +1073,61 @@ function AdminPanel({ currentUser }) {
       user: currentUser || 'Admin',
     })
     DB.appendChangelog(entry).catch(() => {}) // fire-and-forget, non-critical
+  }
+
+  function blockOnValidation(errors) {
+    const message = formatValidationErrors(errors)
+    if (!message) return false
+    setAdminError(message)
+    return true
+  }
+
+  async function saveSnapshot(type, previousData, details = '', tournamentId = tid || null) {
+    if (previousData == null) return
+    const entry = createSnapshotEntry({
+      type,
+      data: cloneForUndo(previousData),
+      user: currentUser || 'Admin',
+      tournamentId,
+      details,
+    })
+    await DB.appendSnapshot(entry)
+  }
+
+  async function restoreSnapshot(entry) {
+    if (!entry?.type) return
+    const label = getSnapshotLabel(entry)
+    if (!await openConfirm(`Restore ${label}? Current live data for ${entry.type} will be overwritten.`)) return
+
+    const restoreMap = {
+      scores: () => DB.saveScores(entry.data),
+      pairings: () => DB.savePairings(entry.data),
+      members: () => DB.saveMembers(entry.data),
+      credits: () => DB.saveCredits(entry.data),
+      payments: () => DB.savePayments(entry.data),
+      users: () => DB.saveUsers(entry.data),
+      standings: () => DB.saveStandings(entry.data),
+      poy: () => DB.savePoy(entry.data),
+      results: () => {
+        if (!entry.tid) throw new Error('Result snapshot is missing tournament reference.')
+        return DB.saveResult(entry.tid, entry.data)
+      },
+    }
+
+    const restore = restoreMap[entry.type]
+    if (!restore) {
+      setAdminError(`Restore is not supported for snapshot type: ${entry.type}`)
+      return
+    }
+
+    const ok = await withSaveState(setSaveAllSaving, setSaveAllStatus, async () => {
+      await restore()
+    }, setAdminError)
+
+    if (ok) {
+      logChange('Snapshot restored', `${entry.type}${entry.tid ? ` (${entry.tid})` : ''}`)
+      setActionFeedback(`Restored snapshot: ${label}`)
+    }
   }
 
   function registerUndoAction({ label, undo }) {
@@ -1484,10 +1553,17 @@ function AdminPanel({ currentUser }) {
   }
 
   async function savePairings() {
-    if (!tournament) return
-    const ok = await withSaveState(setPairingsSaving, setPairingsSaveStatus, () =>
-      DB.savePairings({ ...pairingsData }), setAdminError
-    )
+    if (!tournament) return false
+    const errors = [
+      ...validateTournamentId(tid, schedule),
+      ...validatePairingsForTournament({ tournamentId: tid, pairingsByTournament: pairingsData, scoresByTournament: data }),
+    ]
+    if (blockOnValidation(errors)) return false
+
+    const ok = await withSaveState(setPairingsSaving, setPairingsSaveStatus, async () => {
+      await saveSnapshot('pairings', cloudPairings, `Before pairings save for ${tid}`, tid)
+      await DB.savePairings({ ...pairingsData })
+    }, setAdminError)
     if (ok) logChange('Pairings saved', tournament?.name ?? tid)
     return ok
   }
@@ -1521,9 +1597,12 @@ function AdminPanel({ currentUser }) {
       ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
       tee:    membersOverride[m.name]?.tee    ?? m.tee,
     }))
-    const ok = await withSaveState(setMembersSaving, setMembersSaveStatus, () =>
-      DB.saveMembers(updated), setAdminError
-    )
+    if (blockOnValidation(validateMembers(updated))) return false
+
+    const ok = await withSaveState(setMembersSaving, setMembersSaveStatus, async () => {
+      await saveSnapshot('members', membersData, 'Before members save')
+      await DB.saveMembers(updated)
+    }, setAdminError)
     if (ok) logChange('Members saved', `${updated.length} members`)
     return ok
   }
@@ -1553,9 +1632,13 @@ function AdminPanel({ currentUser }) {
   }
 
   async function saveCredits() {
-    const ok = await withSaveState(setCreditsSaving, setCreditsSaveStatus, () =>
-      DB.saveCredits(credits), setAdminError
-    )
+    const errors = validateCredits(credits, membersData.map(m => m.name))
+    if (blockOnValidation(errors)) return false
+
+    const ok = await withSaveState(setCreditsSaving, setCreditsSaveStatus, async () => {
+      await saveSnapshot('credits', cloudCredits, 'Before credits save')
+      await DB.saveCredits(credits)
+    }, setAdminError)
     if (ok) logChange('Credits saved', `${Object.keys(credits).length} member(s) with balances`)
     return ok
   }
@@ -1619,9 +1702,16 @@ function AdminPanel({ currentUser }) {
   }
 
   async function savePayments() {
-    const ok = await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, () =>
-      DB.savePayments(payments), setAdminError
-    )
+    const errors = [
+      ...validateTournamentId(tid, schedule),
+      ...validatePayments(payments, schedule, membersData.map(m => m.name)),
+    ]
+    if (blockOnValidation(errors)) return false
+
+    const ok = await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, async () => {
+      await saveSnapshot('payments', cloudPayments, `Before payments save for ${tid}`, tid)
+      await DB.savePayments(payments)
+    }, setAdminError)
     if (ok) logChange('Payments saved', `${Object.keys(paymentMap).length} paid for ${tournament?.name ?? tid}`)
     return ok
   }
@@ -1655,9 +1745,12 @@ function AdminPanel({ currentUser }) {
   }
 
   async function saveUsers() {
-    const ok = await withSaveState(setUsersSaving, setUsersSaveStatus, () =>
-      DB.saveUsers(usersDraft), setAdminError
-    )
+    if (blockOnValidation(validateUsers(usersDraft))) return false
+
+    const ok = await withSaveState(setUsersSaving, setUsersSaveStatus, async () => {
+      await saveSnapshot('users', cloudUsers, 'Before users save')
+      await DB.saveUsers(usersDraft)
+    }, setAdminError)
     if (ok) logChange('Users saved', `${usersDraft.length} user account(s)`)
     return ok
   }
@@ -1970,9 +2063,16 @@ function AdminPanel({ currentUser }) {
 
   // ── Save scores draft to Firestore ───────────────────────────────────────────
   async function saveScores() {
-    const ok = await withSaveState(setScoresSaving, setScoresSaveStatus, () =>
-      DB.saveScores(data), setAdminError
-    )
+    const errors = [
+      ...validateTournamentId(tid, schedule),
+      ...validateScoresForTournament({ tournamentId: tid, scoresByTournament: data, scoreFlights: ALL_SCORE_TABS }),
+    ]
+    if (blockOnValidation(errors)) return false
+
+    const ok = await withSaveState(setScoresSaving, setScoresSaveStatus, async () => {
+      await saveSnapshot('scores', cloudScores, `Before scores save for ${tid}`, tid)
+      await DB.saveScores(data)
+    }, setAdminError)
     if (ok) logChange('Scores saved', `${totalPlayers} player(s) — ${tournament?.name ?? tid}`)
     return ok
   }
@@ -1994,9 +2094,21 @@ function AdminPanel({ currentUser }) {
     const payload = typeof payloadOrTid === 'string'
       ? buildPublishPayloadForTournament(payloadOrTid)
       : payloadOrTid
-    if (!payload?.resultDoc) return
+    if (!payload?.resultDoc) return false
+
+    const publishErrors = [
+      ...validateTournamentId(payload.targetTid, schedule),
+      ...validateScoresForTournament({ tournamentId: payload.targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
+      ...validatePublishPayload(payload, { members: membersData, scoreFlights: FLIGHTS }),
+    ]
+    if (blockOnValidation(publishErrors)) return false
 
     const ok = await withSaveState(setPublishSaving, setPublishSaveStatus, async () => {
+      await Promise.all([
+        saveSnapshot('results', allResults?.[payload.targetTid] ?? null, `Before publish ${payload.targetTid}`, payload.targetTid),
+        saveSnapshot('standings', currentStandings, `Before publish ${payload.targetTid}`, payload.targetTid),
+        saveSnapshot('poy', currentPoy, `Before publish ${payload.targetTid}`, payload.targetTid),
+      ])
       await Promise.all([
         DB.saveResult(payload.targetTid, payload.resultDoc),
         DB.savePoy(payload.newPoy),
@@ -2013,6 +2125,12 @@ function AdminPanel({ currentUser }) {
   function openPublishPreview(targetTid = tid) {
     const payload = buildPublishPayloadForTournament(targetTid)
     if (!payload) return
+    const publishErrors = [
+      ...validateTournamentId(targetTid, schedule),
+      ...validateScoresForTournament({ tournamentId: targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
+      ...validatePublishPayload(payload, { members: membersData, scoreFlights: FLIGHTS }),
+    ]
+    if (blockOnValidation(publishErrors)) return
     setPublishPreview(payload)
   }
 
@@ -2166,6 +2284,13 @@ function AdminPanel({ currentUser }) {
               className={`px-2 py-1 text-[11px] font-sans font-semibold rounded border ${adminMode === 'changelog' ? 'border-slate-700 bg-slate-700 text-white' : 'border-gray-300 text-gray-600 hover:border-forest hover:text-forest'}`}
             >
               Changelog
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdminMode('snapshots')}
+              className={`px-2 py-1 text-[11px] font-sans font-semibold rounded border ${adminMode === 'snapshots' ? 'border-purple-700 bg-purple-700 text-white' : 'border-gray-300 text-gray-600 hover:border-forest hover:text-forest'}`}
+            >
+              Snapshots
             </button>
             <button
               type="button"
@@ -2541,6 +2666,10 @@ function AdminPanel({ currentUser }) {
       ════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'changelog' && (
         <ChangelogPanel changelog={changelog} />
+      )}
+
+      {adminMode === 'snapshots' && (
+        <SnapshotsPanel snapshots={snapshots} onRestore={restoreSnapshot} />
       )}
 
       {/* ════════════════════════════════════════════════════════════════════════
@@ -3016,6 +3145,7 @@ const ACTION_LABELS = {
   'Credits saved':     { color: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-400'  },
   'Members saved':     { color: 'bg-teal-100 text-teal-700',    dot: 'bg-teal-400'   },
   'Results published': { color: 'bg-red-100 text-red-700',      dot: 'bg-red-500'    },
+  'Snapshot restored': { color: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500' },
 }
 function fmtLogTime(ts) {
   if (!ts) return '—'
@@ -3059,6 +3189,40 @@ function ChangelogPanel({ changelog }) {
               </div>
             )
           })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+function SnapshotsPanel({ snapshots, onRestore }) {
+  const sorted = [...snapshots].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0)).slice(0, 50)
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-purple-700 px-4 py-2.5 flex items-center justify-between">
+        <span className="text-white font-sans text-sm font-semibold">Snapshots / Restore</span>
+        <span className="text-white/70 font-sans text-xs">{sorted.length} recent</span>
+      </div>
+      {sorted.length === 0 ? (
+        <p className="px-4 py-10 text-center text-gray-400 font-sans text-sm">No snapshots yet.</p>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {sorted.map(entry => (
+            <div key={entry.id} className="px-4 py-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-sans font-semibold text-darktext">{entry.type}{entry.tid ? ` · ${entry.tid}` : ''}</p>
+                <p className="text-xs font-sans text-gray-500">{fmtLogTime(entry.ts)}{entry.details ? ` — ${entry.details}` : ''}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onRestore(entry)}
+                className="px-3 py-1.5 text-xs font-sans font-semibold rounded border border-purple-300 text-purple-700 hover:bg-purple-50"
+              >
+                Restore
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

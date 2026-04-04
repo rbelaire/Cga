@@ -104,4 +104,15 @@ export const DB = {
     }
   },
   listenChangelog: (cb) => fsListen('cga/changelog', d => cb(d?.entries ?? [])),
+
+  // Admin snapshots / rollback history { entries: [...] }
+  appendSnapshot: async (entry) => {
+    const ref = REF('cga/snapshots')
+    try {
+      await updateDoc(ref, { entries: arrayUnion(entry) })
+    } catch {
+      await setDoc(ref, { entries: [entry] })
+    }
+  },
+  listenSnapshots: (cb) => fsListen('cga/snapshots', d => cb(d?.entries ?? [])),
 }
