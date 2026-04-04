@@ -37,7 +37,7 @@ export default function Pairings() {
           <p className="text-gray-400 font-sans text-xs mb-8">
             Pairings are typically posted 3–5 days before the tournament date. Check back closer to the event.
           </p>
-          <Link to="/schedule" className="btn-primary">← Back to Schedule</Link>
+          <Link to="/tournaments" className="btn-primary">← Back to Schedule</Link>
         </div>
       </PageWrapper>
     )
@@ -48,7 +48,7 @@ export default function Pairings() {
       <nav className="flex items-center gap-1.5 text-xs font-sans text-gray-400 mb-6">
         <Link to="/" className="hover:text-forest transition-colors">Home</Link>
         <span>/</span>
-        <Link to="/schedule" className="hover:text-forest transition-colors">Schedule</Link>
+        <Link to="/tournaments" className="hover:text-forest transition-colors">Schedule</Link>
         <span>/</span>
         <span className="text-darktext font-medium">Pairings</span>
       </nav>
