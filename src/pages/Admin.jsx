@@ -2388,11 +2388,11 @@ function AdminPanel() {
                 <span className="font-semibold text-forest">{membersData.filter(m => m.active !== false).length}</span> paid
               </div>
               <SaveBtn onClick={savePayments} saving={paymentsSaving} status={paymentsSaveStatus} />
-              <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament}>
-                Export PDF
+              <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>
+                PDF
               </PdfBtn>
-              <XlsxBtn onClick={() => exportPaymentsXLSX(tournament, paymentMap, membersData)} disabled={!tournament}>
-                Export Excel
+              <XlsxBtn onClick={() => exportPaymentsXLSX(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>
+                Excel
               </XlsxBtn>
               {paymentPaidCount > 0 && (
                 <button
@@ -2505,51 +2505,81 @@ function AdminPanel() {
       {/* ════════════════════════════════════════════════════════════════════════
           EXPORTS  (always visible)
       ════════════════════════════════════════════════════════════════════════ */}
-      <div className="mt-6 bg-white border border-gray-200 rounded-lg p-5">
-        <h2 className="text-forest font-sans text-xs font-semibold uppercase tracking-widest mb-1">Export Reports</h2>
-        <p className="text-gray-500 font-sans text-xs mb-4 leading-relaxed">
-          Generate printable PDF or Excel documents for distribution.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <PdfBtn onClick={() => setShowTournamentInfoEditor(true)} disabled={!tournamentInfo}>
-            Tournament Info PDF
-          </PdfBtn>
-          <PdfBtn onClick={() => exportPtmPDF(membersData)}>
-            Points to Make PDF
-          </PdfBtn>
-          <XlsxBtn onClick={() => exportPtmXLSX(membersData)}>
-            Points to Make Excel
-          </XlsxBtn>
-          {totalPlayers > 0 && (
-            <>
-              <PdfBtn onClick={() => exportResultsPDF(tournament, data[tid] ?? {})} disabled={!tournament}>
-                Tournament Results PDF
-              </PdfBtn>
-              <XlsxBtn onClick={() => exportResultsXLSX(tournament, data[tid] ?? {})} disabled={!tournament}>
-                Tournament Results Excel
-              </XlsxBtn>
-            </>
-          )}
-          {currentPairings.length > 0 && (
-            <PdfBtn onClick={() => exportPairingsPDF(tournament, currentPairings)} disabled={!tournament}>
-              Pairings PDF
-            </PdfBtn>
-          )}
-          {Object.keys(credits).length > 0 && (
-            <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
-              Credit on Books PDF
-            </PdfBtn>
-          )}
-          {paymentPaidCount > 0 && (
-            <>
-              <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament}>
-                Payment Status PDF
-              </PdfBtn>
-              <XlsxBtn onClick={() => exportPaymentsXLSX(tournament, paymentMap, membersData)} disabled={!tournament}>
-                Payment Status Excel
-              </XlsxBtn>
-            </>
-          )}
+      <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-forest px-4 py-2.5">
+          <span className="text-white font-sans text-sm font-semibold">Export Reports</span>
+        </div>
+        <div className="divide-y divide-gray-100">
+
+          {/* Tournament Info — PDF only */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-700 font-sans">Tournament Info</p>
+              <p className="text-[11px] text-gray-400 font-sans">Registration sheet with date, course, entry fee, and Venmo QR</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <PdfBtn onClick={() => setShowTournamentInfoEditor(true)} disabled={!tournamentInfo}>PDF</PdfBtn>
+            </div>
+          </div>
+
+          {/* Points to Make — PDF + Excel */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-700 font-sans">Points to Make — Full Roster</p>
+              <p className="text-[11px] text-gray-400 font-sans">All members grouped by flight with their PTM targets</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <PdfBtn onClick={() => exportPtmPDF(membersData)}>PDF</PdfBtn>
+              <XlsxBtn onClick={() => exportPtmXLSX(membersData)}>Excel</XlsxBtn>
+            </div>
+          </div>
+
+          {/* Tournament Results — PDF + Excel (only when scores entered) */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-700 font-sans">Tournament Results</p>
+              <p className="text-[11px] text-gray-400 font-sans">Per-flight leaderboard with rank, score, +/−, and POY points</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <PdfBtn onClick={() => exportResultsPDF(tournament, data[tid] ?? {})} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn>
+              <XlsxBtn onClick={() => exportResultsXLSX(tournament, data[tid] ?? {})} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn>
+            </div>
+          </div>
+
+          {/* Pairings — PDF only */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-700 font-sans">Pairings</p>
+              <p className="text-[11px] text-gray-400 font-sans">Tee-time groupings for the round</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <PdfBtn onClick={() => exportPairingsPDF(tournament, currentPairings)} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn>
+            </div>
+          </div>
+
+          {/* Payment Status — PDF + Excel */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-700 font-sans">Payment Status</p>
+              <p className="text-[11px] text-gray-400 font-sans">List of paid players with Venmo QR code</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn>
+              <XlsxBtn onClick={() => exportPaymentsXLSX(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn>
+            </div>
+          </div>
+
+          {/* Credit on Books — PDF only */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-700 font-sans">Credit on Books</p>
+              <p className="text-[11px] text-gray-400 font-sans">Member credit balances with totals</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn>
+            </div>
+          </div>
+
         </div>
       </div>
 
