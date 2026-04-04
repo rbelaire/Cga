@@ -491,6 +491,25 @@ async function exportPtmPDF(membersList) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
   let y = await buildPdfHeader(doc, 'Points to Make', 'CGA 2026 Season — Full Roster by Flight')
   const displayPtm = (ptm) => (typeof ptm === 'number' ? Math.round(ptm) : (ptm ?? '—'))
+  const toTwoColumnRows = (members) => {
+    const sorted = members.slice().sort((a, b) => a.name.localeCompare(b.name))
+    const rows = []
+    for (let i = 0; i < sorted.length; i += 2) {
+      const left = sorted[i]
+      const right = sorted[i + 1]
+      rows.push([
+        i + 1,
+        left?.name ?? '',
+        displayPtm(left?.ptm),
+        left?.tee ?? '—',
+        right ? i + 2 : '',
+        right?.name ?? '',
+        right ? displayPtm(right?.ptm) : '',
+        right?.tee ?? '',
+      ])
+    }
+    return rows
+  }
 
   const grouped = FLIGHTS.reduce((acc, f) => ({ ...acc, [f]: [] }), {})
   const unassigned = []
@@ -512,14 +531,22 @@ async function exportPtmPDF(membersList) {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
     doc.text(fl.toUpperCase(), 14, y + 4)
     autoTable(doc, {
-      head: [['#', 'Player', 'PTM', 'Tee']],
-      body: members.slice().sort((a, b) => a.name.localeCompare(b.name))
-                   .map((m, i) => [i + 1, m.name, displayPtm(m.ptm), m.tee ?? '—']),
+      head: [['#', 'Player', 'PTM', 'Tee', '#', 'Player', 'PTM', 'Tee']],
+      body: toTwoColumnRows(members),
       startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [245, 248, 252] },
       styles: { fontSize: 8, cellPadding: 1.8 },
-      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 16, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 16 } },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 8, fontStyle: 'bold' },
+        1: { cellWidth: 52 },
+        2: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
+        3: { halign: 'center', cellWidth: 12 },
+        4: { halign: 'center', cellWidth: 8, fontStyle: 'bold' },
+        5: { cellWidth: 52 },
+        6: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
+        7: { halign: 'center', cellWidth: 12 },
+      },
       margin: { left: 14, right: 14 },
     })
     y = doc.lastAutoTable.finalY + 8
@@ -529,14 +556,22 @@ async function exportPtmPDF(membersList) {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(100, 100, 100)
     doc.text('UNASSIGNED', 14, y + 4)
     autoTable(doc, {
-      head: [['#', 'Player', 'PTM', 'Tee']],
-      body: unassigned.slice().sort((a, b) => a.name.localeCompare(b.name))
-                      .map((m, i) => [i + 1, m.name, displayPtm(m.ptm), m.tee ?? '—']),
+      head: [['#', 'Player', 'PTM', 'Tee', '#', 'Player', 'PTM', 'Tee']],
+      body: toTwoColumnRows(unassigned),
       startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: [110, 110, 110], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       styles: { fontSize: 8, cellPadding: 1.8 },
-      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 16, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 16 } },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 8, fontStyle: 'bold' },
+        1: { cellWidth: 52 },
+        2: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
+        3: { halign: 'center', cellWidth: 12 },
+        4: { halign: 'center', cellWidth: 8, fontStyle: 'bold' },
+        5: { cellWidth: 52 },
+        6: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
+        7: { halign: 'center', cellWidth: 12 },
+      },
       margin: { left: 14, right: 14 },
     })
   }
