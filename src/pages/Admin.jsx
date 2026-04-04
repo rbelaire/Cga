@@ -26,6 +26,14 @@ const CREDITS_KEY  = 'cga_credits_v1'
 const PAYMENTS_KEY = 'cga_payments_v1'
 const TOURNAMENT_INFO_KEY = 'cga_tournament_info_v1'
 const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
+// Multi-PIN map: { [pin]: userName }. Env var VITE_ADMIN_PINS is a JSON object e.g. '{"cga2026":"Admin","5678":"Scott"}'
+const PINS = (() => {
+  try {
+    const raw = import.meta.env.VITE_ADMIN_PINS
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore bad JSON */ }
+  return { [PIN]: 'Admin' }
+})()
 const MAX_RECENT_ACTIONS = 5
 
 const PDF_NAVY = [27,  59,  111]
@@ -33,7 +41,7 @@ const PDF_GOLD = [201, 168, 76]
 
 
 const ADMIN_TAB_CONFIG = [
-  { mode: 'scores', label: 'Score Entry', priority: 'primary', icon: '📝' },
+  { mode: 'scores', label: 'Tournament Setup', priority: 'primary', icon: '⛳' },
   { mode: 'pairings', label: 'Pairings', priority: 'primary', icon: '👥' },
   { mode: 'payments', label: 'Payments', priority: 'primary', icon: '💳' },
   { mode: 'dashboard', label: 'Dashboard', priority: 'secondary' },
@@ -845,18 +853,21 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@cga.local'
 
 export default function Admin() {
-  const [pin,       setPin]       = useState('')
-  const [unlocked,  setUnlocked]  = useState(false)
-  const [err,       setErr]       = useState(false)
-  const [loading,   setLoading]   = useState(false)
-  const [authError, setAuthError] = useState(null)
+  const [pin,        setPin]        = useState('')
+  const [unlocked,   setUnlocked]   = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [err,        setErr]        = useState(false)
+  const [loading,    setLoading]    = useState(false)
+  const [authError,  setAuthError]  = useState(null)
 
   const tryUnlock = async () => {
-    if (pin !== PIN) { setErr(true); setTimeout(() => setErr(false), 1500); return }
+    const userName = PINS[pin]
+    if (!userName) { setErr(true); setTimeout(() => setErr(false), 1500); return }
     setLoading(true)
     setAuthError(null)
     try {
-      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pin)
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, PIN)
+      setCurrentUser(userName)
       setUnlocked(true)
     } catch (e) {
       setAuthError(e.message)
@@ -886,11 +897,11 @@ export default function Admin() {
     </PageWrapper>
   )
 
-  return <AdminPanel />
+  return <AdminPanel currentUser={currentUser} />
 }
 
 // ── Admin panel ────────────────────────────────────────────────────────────────
-function AdminPanel() {
+function AdminPanel({ currentUser }) {
   // Live data from Firebase
   const { data: membersData = [] } = useFireData(DB.listenMembers, [])
   const { data: currentStandings } = useFireData(DB.listenStandings, { flights: {} })
@@ -937,7 +948,6 @@ function AdminPanel() {
   const defaultTournamentId = currentTournaments[0]?.id ?? pastTournaments[0]?.id ?? schedule[0]?.id ?? ''
 
   const [tid,          setTid]          = useState(defaultTournamentId)
-  const [flight,       setFlight]       = useState(FLIGHTS[0])
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
   const [adminMode,    setAdminMode]    = useState('dashboard')
@@ -997,12 +1007,14 @@ function AdminPanel() {
   }
 
   function logChange(action, details = '') {
+    const ts = Date.now()
     const entry = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      ts: Date.now(),
+      id: `${ts}-${Math.random().toString(16).slice(2, 8)}`,
+      ts,
       action,
       details,
       tid: tid || null,
+      user: currentUser || 'Admin',
     }
     DB.appendChangelog(entry).catch(() => {}) // fire-and-forget, non-critical
   }
@@ -1045,8 +1057,6 @@ function AdminPanel() {
   const nextTournament = currentTournaments[0] ?? pastTournaments[0] ?? null
   const tournamentInfo = tournament ? { ...tournament, ...(tournamentInfoDrafts[tournament.id] ?? {}) } : null
   const nextTournamentInfo = nextTournament ? { ...nextTournament, ...(tournamentInfoDrafts[nextTournament.id] ?? {}) } : null
-  const rawPlayers     = data[tid]?.[flight] ?? []
-  const players      = useMemo(() => calcFlightPOY(rawPlayers), [rawPlayers])
   const totalPlayers = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
 
   // All names entered for this tournament across all flights
@@ -1149,10 +1159,6 @@ function AdminPanel() {
   )
 
   // ── Score data mutations ──────────────────────────────────────────────────────
-  function flightSet(newList) {
-    setData(prev => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [flight]: newList } }))
-  }
-
   function togglePoolSelect(name) {
     setSelectedPool(prev => {
       const next = new Set(prev)
@@ -1195,47 +1201,49 @@ function AdminPanel() {
     setSelectedPool(new Set())
   }
 
-  function removePlayer(idx) {
-    const removedPlayer = rawPlayers[idx]
+  function removePlayerFromFlight(flightName, idx) {
+    const flightPlayers = data[tid]?.[flightName] ?? []
+    const removedPlayer = flightPlayers[idx]
     if (!removedPlayer) return
-    const fl = [...rawPlayers]
-    fl.splice(idx, 1)
-    flightSet(fl)
+    const next = [...flightPlayers]
+    next.splice(idx, 1)
+    setData(prev => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [flightName]: next } }))
     registerUndoAction({
-      label: `Removed ${removedPlayer.name} from ${flight}`,
+      label: `Removed ${removedPlayer.name} from ${flightName}`,
       undo: () => {
         setData(prev => {
           const td = { ...(prev[tid] ?? {}) }
-          const playersInFlight = [...(td[flight] ?? [])]
-          const restoreIdx = Math.min(idx, playersInFlight.length)
-          playersInFlight.splice(restoreIdx, 0, removedPlayer)
-          td[flight] = playersInFlight
+          const fl = [...(td[flightName] ?? [])]
+          fl.splice(idx, 0, removedPlayer)
+          td[flightName] = fl
           return { ...prev, [tid]: td }
         })
       },
     })
   }
 
-  function updatePlayer(idx, field, val) {
-    const fl = [...rawPlayers]
-    fl[idx]  = { ...fl[idx], [field]: val }
-    flightSet(fl)
+  function updatePlayerInFlight(flightName, idx, field, val) {
+    setData(prev => {
+      const td = { ...(prev[tid] ?? {}) }
+      const fl = [...(td[flightName] ?? [])]
+      fl[idx] = { ...fl[idx], [field]: val }
+      td[flightName] = fl
+      return { ...prev, [tid]: td }
+    })
   }
 
-  async function clearFlight() {
-    if (!await openConfirm(`Clear all players from ${flight}?`)) return
-    const snapshot = cloneForUndo(rawPlayers)
-    flightSet([])
+  async function clearFlightByName(flightName) {
+    const flightPlayers = data[tid]?.[flightName] ?? []
+    if (!await openConfirm(`Clear all players from ${flightName}?`)) return
+    const snapshot = cloneForUndo(flightPlayers)
+    setData(prev => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [flightName]: [] } }))
     if (!snapshot?.length) return
     registerUndoAction({
-      label: `Cleared ${flight}`,
+      label: `Cleared ${flightName}`,
       undo: () => {
         setData(prev => ({
           ...prev,
-          [tid]: {
-            ...(prev[tid] ?? {}),
-            [flight]: snapshot,
-          },
+          [tid]: { ...(prev[tid] ?? {}), [flightName]: snapshot },
         }))
       },
     })
@@ -1610,6 +1618,11 @@ function AdminPanel() {
       .filter(t => allResults?.[t.id])
       .sort((a, b) => (new Date(b.date)) - (new Date(a.date)))[0] ?? null
   ), [allResults])
+
+  const pairingsPosted = useMemo(() => {
+    const p = cloudPairings[tid]
+    return Array.isArray(p) && p.length > 0
+  }, [cloudPairings, tid])
 
   const membersDirty = useMemo(() => {
     const cloudLookup = Object.fromEntries(membersData.map(m => [m.name, m]))
@@ -2173,7 +2186,7 @@ function AdminPanel() {
           </div>
           <select
             value={tid}
-            onChange={e => { setTid(e.target.value); setFlight(FLIGHTS[0]); setPoolSearch(''); setSelectedPool(new Set()) }}
+            onChange={e => { setTid(e.target.value); setPoolSearch(''); setSelectedPool(new Set()) }}
             className="border border-gray-300 rounded px-3 py-2 text-sm font-sans w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-forest"
           >
             {currentTournaments.length > 0 && (
@@ -2213,17 +2226,13 @@ function AdminPanel() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          SCORE ENTRY MODE
+          TOURNAMENT SETUP MODE
       ══════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'scores' && (
         <ScoreEntryPanel
-          flights={ALL_SCORE_TABS}
-          flight={flight}
-          setFlight={f => { setFlight(f); setPoolSearch(''); setSelectedPool(new Set()) }}
-          data={data}
+          allFlights={ALL_SCORE_TABS}
+          tournamentData={data[tid] ?? {}}
           tid={tid}
-          players={players}
-          rawPlayers={rawPlayers}
           poolMembersGrouped={poolMembersGrouped}
           poolTotalCount={poolTotalCount}
           poolSearch={poolSearch}
@@ -2232,9 +2241,9 @@ function AdminPanel() {
           togglePoolSelect={togglePoolSelect}
           toggleGroupSelect={toggleGroupSelect}
           addSelectedPlayers={addSelectedPlayers}
-          removePlayer={removePlayer}
-          updatePlayer={updatePlayer}
-          clearFlight={clearFlight}
+          removePlayerFromFlight={removePlayerFromFlight}
+          updatePlayerInFlight={updatePlayerInFlight}
+          clearFlightByName={clearFlightByName}
           fmtPM={fmtPM}
           fmtPOY={fmtPOY}
           onOpenPublishPreview={() => openPublishPreview(tid)}
@@ -2243,10 +2252,12 @@ function AdminPanel() {
           saveScores={saveScores}
           scoresSaving={scoresSaving}
           scoresSaveStatus={scoresSaveStatus}
-          ptmLookup={ptmLookup}
           tournament={tournament}
           totalPlayers={totalPlayers}
           onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
+          pairingsPosted={pairingsPosted}
+          onGoToPairings={() => setAdminMode('pairings')}
+          workflow={dashboardWorkflow}
         />
       )}
 
@@ -3031,7 +3042,10 @@ function ChangelogPanel({ changelog }) {
                       <span className="text-xs font-sans text-gray-600 truncate">{entry.details}</span>
                     )}
                   </div>
-                  <p className="text-[11px] font-sans text-gray-400 mt-0.5">{fmtLogTime(entry.ts)}</p>
+                  <p className="text-[11px] font-sans text-gray-400 mt-0.5">
+                    {fmtLogTime(entry.ts)}
+                    {entry.user && <span className="ml-2 text-gray-400">— {entry.user}</span>}
+                  </p>
                 </div>
               </div>
             )
@@ -3137,17 +3151,103 @@ function PublishConfirmModal({ preview, publishSaving, publishSaveStatus, onCanc
   )
 }
 
-// ── Score Entry Panel ─────────────────────────────────────────────────────────
-function ScoreEntryPanel({
-  flights, flight, setFlight, data, tid, players, rawPlayers,
-  poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
-  selectedPool, togglePoolSelect, toggleGroupSelect, addSelectedPlayers,
-  removePlayer, updatePlayer, clearFlight, fmtPM, fmtPOY, onOpenPublishPreview,
-  publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
-  tournament, totalPlayers, onExportResultsPDF,
-}) {
+// ── Tournament Step Guide ─────────────────────────────────────────────────────
+function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournament }) {
+  const { counts = {} } = workflow ?? {}
+  const { enteredCount = 0, scoredCount = 0, pairingsCount = 0, resultsPublished = false } = counts
+
+  const guideSteps = [
+    {
+      num: 1,
+      key: 'entries',
+      title: 'Add Players',
+      desc: enteredCount > 0
+        ? `${enteredCount} player${enteredCount !== 1 ? 's' : ''} entered`
+        : 'Select members and add to flights',
+      done: enteredCount > 0,
+      locked: false,
+    },
+    {
+      num: 2,
+      key: 'pairings',
+      title: 'Post Pairings',
+      desc: pairingsPosted
+        ? `${pairingsCount} group${pairingsCount !== 1 ? 's' : ''} posted`
+        : 'Generate and publish tee-time groups',
+      done: pairingsPosted,
+      locked: false,
+      action: !pairingsPosted ? onGoToPairings : null,
+      actionLabel: 'Go to Pairings →',
+    },
+    {
+      num: 3,
+      key: 'scores',
+      title: 'Enter Scores',
+      desc: !pairingsPosted
+        ? 'Available after pairings are posted'
+        : scoredCount === 0
+          ? 'Enter each player\'s score'
+          : scoredCount >= enteredCount && enteredCount > 0
+            ? `All ${scoredCount} scores entered`
+            : `${scoredCount} / ${enteredCount} scored`,
+      done: pairingsPosted && scoredCount > 0 && enteredCount > 0 && scoredCount >= enteredCount,
+      locked: !pairingsPosted,
+    },
+    {
+      num: 4,
+      key: 'results',
+      title: 'Publish Results',
+      desc: resultsPublished
+        ? 'Results live on the site'
+        : 'Calculate standings and make results live',
+      done: resultsPublished,
+      locked: !pairingsPosted || scoredCount === 0,
+    },
+  ]
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg mb-5 overflow-hidden">
+      <div className="bg-forest px-4 py-2.5 flex items-center gap-3">
+        <span className="text-white font-sans text-sm font-semibold">Tournament Workflow</span>
+        {tournament && (
+          <span className="text-white/50 font-sans text-xs">— {tournament.name}</span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+        {guideSteps.map(step => (
+          <div key={step.key} className={`px-4 py-3 ${step.locked ? 'opacity-50' : ''}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center flex-shrink-0 ${
+                step.done
+                  ? 'bg-green-500 text-white'
+                  : step.locked
+                    ? 'bg-gray-200 text-gray-400'
+                    : 'bg-gold text-forest'
+              }`}>
+                {step.done ? '✓' : step.num}
+              </span>
+              <span className="text-xs font-sans font-semibold text-darktext">{step.title}</span>
+              {step.locked && <span className="text-gray-300 text-xs">🔒</span>}
+            </div>
+            <p className="text-[11px] font-sans text-gray-400 leading-relaxed ml-7">{step.desc}</p>
+            {step.action && (
+              <button
+                onClick={step.action}
+                className="ml-7 mt-1.5 text-[11px] font-sans font-semibold text-forest hover:underline"
+              >
+                {step.actionLabel}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Flight Score Section ──────────────────────────────────────────────────────
+function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdate, onClear, fmtPM, fmtPOY }) {
   const scoreInputRefs = useRef({ mobile: [], desktop: [] })
-  const lastFocusContextRef = useRef(null)
 
   const setScoreInputRef = (layout, idx, el) => {
     scoreInputRefs.current[layout][idx] = el
@@ -3156,73 +3256,201 @@ function ScoreEntryPanel({
   const focusScoreAt = (idx) => {
     const mobileTarget = scoreInputRefs.current.mobile[idx]
     const desktopTarget = scoreInputRefs.current.desktop[idx]
-    const target = [mobileTarget, desktopTarget].find((el) => el && el.offsetParent !== null) || mobileTarget || desktopTarget
+    const target = [mobileTarget, desktopTarget].find(el => el && el.offsetParent !== null) || mobileTarget || desktopTarget
     if (!target) return
     target.focus()
     target.select?.()
   }
 
-  useEffect(() => {
-    const contextKey = `${tid ?? ''}::${flight ?? ''}`
-    if (lastFocusContextRef.current === contextKey) return
-    lastFocusContextRef.current = contextKey
-
-    const rafId = requestAnimationFrame(() => {
-      const firstEmptyIdx = players.findIndex((player) => player.score == null || player.score === '')
-      const targetIdx = firstEmptyIdx >= 0 ? firstEmptyIdx : 0
-      focusScoreAt(targetIdx)
-    })
-    return () => cancelAnimationFrame(rafId)
-  }, [tid, flight, players])
-
   const handleScoreInputKeyDown = (e, idx) => {
     const { key, shiftKey } = e
-
-    if (key === 'ArrowDown') {
-      e.preventDefault()
-      focusScoreAt(idx + 1)
-      return
-    }
-    if (key === 'ArrowUp') {
-      e.preventDefault()
-      focusScoreAt(Math.max(0, idx - 1))
-      return
-    }
-
-    if (key === 'Enter') {
-      e.preventDefault()
-      focusScoreAt(idx + 1)
-      return
-    }
-
-    if (key === 'Tab') {
-      if (shiftKey) {
-        e.preventDefault()
-        focusScoreAt(Math.max(0, idx - 1))
-      } else {
-        e.preventDefault()
-        focusScoreAt(idx + 1)
-      }
-    }
+    if (key === 'ArrowDown' || key === 'Enter') { e.preventDefault(); focusScoreAt(idx + 1); return }
+    if (key === 'ArrowUp') { e.preventDefault(); focusScoreAt(Math.max(0, idx - 1)); return }
+    if (key === 'Tab') { e.preventDefault(); focusScoreAt(shiftKey ? Math.max(0, idx - 1) : idx + 1) }
   }
 
   return (
-    <>
-      {/* Flight tabs */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {flights.map(f => {
-          const cnt = data[tid]?.[f]?.length ?? 0
-          return (
-            <button key={f} onClick={() => setFlight(f)}
-              className={`px-3 py-1.5 text-xs font-sans font-medium rounded transition-colors ${
-                flight === f ? 'bg-gold text-forest' : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
-              }`}
-            >
-              {f}{cnt > 0 && <span className="ml-1 opacity-60">({cnt})</span>}
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-white font-sans text-sm font-semibold">{flightName}</span>
+          {flightName === 'New Players' && (
+            <span className="text-xs font-sans px-2 py-0.5 rounded bg-teal-400/30 text-teal-200 border border-teal-400/40">
+              scores logged — not published to standings
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-gold font-mono text-xs">{rawPlayers.length} players</span>
+          {rawPlayers.length > 0 && (
+            <button onClick={onClear} className="text-gray-300 hover:text-red-300 text-xs font-sans transition-colors">
+              Clear All
             </button>
-          )
-        })}
+          )}
+        </div>
       </div>
+
+      {players.length > 0 ? (
+        <div>
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-2 p-2">
+            {players.map((p, idx) => (
+              <div key={p.name} className={`border border-gray-200 rounded-lg p-3 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-sans text-sm font-semibold text-darktext truncate">{formatName(p.name)}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
+                        Rank {p.rank ?? '—'}
+                      </span>
+                      <span className={`stat-number text-xs font-semibold ${
+                        p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
+                      }`}>
+                        {fmtPM(p.plusMinus)}
+                      </span>
+                    </div>
+                  </div>
+                  <button onClick={() => onRemove(idx)} title="Remove player"
+                    className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors px-1">×</button>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="text-[11px] font-sans text-gray-400">PTM</span>
+                    <input type="number" inputMode="numeric" value={p.ptm}
+                      onChange={e => onUpdate(idx, 'ptm', e.target.value)}
+                      className="mt-1 w-full border border-gray-200 rounded px-2 py-2 text-sm font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-sans text-gray-400">Score</span>
+                    <input
+                      ref={el => setScoreInputRef('mobile', idx, el)}
+                      type="number" inputMode="numeric" value={p.score}
+                      onChange={e => onUpdate(idx, 'score', e.target.value)}
+                      onKeyDown={e => handleScoreInputKeyDown(e, idx)}
+                      aria-label={`Score for ${formatName(p.name)}`}
+                      className="mt-1 w-full border border-gray-200 rounded px-2 py-2 text-sm font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                    />
+                  </label>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className={`stat-number text-xs font-semibold ${
+                    p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
+                  }`}>
+                    POY: {fmtPOY(p)}
+                  </span>
+                  <label className="flex items-center gap-1.5 text-xs font-sans text-gray-500">
+                    <input type="checkbox" checked={p.eligible !== false}
+                      onChange={e => onUpdate(idx, 'eligible', e.target.checked)}
+                      className="accent-forest cursor-pointer w-4 h-4"
+                    />
+                    Eligible
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="table-header text-gray-400 text-left">Rank</th>
+                  <th className="table-header text-gray-400 text-left">Player</th>
+                  <th className="table-header text-gray-400 text-center">PTM</th>
+                  <th className="table-header text-gray-400 text-center">Score</th>
+                  <th className="table-header text-gray-400 text-center">+/-</th>
+                  <th className="table-header text-gray-400 text-center">POY</th>
+                  <th className="table-header text-gray-400 text-center">Elig.</th>
+                  <th className="table-header text-gray-400 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {players.map((p, idx) => (
+                  <tr key={p.name} className={`border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                    <td className="px-3 py-2">
+                      <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
+                        {p.rank ?? '—'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-sans text-sm text-darktext whitespace-nowrap">{formatName(p.name)}</td>
+                    <td className="px-2 py-1.5 text-center">
+                      <input type="number" value={p.ptm} onChange={e => onUpdate(idx, 'ptm', e.target.value)}
+                        className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <input
+                        ref={el => setScoreInputRef('desktop', idx, el)}
+                        type="number" inputMode="numeric" value={p.score}
+                        onChange={e => onUpdate(idx, 'score', e.target.value)}
+                        onKeyDown={e => handleScoreInputKeyDown(e, idx)}
+                        aria-label={`Score for ${formatName(p.name)}`}
+                        className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`stat-number text-xs font-semibold ${
+                        p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
+                      }`}>
+                        {fmtPM(p.plusMinus)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`stat-number text-xs font-semibold ${
+                        p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
+                      }`}>
+                        {fmtPOY(p)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input type="checkbox" checked={p.eligible !== false}
+                        onChange={e => onUpdate(idx, 'eligible', e.target.checked)}
+                        className="accent-forest cursor-pointer w-4 h-4"
+                      />
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <button onClick={() => onRemove(idx)} title="Remove player"
+                        className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors">×</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed m-3 rounded-lg border-gray-100">
+          <p className="text-gray-300 font-sans text-xs">No players in {flightName} yet.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Tournament Setup Panel (Score Entry) ──────────────────────────────────────
+function ScoreEntryPanel({
+  allFlights, tournamentData, tid,
+  poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
+  selectedPool, togglePoolSelect, toggleGroupSelect, addSelectedPlayers,
+  removePlayerFromFlight, updatePlayerInFlight, clearFlightByName,
+  fmtPM, fmtPOY, onOpenPublishPreview,
+  publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
+  tournament, totalPlayers, onExportResultsPDF,
+  pairingsPosted, onGoToPairings, workflow,
+}) {
+  const hasAnyPlayers = allFlights.some(f => (tournamentData[f]?.length ?? 0) > 0)
+
+  return (
+    <>
+      {/* Step guide */}
+      <TournamentStepGuide
+        workflow={workflow}
+        pairingsPosted={pairingsPosted}
+        onGoToPairings={onGoToPairings}
+        tournament={tournament}
+      />
 
       {/* Two-panel layout */}
       <div className="flex flex-col lg:flex-row gap-4 mb-6">
@@ -3232,9 +3460,8 @@ function ScoreEntryPanel({
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-forest px-4 py-2.5">
               <p className="text-white font-sans text-sm font-semibold">Members</p>
-              <p className="text-white/50 text-xs font-sans mt-0.5">Select one or more names, then tap "Add Selected"</p>
+              <p className="text-white/50 text-xs font-sans mt-0.5">Select names, then tap "Add Selected"</p>
             </div>
-
             <div className="px-3 py-2 border-b border-gray-100">
               <input
                 type="text"
@@ -3244,7 +3471,6 @@ function ScoreEntryPanel({
                 className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
               />
             </div>
-
             <MemberPool
               poolMembersGrouped={poolMembersGrouped}
               poolTotalCount={poolTotalCount}
@@ -3257,207 +3483,47 @@ function ScoreEntryPanel({
           </div>
         </div>
 
-        {/* Right: Flight panel */}
+        {/* Right: Score entry (locked until pairings posted) */}
         <div className="flex-1 min-w-0">
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-white font-sans text-sm font-semibold">{flight}</span>
-                {flight === 'New Players' && (
-                  <span className="text-xs font-sans px-2 py-0.5 rounded bg-teal-400/30 text-teal-200 border border-teal-400/40">
-                    scores logged — not published to standings
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-gold font-mono text-xs">{rawPlayers.length} players</span>
-                {rawPlayers.length > 0 && (
-                  <button onClick={clearFlight} className="text-gray-300 hover:text-red-300 text-xs font-sans transition-colors">
-                    Clear All
-                  </button>
-                )}
-              </div>
+          {!pairingsPosted ? (
+            <div className="bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center py-16 text-center px-8">
+              <span className="text-4xl mb-3 opacity-30">🔒</span>
+              <p className="font-sans font-semibold text-darktext mb-1">Score entry locked</p>
+              <p className="text-gray-400 font-sans text-sm mb-4">
+                Post pairings first — Step 2 above.
+              </p>
+              <button onClick={onGoToPairings} className="btn-primary text-sm">
+                Go to Pairings →
+              </button>
             </div>
-
-            {players.length > 0 ? (
-              <div>
-                {/* Mobile cards */}
-                <div className="sm:hidden space-y-2 p-2">
-                  {players.map((p, idx) => (
-                    <div
-                      key={p.name}
-                      className={`border border-gray-200 rounded-lg p-3 ${
-                        idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-sans text-sm font-semibold text-darktext truncate">{formatName(p.name)}</p>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
-                              Rank {p.rank ?? '—'}
-                            </span>
-                            <span className={`stat-number text-xs font-semibold ${
-                              p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
-                            }`}>
-                              {fmtPM(p.plusMinus)}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => removePlayer(idx)}
-                          title="Remove player from this tournament"
-                          className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors px-1"
-                        >
-                          ×
-                        </button>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <label className="block">
-                          <span className="text-[11px] font-sans text-gray-400">PTM</span>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            value={p.ptm}
-                            onChange={e => updatePlayer(idx, 'ptm', e.target.value)}
-                            className="mt-1 w-full border border-gray-200 rounded px-2 py-2 text-sm font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="text-[11px] font-sans text-gray-400">Score</span>
-                          <input
-                            ref={(el) => setScoreInputRef('mobile', idx, el)}
-                            type="number"
-                            inputMode="numeric"
-                            value={p.score}
-                            onChange={e => updatePlayer(idx, 'score', e.target.value)}
-                            onKeyDown={e => handleScoreInputKeyDown(e, idx)}
-                            aria-label={`Score for ${formatName(p.name)}`}
-                            className="mt-1 w-full border border-gray-200 rounded px-2 py-2 text-sm font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                          />
-                        </label>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between">
-                        <span className={`stat-number text-xs font-semibold ${
-                          p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
-                        }`}>
-                          POY: {fmtPOY(p)}
-                        </span>
-                        <label className="flex items-center gap-1.5 text-xs font-sans text-gray-500">
-                          <input
-                            type="checkbox"
-                            checked={p.eligible !== false}
-                            onChange={e => updatePlayer(idx, 'eligible', e.target.checked)}
-                            className="accent-forest cursor-pointer w-4 h-4"
-                          />
-                          Eligible
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Desktop table */}
-                <div className="hidden sm:block overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100">
-                        <th className="table-header text-gray-400 text-left">Rank</th>
-                        <th className="table-header text-gray-400 text-left">Player</th>
-                        <th className="table-header text-gray-400 text-center">PTM</th>
-                        <th className="table-header text-gray-400 text-center">Score</th>
-                        <th className="table-header text-gray-400 text-center">+/-</th>
-                        <th className="table-header text-gray-400 text-center">POY</th>
-                        <th className="table-header text-gray-400 text-center">Elig.</th>
-                        <th className="table-header text-gray-400 w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {players.map((p, idx) => (
-                        <tr
-                          key={p.name}
-                          className={`border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50 ${
-                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                          }`}
-                        >
-                          {/* Rank */}
-                          <td className="px-3 py-2">
-                            <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
-                              {p.rank ?? '—'}
-                            </span>
-                          </td>
-                          {/* Name */}
-                          <td className="px-3 py-2 font-sans text-sm text-darktext whitespace-nowrap">
-                            {formatName(p.name)}
-                          </td>
-                          {/* PTM */}
-                          <td className="px-2 py-1.5 text-center">
-                            <input type="number" value={p.ptm} onChange={e => updatePlayer(idx, 'ptm', e.target.value)}
-                              className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                            />
-                          </td>
-                          {/* Score */}
-                          <td className="px-2 py-1.5 text-center">
-                            <input
-                              ref={(el) => setScoreInputRef('desktop', idx, el)}
-                              type="number"
-                              inputMode="numeric"
-                              value={p.score}
-                              onChange={e => updatePlayer(idx, 'score', e.target.value)}
-                              onKeyDown={e => handleScoreInputKeyDown(e, idx)}
-                              aria-label={`Score for ${formatName(p.name)}`}
-                              className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                            />
-                          </td>
-                          {/* +/- */}
-                          <td className="px-3 py-2 text-center">
-                            <span className={`stat-number text-xs font-semibold ${
-                              p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
-                            }`}>
-                              {fmtPM(p.plusMinus)}
-                            </span>
-                          </td>
-                          {/* POY */}
-                          <td className="px-3 py-2 text-center">
-                            <span className={`stat-number text-xs font-semibold ${
-                              p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
-                            }`}>
-                              {fmtPOY(p)}
-                            </span>
-                          </td>
-                          {/* Eligible */}
-                          <td className="px-3 py-2 text-center">
-                            <input type="checkbox" checked={p.eligible !== false}
-                              onChange={e => updatePlayer(idx, 'eligible', e.target.checked)}
-                              className="accent-forest cursor-pointer w-4 h-4"
-                            />
-                          </td>
-                          {/* Remove */}
-                          <td className="px-2 py-2 text-center">
-                            <button
-                              onClick={() => removePlayer(idx)}
-                              title="Remove player from this tournament"
-                              className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors"
-                            >
-                              ×
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed m-4 rounded-lg border-gray-200">
-                <span className="text-3xl mb-2 text-gray-300">⛳</span>
-                <p className="text-gray-400 font-sans text-sm">No players added yet.</p>
-                <p className="text-gray-400 font-sans text-xs mt-1">Select a player from the list on the left.</p>
-              </div>
-            )}
-          </div>
+          ) : !hasAnyPlayers ? (
+            <div className="bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center py-16 text-center px-8">
+              <span className="text-3xl mb-2 text-gray-300">⛳</span>
+              <p className="text-gray-400 font-sans text-sm">No players added yet.</p>
+              <p className="text-gray-400 font-sans text-xs mt-1">Select players from the pool on the left.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {allFlights.map(f => {
+                const rawFlightPlayers = tournamentData[f] ?? []
+                if (rawFlightPlayers.length === 0) return null
+                const flightPlayers = calcFlightPOY(rawFlightPlayers)
+                return (
+                  <FlightScoreSection
+                    key={f}
+                    flightName={f}
+                    players={flightPlayers}
+                    rawPlayers={rawFlightPlayers}
+                    onUpdate={(idx, field, val) => updatePlayerInFlight(f, idx, field, val)}
+                    onRemove={idx => removePlayerFromFlight(f, idx)}
+                    onClear={() => clearFlightByName(f)}
+                    fmtPM={fmtPM}
+                    fmtPOY={fmtPOY}
+                  />
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
