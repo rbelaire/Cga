@@ -31,10 +31,11 @@ export default function Footer() {
             <ul className="space-y-2">
               {[
                 ['/', 'Home'],
-                ['/schedule', 'Tournament Schedule'],
-                ['/standings', 'Season Standings'],
-                ['/results', 'Results'],
-                ['/eligibility', 'Eligibility Rules'],
+                ['/tournaments', 'Tournaments'],
+                ['/standings', 'Standings'],
+                ['/members', 'Members'],
+                ['/info', 'Rules & Info'],
+                ['/sponsors', 'Sponsors'],
               ].map(([to, label]) => (
                 <li key={label}>
                   <Link
