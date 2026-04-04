@@ -164,3 +164,9 @@ Adjust as needed for production-grade role checks.
 ## Deployment
 
 Push to `main` triggers GitHub Actions deployment to GitHub Pages via the repository workflow.
+
+## Additional Documentation
+
+- [`BOARD_OVERVIEW.md`](./BOARD_OVERVIEW.md) — plain-English summary for board members and stakeholders.
+- [`ADMIN_GUIDE.md`](./ADMIN_GUIDE.md) — practical, non-technical guide for tournament admins.
+
