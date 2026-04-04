@@ -1,142 +1,136 @@
-# Carencro Golf Association — 2026 Season Site
+# Carencro Golf Association (CGA) Site — 2026
 
 Live site: **https://rbelaire.github.io/Cga/**
 
----
-
 ## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| UI | React 19 + Vite 8 |
-| Styling | Tailwind CSS 3 |
-| Routing | React Router v7 (HashRouter) |
-| Database | Firebase Firestore |
-| Hosting | GitHub Pages (via GitHub Actions) |
-
----
+- React 19 + Vite
+- Tailwind CSS
+- React Router (HashRouter)
+- Firebase Firestore + Firebase Auth
+- GitHub Pages (GitHub Actions)
 
 ## Local development
 
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Create your local env file (never committed)
-cp .env.example .env.local
-# Fill in the Firebase values from the Firebase console
-
-# 3. Start dev server
 npm run dev
-# → http://localhost:5173/Cga/
 ```
 
----
+> App runs at `http://localhost:5173/Cga/` in local Vite dev.
 
 ## Environment variables
 
-All six Firebase config values must be set before the app connects to the database.
+Set these in `.env.local` for local development and in GitHub Actions secrets for deploys:
 
-| Variable | Where to find it |
-|----------|-----------------|
-| `VITE_FIREBASE_API_KEY` | Firebase Console → Project Settings → Your apps → Web app |
-| `VITE_FIREBASE_AUTH_DOMAIN` | same |
-| `VITE_FIREBASE_PROJECT_ID` | same |
-| `VITE_FIREBASE_STORAGE_BUCKET` | same |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | same |
-| `VITE_FIREBASE_APP_ID` | same |
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_ADMIN_EMAIL` (optional, defaults to `admin@cga.local`)
+- `VITE_ADMIN_PIN` (optional fallback PIN)
+- `VITE_ADMIN_PINS` (optional JSON map for multi-user PIN labels)
 
-**For local dev:** put them in `.env.local`
+## Data flow (actual)
 
-**For GitHub Pages deploys:** add them as repository secrets at  
-`Settings → Secrets and variables → Actions → New repository secret`
+```text
+Admin local draft state (localStorage)
+  ├─ Save Draft / Save Pairings / Save Users / Save Payments ...
+  │    -> Firestore draft-like docs (cga/scores, cga/pairings, cga/users, ...)
+  └─ Publish Results
+       -> Firestore live docs (cga/results, cga/standings, cga/poy)
 
----
+Public pages
+  -> subscribe to Firestore in real-time via useFireData()
+  -> render live data when available
+```
+
+### Draft → publish behavior
+
+- Score entry supports draft saves (`cga/scores`) before publishing.
+- Publishing writes the selected tournament’s result plus recomputed season tables:
+  - `cga/results`
+  - `cga/standings`
+  - `cga/poy`
+- Other admin sections (members, credits, users, pairings, payments) save directly to their respective docs.
+
+## Firestore structure (current implementation)
+
+The project currently uses **flat document paths under `cga/*`** rather than `current/draft/history` namespaces.
+
+- `cga/members` → `{ list: [...] }`
+- `cga/standings` → `{ flights: {...} }`
+- `cga/poy` → `{ flights: {...} }`
+- `cga/ptm` → `{ list: [...] }`
+- `cga/pairings` → `{ map: { [tournamentId]: [...] } }`
+- `cga/payments` → `{ data: { [tournamentId]: { [member]: true } } }`
+- `cga/credits` → `{ balances: { [member]: number } }`
+- `cga/users` → `{ list: [...] }`
+- `cga/scores` → `{ data: { [tournamentId]: { [flight]: [...] } } }`
+- `cga/results` → `{ data: { [tournamentId]: resultDoc } }`
+- `cga/changelog` → `{ entries: [...] }` (admin audit history)
+
+## Results page data source
+
+There is no standalone `Results.jsx` route in the app.
+
+- Tournament result display is implemented in `src/pages/Tournaments.jsx`.
+- It reads from Firestore (`DB.listenResults`) through `useFireData`.
+- Fallback is an empty object (`{}`), so completed tournaments show “Results not yet available” until Firestore data exists.
+- Legacy `/results` URL redirects to `/tournaments`.
+
+## Admin architecture
+
+- UI remains in `src/pages/Admin.jsx`.
+- Publish computation is extracted to `src/services/admin/publishService.js`.
+- Audit-entry construction is extracted to `src/services/admin/auditService.js`.
+- Firestore read/write access remains centralized in `src/db.js`.
+
+## Admin workflow UX
+
+Admin includes an actionable workflow system:
+
+- Quick action buttons (setup, payments, pairings, scores, users)
+- Tournament workflow tracker with step actions
+- “Next step” CTA based on current workflow state
+- Unsaved draft detection + “Save All” orchestration
+
+## Logging / history
+
+Admin actions are recorded in Firestore changelog entries via `DB.appendChangelog`.
+
+Typical entries include:
+
+- Scores saved
+- Pairings saved
+- Members / credits / users / payments saved
+- Results published
+
+## Security model
+
+- **Authentication:** Admin unlock requires PIN and also attempts Firebase Auth email/password sign-in.
+- **Authorization rules:** Firestore security rules are managed in Firebase Console (no `firestore.rules` file is stored in this repo).
+
+Recommended rule baseline for admin writes:
+
+```text
+allow write: if request.auth != null;
+```
+
+Adjust as needed for production-grade role checks.
+
+## Key folders/files
+
+- `src/db.js` — Firestore data-access layer
+- `src/hooks/useFireData.js` — realtime subscription hook with fallback
+- `src/pages/Admin.jsx` — admin UI and workflow
+- `src/services/admin/` — extracted admin services
+- `src/pages/Tournaments.jsx` — completed tournament results UI
+- `src/pages/Standings.jsx`, `src/pages/Members.jsx`, `src/pages/Pairings.jsx` — public data pages
+- `src/data/schedule.json` — season schedule metadata
 
 ## Deployment
 
-Pushes to `main` automatically build and deploy via `.github/workflows/deploy.yml`.  
-The workflow injects the Firebase secrets as env vars during `npm run build`.
-
----
-
-## Admin panel
-
-URL: `/#/admin` — PIN-gated (`cga2026`)
-
-| Tab | What it does |
-|-----|-------------|
-| **Score Entry** | Enter player scores per flight for a tournament. **Save Draft** saves work-in-progress to Firestore. **Publish Results** calculates standings and POY and makes them live instantly. |
-| **Pairings Builder** | Auto-generate or manually build tee-time groups. **Save Pairings** pushes to Firestore. |
-| **Flight Management** | Assign each member to a flight and set their PTM. **Save to Cloud** publishes immediately. |
-| **Credit on Books** | Track member credit balances. **Save to Cloud** persists to Firestore. |
-
-PDF exports (results, pairings, points-to-make, credits) are available in every tab for printing.
-
----
-
-## Data flow
-
-```
-Admin panel  →  Firestore  →  Live site (real-time)
-                    ↑
-            Static JSON files (instant first-load fallback)
-```
-
-Public pages subscribe to Firestore on load. They show the static JSON bundled at build time immediately, then switch to live Firestore data the moment it arrives. No page reload needed when the admin saves.
-
----
-
-## Firestore structure
-
-| Path | Contents |
-|------|---------|
-| `cga/members` | `{ list: [...] }` — full member roster |
-| `cga/standings` | `{ flights: { ... } }` — season standings by flight |
-| `cga/poy` | `{ flights: { ... } }` — Player of the Year points |
-| `cga/pairings` | `{ map: { [tournamentId]: [...] } }` — tee-time pairings |
-| `cga/credits` | `{ balances: { [name]: amount } }` — credit balances |
-| `cga/scores` | `{ data: { [tid]: { [flight]: [...] } } }` — admin score drafts |
-| `cga/results/{tid}` | Full result document for one tournament |
-
----
-
-## Adding a new tournament
-
-1. Add the tournament to `src/data/schedule.json`
-2. Enter scores in the Admin panel → Score Entry
-3. Click **Publish Results** — standings, POY, and the result document are written to Firestore and go live immediately
-4. If the Results page should show a leaderboard, also add a static import in `src/pages/Results.jsx` and map the tournament id (the Results page currently reads from static JSON imports)
-
----
-
-## Firestore security rules
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /cga/{document=**} {
-      allow read: if true;
-      allow write: if false;
-    }
-  }
-}
-```
-
-Public reads are open. Writes are only possible from the Firebase console or a trusted server — the admin panel writes using the SDK with the API key, which is fine for this use case since the PIN gates access.
-
----
-
-## Key source files
-
-| File | Purpose |
-|------|---------|
-| `src/firebase.js` | Firebase app init |
-| `src/db.js` | All Firestore read/write functions |
-| `src/hooks/useFireData.js` | React hook for live Firestore subscriptions with static fallback |
-| `src/pages/Admin.jsx` | Full admin panel |
-| `src/pages/Results.jsx` | Tournament results viewer |
-| `src/pages/Standings.jsx` | Season standings |
-| `src/pages/PointsToMake.jsx` | PTM table for all members |
-| `src/data/` | Static JSON (bundled at build time, used as fallback) |
+Push to `main` triggers GitHub Actions deployment to GitHub Pages via the repository workflow.

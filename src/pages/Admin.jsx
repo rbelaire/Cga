@@ -15,6 +15,8 @@ import TeeTag from '../components/ui/TeeTag'
 import CountdownTimer from '../components/ui/CountdownTimer'
 import { getCurrentTournaments, getPastTournaments } from '../utils/tournamentFilters'
 import cgaPayVenmo from '../../cga-pay-venmo.jpg'
+import { createAdminAuditEntry } from '../services/admin/auditService'
+import { buildPublishPayload } from '../services/admin/publishService'
 
 const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const ALL_SCORE_TABS   = [...FLIGHTS, 'New Players']
@@ -1050,15 +1052,12 @@ function AdminPanel({ currentUser }) {
   }
 
   function logChange(action, details = '') {
-    const ts = Date.now()
-    const entry = {
-      id: `${ts}-${Math.random().toString(16).slice(2, 8)}`,
-      ts,
+    const entry = createAdminAuditEntry({
       action,
       details,
-      tid: tid || null,
+      tournamentId: tid || null,
       user: currentUser || 'Admin',
-    }
+    })
     DB.appendChangelog(entry).catch(() => {}) // fire-and-forget, non-critical
   }
 
@@ -1979,93 +1978,21 @@ function AdminPanel({ currentUser }) {
   }
 
   // ── Publish tournament results to Firestore ───────────────────────────────────
-  function buildPublishPayload(targetTid = tid) {
-    const targetTournament = schedule.find(t => t.id === targetTid)
-    if (!targetTournament) return null
-    const flightWinners = [], leaderboard = {}
-    for (const fl of FLIGHTS) {
-      const ps      = calcFlightPOY(data[targetTid]?.[fl] ?? [])
-      const ranked  = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
-      const allRows = [...ranked, ...ps.filter(p => p.rank == null)]
-      leaderboard[fl] = allRows.map(p => ({
-        rank: p.rank ?? 0, name: p.name, poy: p.poy ?? 0,
-        points: Number(p.score) || 0, ptm: Number(p.ptm) || 0, plusMinus: p.plusMinus ?? 0,
-      }))
-      if (ranked[0]) flightWinners.push({ flight: fl, winner: ranked[0].name, points: ranked[0].poy ?? 0 })
-    }
-
-    // Include New Players in leaderboard (poy: 0) so scratch standings count them
-    const newPlayerRows = (data[targetTid]?.['New Players'] ?? []).filter(p => p.name && p.score != null && p.score !== '')
-    if (newPlayerRows.length) {
-      leaderboard['New Players'] = newPlayerRows.map(p => ({
-        rank: 0, name: p.name, poy: 0,
-        points: Number(p.score) || 0, ptm: Number(p.ptm) || 0,
-        plusMinus: (p.ptm != null && p.ptm !== '' && p.score != null && p.score !== '')
-          ? Number(p.score) - Number(p.ptm) : 0,
-      }))
-    }
-
-    const resultDoc = {
-      id: targetTid, name: targetTournament.name, date: targetTournament.date, course: targetTournament.course,
-      format: 'Individual Stroke Play', status: 'completed', flightWinners, leaderboard,
-    }
-
-    // Build lookups from previous standings for cumulative fields
-    const prevStandingsLookup = {}
-    const prevPtmLookup = {}
-    for (const fl of FLIGHTS) {
-      for (const p of (currentStandings.flights[fl] ?? [])) {
-        prevStandingsLookup[p.name] = p
-        if (p.ptm != null) prevPtmLookup[p.name] = p.ptm
-      }
-    }
-
-    const newPoy = { flights: {} }
-    for (const fl of FLIGHTS) {
-      const ps = calcFlightPOY(data[targetTid]?.[fl] ?? [])
-      newPoy.flights[fl] = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
-        .map((p, i) => {
-          const prevEvents = prevStandingsLookup[p.name]?.events ?? 0
-          return { rank: i + 1, name: p.name, points: p.poy ?? 0, events: prevEvents + 1 }
-        })
-    }
-
-    const newStandings = { flights: {} }
-    for (const fl of FLIGHTS) {
-      const ps     = calcFlightPOY(data[targetTid]?.[fl] ?? [])
-      const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
-      newStandings.flights[fl] = sorted.map((p, i) => {
-        const newPtm     = ptmLookup[p.name] ?? (Number(p.ptm) || null)
-        const oldPtm     = prevPtmLookup[p.name] ?? null
-        const ptmDelta   = (newPtm != null && oldPtm != null) ? +(newPtm - oldPtm).toFixed(2) : 0
-        const prev       = prevStandingsLookup[p.name]
-        const prevEvents = prev?.events ?? 0
-        const prevPoy    = prev?.poy ?? 0
-        const newPoyVal  = p.poy ?? 0
-        const trend      = newPoyVal > prevPoy ? 'up' : newPoyVal < prevPoy ? 'down' : 'stable'
-        return {
-          rank: i + 1, name: p.name, poy: newPoyVal, ptm: newPtm, ptmDelta,
-          latestScore: Number(p.score) || null, latestTournament: targetTournament.name,
-          events: prevEvents + 1, trend,
-        }
-      })
-    }
-
-    const totalPlayersAffected = FLIGHTS.reduce(
-      (sum, fl) => sum + (newStandings.flights[fl]?.length ?? 0), 0
-    )
-    const flightSummaries = FLIGHTS.map(fl => ({
-      flight: fl,
-      winner: flightWinners.find(w => w.flight === fl) ?? null,
-      topRows: (resultDoc.leaderboard[fl] ?? []).filter(row => row.rank > 0).slice(0, 3),
-    }))
-
-    return { targetTid, targetTournament, resultDoc, newPoy, newStandings, preview: { totalPlayersAffected, flightSummaries } }
+  function buildPublishPayloadForTournament(targetTid = tid) {
+    return buildPublishPayload({
+      targetTid,
+      schedule,
+      flights: FLIGHTS,
+      scoreData: data,
+      currentStandings,
+      ptmLookup,
+      calcFlightPOY,
+    })
   }
 
   async function publishTournament(payloadOrTid = tid) {
     const payload = typeof payloadOrTid === 'string'
-      ? buildPublishPayload(payloadOrTid)
+      ? buildPublishPayloadForTournament(payloadOrTid)
       : payloadOrTid
     if (!payload?.resultDoc) return
 
@@ -2084,7 +2011,7 @@ function AdminPanel({ currentUser }) {
   }
 
   function openPublishPreview(targetTid = tid) {
-    const payload = buildPublishPayload(targetTid)
+    const payload = buildPublishPayloadForTournament(targetTid)
     if (!payload) return
     setPublishPreview(payload)
   }
