@@ -41,14 +41,12 @@ const PDF_NAVY = [27,  59,  111]
 const PDF_GOLD = [201, 168, 76]
 
 
-const ADMIN_TAB_CONFIG = [
-  { mode: 'scores', label: 'Tournament Setup', priority: 'primary', icon: '⛳' },
-  { mode: 'pairings', label: 'Pairings', priority: 'primary', icon: '👥' },
-  { mode: 'payments', label: 'Payments', priority: 'primary', icon: '💳' },
-  { mode: 'users', label: 'Users', priority: 'primary', icon: '🧑‍💼' },
-  { mode: 'dashboard', label: 'Dashboard', priority: 'secondary' },
-  { mode: 'operations', label: 'Operations', priority: 'secondary' },
-  { mode: 'changelog', label: 'Changelog', priority: 'secondary' },
+const QUICK_ACTIONS = [
+  { key: 'setup', mode: 'operations', label: 'Setup Tournament', icon: '⚙️' },
+  { key: 'payments', mode: 'payments', label: 'Enter Payments', icon: '💳' },
+  { key: 'pairings', mode: 'pairings', label: 'Generate Pairings', icon: '👥' },
+  { key: 'scores', mode: 'scores', label: 'Enter Scores', icon: '⛳' },
+  { key: 'users', mode: 'users', label: 'Manage Users', icon: '🧑‍💼' },
 ]
 
 const flightTagStyles = {
@@ -1706,6 +1704,19 @@ function AdminPanel({ currentUser }) {
     resultsByTournament: allResults,
     scoreFlights: ALL_SCORE_TABS,
   }), [dashboardTid, data, pairingsData, payments, allResults])
+  const workflowActions = useMemo(() => ({
+    payments: { label: 'Record Payments', mode: 'payments' },
+    entries: { label: 'Add Players', mode: 'scores' },
+    pairings: { label: 'Generate Pairings', mode: 'pairings' },
+    scores: { label: 'Enter Scores', mode: 'scores' },
+    results: { label: 'Publish Results', mode: 'scores' },
+    export: { label: 'Export Reports', mode: 'dashboard' },
+  }), [])
+  const nextWorkflowStep = useMemo(() => {
+    const firstIncomplete = dashboardWorkflow.steps.find(step => step.status !== 'complete')
+    if (firstIncomplete) return firstIncomplete
+    return { key: 'export', title: 'Export Reports', label: 'Workflow complete. Export packets and records.' }
+  }, [dashboardWorkflow])
   const lastPublishedTournament = useMemo(() => (
     [...schedule]
       .filter(t => allResults?.[t.id])
@@ -1826,21 +1837,6 @@ function AdminPanel({ currentUser }) {
     }
     setSaveAllSaving(false)
     setTimeout(() => setSaveAllStatus(null), 3000)
-  }
-
-  // ── Discard (reset local → cloud) ─────────────────────────────────────────────
-  async function discardSection(key) {
-    if (!await openConfirm('Discard local changes and revert to the last saved cloud version?')) return
-    if (key === 'scores')   setData(cloudScores)
-    if (key === 'pairings') setPairingsData(cloudPairings)
-    if (key === 'payments') setPayments(cloudPayments)
-    if (key === 'credits')  setCredits(cloudCredits)
-    if (key === 'users')  setUsersDraft(cloudUsers)
-    if (key === 'members') {
-      const base = Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
-      setMembersOverride(base)
-    }
-    if (key === 'tournament-info') setTournamentInfoDrafts({})
   }
 
   const paymentRoster = useMemo(() => {
@@ -2186,36 +2182,9 @@ function AdminPanel({ currentUser }) {
               </button>
             </div>
           </div>
-          <div className="border-t border-amber-200 divide-y divide-amber-100">
-            {unsavedDrafts.map(item => (
-              <div key={item.key} className="px-4 py-2 flex items-center justify-between gap-3">
-                <span className="text-amber-800 font-sans text-xs">{item.label}</span>
-                <div className="flex items-center gap-1.5">
-                  {item.saveAction && (
-                    <button
-                      onClick={() => {
-                        if (item.saveAction === 'scores')   saveScores()
-                        if (item.saveAction === 'pairings') savePairings()
-                        if (item.saveAction === 'members')  saveMembers()
-                        if (item.saveAction === 'credits')  saveCredits()
-                        if (item.saveAction === 'payments') savePayments()
-                      }}
-                      disabled={item.saving}
-                      className="px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-forest/40 text-forest hover:bg-forest/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {item.saving ? 'Saving…' : 'Save'}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => discardSection(item.key)}
-                    className="px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors"
-                  >
-                    Discard
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="px-4 py-2 border-t border-amber-200 text-amber-800 font-sans text-xs">
+            Pending sections: {unsavedDrafts.map(item => item.label).join(', ')}.
+          </p>
           {saveAllStatus === 'ok' && (
             <p className="px-4 py-2 text-green-700 font-sans text-xs border-t border-amber-200">All savable sections synced to cloud.</p>
           )}
@@ -2225,57 +2194,75 @@ function AdminPanel({ currentUser }) {
         </div>
       )}
 
-      {/* Mode tabs */}
-      <div className="sticky top-2 z-30 mb-5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur p-3 shadow-sm space-y-3">
-        <div className="flex flex-wrap gap-2">
+      <div className="mb-4 bg-white border border-forest/20 rounded-lg p-3">
+        <p className="text-[11px] font-sans font-semibold uppercase tracking-widest text-forest mb-1.5">Next Step</p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-sans font-semibold text-darktext text-sm">{nextWorkflowStep.title}</p>
+            <p className="text-xs font-sans text-gray-500">{nextWorkflowStep.label}</p>
+          </div>
           <button
             type="button"
-            onClick={() => setShowExportPanel(true)}
-            className="w-full sm:w-auto min-h-[44px] px-3 py-2 text-sm font-sans font-semibold rounded-lg border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+            onClick={() => {
+              const action = workflowActions[nextWorkflowStep.key]
+              if (!action) return
+              if (nextWorkflowStep.key === 'export') setShowExportPanel(true)
+              setAdminMode(action.mode)
+            }}
+            className="px-3 py-2 text-xs font-sans font-semibold rounded-md bg-forest text-white hover:bg-forest/90"
           >
-            Export
+            {workflowActions[nextWorkflowStep.key]?.label ?? 'Continue'}
           </button>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'primary').map(tab => (
+      <div className="mb-5 rounded-lg border border-gray-200 bg-white p-2.5 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="inline-flex rounded-md border border-gray-200 p-0.5 bg-gray-50">
+            {[
+              { mode: 'dashboard', label: 'Dashboard' },
+              { mode: 'operations', label: 'Operations' },
+            ].map(tab => (
+              <button
+                key={tab.mode}
+                onClick={() => setAdminMode(tab.mode)}
+                className={`px-2.5 py-1 text-xs font-sans font-semibold rounded ${adminMode === tab.mode ? 'bg-white text-forest shadow-sm border border-forest/20' : 'text-gray-500'}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
             <button
-              key={tab.mode}
-              onClick={() => setAdminMode(tab.mode)}
-              className={`min-w-0 min-h-[48px] px-3 py-2.5 text-sm font-sans font-semibold rounded-lg transition-all border text-left ${
-                adminMode === tab.mode
-                  ? 'bg-forest text-white border-forest shadow'
+              type="button"
+              onClick={() => setAdminMode('changelog')}
+              className={`px-2 py-1 text-[11px] font-sans font-semibold rounded border ${adminMode === 'changelog' ? 'border-slate-700 bg-slate-700 text-white' : 'border-gray-300 text-gray-600 hover:border-forest hover:text-forest'}`}
+            >
+              Changelog
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowExportPanel(true)}
+              className="px-2 py-1 text-[11px] font-sans font-semibold rounded border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            >
+              Export
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+          {QUICK_ACTIONS.map(action => (
+            <button
+              key={action.key}
+              onClick={() => setAdminMode(action.mode)}
+              className={`flex-shrink-0 inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-sans font-semibold ${
+                adminMode === action.mode
+                  ? 'bg-forest text-white border-forest'
                   : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:border-forest hover:text-forest'
               }`}
             >
-              <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
-                {tab.icon && <span aria-hidden="true">{tab.icon}</span>}
-                <span>{tab.label}</span>
-                {tab.mode === 'payments' && paymentPaidCount > 0 && (
-                  <span className="bg-green-500 text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold">{paymentPaidCount}</span>
-                )}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'secondary').map(tab => (
-            <button
-              key={tab.mode}
-              onClick={() => setAdminMode(tab.mode)}
-              className={`min-w-0 min-h-[44px] px-2 py-2 text-xs font-sans font-semibold rounded-md transition-colors border ${
-                adminMode === tab.mode
-                  ? 'bg-slate-800 text-white border-slate-800'
-                  : 'bg-white text-gray-600 border-gray-300 hover:text-forest hover:border-forest'
-              }`}
-            >
-              <span className="whitespace-nowrap">
-                {tab.label}
-                {tab.mode === 'operations' && creditNonZero > 0 && (
-                  <span className="ml-1.5 bg-gold text-forest rounded-full px-1.5 py-0.5 text-[10px] font-bold">{creditNonZero}</span>
-                )}
-              </span>
+              <span aria-hidden="true">{action.icon}</span>
+              <span>{action.label}</span>
             </button>
           ))}
         </div>
@@ -2367,6 +2354,7 @@ function AdminPanel({ currentUser }) {
           pairingsPosted={pairingsPosted}
           onGoToPairings={() => setAdminMode('pairings')}
           workflow={dashboardWorkflow}
+          onOpenExport={() => setShowExportPanel(true)}
         />
       )}
 
@@ -2384,6 +2372,10 @@ function AdminPanel({ currentUser }) {
             openPublishPreview(lastPublishedTournament.id)
           }}
           publishSaving={publishSaving}
+          onGoToScores={() => setAdminMode('scores')}
+          onGoToPayments={() => setAdminMode('payments')}
+          onGoToPairings={() => setAdminMode('pairings')}
+          onOpenExport={() => setShowExportPanel(true)}
         />
       )}
 
@@ -2906,7 +2898,17 @@ function AdminPanel({ currentUser }) {
 function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
+  onGoToScores, onGoToPayments, onGoToPairings, onOpenExport,
 }) {
+  const stepActions = {
+    payments: { label: 'Record Payments', action: onGoToPayments },
+    entries: { label: 'Add Players', action: onGoToScores },
+    pairings: { label: 'Generate Pairings', action: onGoToPairings },
+    scores: { label: 'Enter Scores', action: onGoToScores },
+    results: { label: 'Publish Results', action: onGoToScores },
+    export: { label: 'Export Reports', action: onOpenExport },
+  }
+
   return (
     <div className="space-y-5">
       <section className="bg-white border border-gray-200 rounded-lg p-5">
@@ -2939,19 +2941,22 @@ function DashboardPanel({
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
             <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Players Entered</p>
             <p className="stat-number text-3xl text-forest">{workflow.counts.enteredCount}</p>
+            <button onClick={onGoToScores} className="mt-2 text-xs font-sans font-semibold text-forest hover:underline">Add Players</button>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
             <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Players Paid</p>
             <p className="stat-number text-3xl text-forest">{workflow.counts.paidCount}</p>
+            <button onClick={onGoToPayments} className="mt-2 text-xs font-sans font-semibold text-forest hover:underline">Record Payments</button>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
             <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Pairings</p>
             <p className={`font-sans text-sm font-semibold mt-1 ${workflow.counts.pairingsCount > 0 ? 'text-green-700' : 'text-gray-500'}`}>
               {workflow.counts.pairingsCount > 0 ? 'Posted' : 'Not posted'}
             </p>
+            <button onClick={onGoToPairings} className="mt-2 text-xs font-sans font-semibold text-forest hover:underline">Generate Pairings</button>
           </div>
         </div>
-        <TournamentWorkflowTracker workflow={workflow} />
+        <TournamentWorkflowTracker workflow={workflow} actions={stepActions} />
       </section>
 
       <section className="bg-white border border-gray-200 rounded-lg p-5">
@@ -2987,14 +2992,14 @@ function DashboardPanel({
   )
 }
 
-function TournamentWorkflowTracker({ workflow }) {
+function TournamentWorkflowTracker({ workflow, actions = {} }) {
   const statusStyles = {
     complete: {
       dot: 'bg-green-500',
       card: 'bg-green-50 border-green-200',
       title: 'text-green-800',
       text: 'text-green-700',
-      badge: 'Done',
+      badge: 'Complete',
       badgeStyle: 'bg-green-100 text-green-700',
     },
     partial: {
@@ -3002,7 +3007,7 @@ function TournamentWorkflowTracker({ workflow }) {
       card: 'bg-amber-50 border-amber-200',
       title: 'text-amber-800',
       text: 'text-amber-700',
-      badge: 'Partial',
+      badge: 'In progress',
       badgeStyle: 'bg-amber-100 text-amber-700',
     },
     not_started: {
@@ -3018,9 +3023,10 @@ function TournamentWorkflowTracker({ workflow }) {
   return (
     <div>
       <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Tournament Workflow</p>
-      <ol className="grid grid-cols-1 lg:grid-cols-5 gap-2">
+      <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
         {workflow.steps.map((step, idx) => {
           const style = statusStyles[step.status]
+          const actionMeta = actions[step.key]
           return (
             <li key={step.key} className={`border rounded-lg p-3 ${style.card}`}>
               <div className="flex items-center justify-between gap-2 mb-1">
@@ -3032,6 +3038,14 @@ function TournamentWorkflowTracker({ workflow }) {
               </div>
               <p className={`text-xs font-sans font-semibold leading-snug ${style.title}`}>{step.title}</p>
               <p className={`text-xs font-sans mt-1 ${style.text}`}>{step.label}</p>
+              {actionMeta?.action && (
+                <button
+                  onClick={actionMeta.action}
+                  className="mt-2 px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-forest/30 text-forest hover:bg-forest/5"
+                >
+                  {actionMeta.label}
+                </button>
+              )}
             </li>
           )
         })}
@@ -3220,7 +3234,7 @@ function PublishConfirmModal({ preview, publishSaving, publishSaveStatus, onCanc
 }
 
 // ── Tournament Step Guide ─────────────────────────────────────────────────────
-function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournament }) {
+function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournament, onOpenPublishPreview, onOpenExport }) {
   const { counts = {} } = workflow ?? {}
   const { enteredCount = 0, scoredCount = 0, pairingsCount = 0, resultsPublished = false } = counts
 
@@ -3234,6 +3248,8 @@ function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournam
         : 'Select members and add to flights',
       done: enteredCount > 0,
       locked: false,
+      action: null,
+      actionLabel: 'Add Players',
     },
     {
       num: 2,
@@ -3244,8 +3260,8 @@ function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournam
         : 'Generate and publish tee-time groups',
       done: pairingsPosted,
       locked: false,
-      action: !pairingsPosted ? onGoToPairings : null,
-      actionLabel: 'Go to Pairings →',
+      action: onGoToPairings,
+      actionLabel: 'Generate Pairings',
     },
     {
       num: 3,
@@ -3260,6 +3276,8 @@ function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournam
             : `${scoredCount} / ${enteredCount} scored`,
       done: pairingsPosted && scoredCount > 0 && enteredCount > 0 && scoredCount >= enteredCount,
       locked: !pairingsPosted,
+      action: null,
+      actionLabel: 'Enter Scores',
     },
     {
       num: 4,
@@ -3270,6 +3288,18 @@ function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournam
         : 'Calculate standings and make results live',
       done: resultsPublished,
       locked: !pairingsPosted || scoredCount === 0,
+      action: onOpenPublishPreview,
+      actionLabel: 'Publish Results',
+    },
+    {
+      num: 5,
+      key: 'export',
+      title: 'Export Tournament Reports',
+      desc: 'Download pairings, payments, and credits packets',
+      done: false,
+      locked: false,
+      action: onOpenExport,
+      actionLabel: 'Export Reports',
     },
   ]
 
@@ -3281,7 +3311,7 @@ function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournam
           <span className="text-white/50 font-sans text-xs">— {tournament.name}</span>
         )}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
         {guideSteps.map(step => (
           <div key={step.key} className={`px-4 py-3 ${step.locked ? 'opacity-50' : ''}`}>
             <div className="flex items-center gap-2 mb-1">
@@ -3298,10 +3328,11 @@ function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournam
               {step.locked && <span className="text-gray-300 text-xs">🔒</span>}
             </div>
             <p className="text-[11px] font-sans text-gray-400 leading-relaxed ml-7">{step.desc}</p>
-            {step.action && (
+            {step.actionLabel && (
               <button
-                onClick={step.action}
-                className="ml-7 mt-1.5 text-[11px] font-sans font-semibold text-forest hover:underline"
+                onClick={step.action ?? undefined}
+                className="ml-7 mt-2 px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-forest/30 text-forest hover:bg-forest/5 disabled:opacity-50"
+                disabled={step.locked || !step.action}
               >
                 {step.actionLabel}
               </button>
@@ -3589,6 +3620,7 @@ function ScoreEntryPanel({
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
   pairingsPosted, onGoToPairings, workflow,
+  onOpenExport,
 }) {
   const hasAnyPlayers = allFlights.some(f => (tournamentData[f]?.length ?? 0) > 0)
 
@@ -3600,6 +3632,8 @@ function ScoreEntryPanel({
         pairingsPosted={pairingsPosted}
         onGoToPairings={onGoToPairings}
         tournament={tournament}
+        onOpenPublishPreview={onOpenPublishPreview}
+        onOpenExport={onOpenExport}
       />
 
       {/* Two-panel layout */}
