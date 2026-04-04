@@ -419,7 +419,7 @@ async function exportTournamentInfoPDF(tournament) {
     doc.text(label, 14, y)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(13); doc.setTextColor(25, 25, 25)
     doc.text(value, 14, y + 6)
-    y += 16
+    y += 13
   })
 
   if (tournament.notes) {
@@ -461,7 +461,7 @@ async function exportPairingsPDF(tournament, pairings) {
     const row = [i + 1]
     for (let j = 0; j < maxPlayers; j++) {
       const p = card.players[j]
-      row.push(p ? `${p.name}  (${p.flight})` : '')
+      row.push(p ? `${p.name} (${p.flight})` : '')
     }
     return row
   })
@@ -499,6 +499,7 @@ async function exportPtmPDF(membersList) {
     const members = grouped[fl]
     if (!members.length) continue
     const color = flightColors[fl] ?? PDF_NAVY
+    y = ensurePdfSpace(doc, y, 24)
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
     doc.text(fl.toUpperCase(), 14, y + 4)
     autoTable(doc, {
@@ -508,13 +509,14 @@ async function exportPtmPDF(membersList) {
       startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [245, 248, 252] },
-      styles: { fontSize: 8, cellPadding: 2 },
-      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 20, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 20 } },
+      styles: { fontSize: 8, cellPadding: 1.8 },
+      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 16, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 16 } },
       margin: { left: 14, right: 14 },
     })
     y = doc.lastAutoTable.finalY + 8
   }
   if (unassigned.length) {
+    y = ensurePdfSpace(doc, y, 24)
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(100, 100, 100)
     doc.text('UNASSIGNED', 14, y + 4)
     autoTable(doc, {
@@ -524,8 +526,8 @@ async function exportPtmPDF(membersList) {
       startY: y + 6, theme: 'striped',
       headStyles:      { fillColor: [110, 110, 110], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [248, 248, 248] },
-      styles: { fontSize: 8, cellPadding: 2 },
-      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 20, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 20 } },
+      styles: { fontSize: 8, cellPadding: 1.8 },
+      columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 2: { halign: 'center', cellWidth: 16, fontStyle: 'bold' }, 3: { halign: 'center', cellWidth: 16 } },
       margin: { left: 14, right: 14 },
     })
   }
@@ -554,6 +556,7 @@ async function exportResultsPDF(tournament, flightData) {
     const unranked = ps.filter(p => p.rank == null)
     const rows     = [...ranked, ...unranked]
     const color = flightColors[fl] ?? PDF_NAVY
+    y = ensurePdfSpace(doc, y, 24)
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
     doc.text(fl.toUpperCase(), 14, y + 4)
     autoTable(doc, {
@@ -614,7 +617,7 @@ async function exportCreditsPDF(credits, membersList) {
     headStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
     footStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
     alternateRowStyles: { fillColor: [245, 248, 252] },
-    styles:             { fontSize: 8, cellPadding: 2.5 },
+    styles:             { fontSize: 8, cellPadding: 2 },
     columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'right', cellWidth: 30 } },
     margin: { left: 14, right: 14 },
     didParseCell(data) {
