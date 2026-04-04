@@ -7,6 +7,7 @@
  *   cga/poy              – { flights: { ... } }
  *   cga/pairings         – { [tournamentId]: [...] }
  *   cga/credits          – { [memberName]: balance }
+ *   cga/users            – users array for admin management
  *   cga/results          – { data: { [tid]: resultDoc, ... } }
  *   cga/scores           – { [tid]: { [flight]: [...players] } }  (admin work-in-progress)
  */
@@ -65,6 +66,11 @@ export const DB = {
   getCredits:    () => fsGet('cga/credits').then(d => d?.balances ?? {}),
   saveCredits:   (balances) => fsSet('cga/credits', { balances }),
   listenCredits: (cb) => fsListen('cga/credits', d => cb(d?.balances ?? {})),
+
+  // Users
+  getUsers:    () => fsGet('cga/users').then(d => d?.list ?? []),
+  saveUsers:   (list) => fsSet('cga/users', { list }),
+  listenUsers: (cb) => fsListen('cga/users', d => cb(d?.list ?? [])),
 
   // PTM history (list of { name, ptm, ptmAtFlowControl, tee, history, rounds })
   getPtm:    () => fsGet('cga/ptm').then(d => d?.list ?? null),

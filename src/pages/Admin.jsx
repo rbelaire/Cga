@@ -24,6 +24,7 @@ const PAIRINGS_KEY = 'cga_pairings_v1'
 const MEMBERS_KEY  = 'cga_members_v1'
 const CREDITS_KEY  = 'cga_credits_v1'
 const PAYMENTS_KEY = 'cga_payments_v1'
+const USERS_KEY = 'cga_users_v1'
 const TOURNAMENT_INFO_KEY = 'cga_tournament_info_v1'
 const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
 // Multi-PIN map: { [pin]: userName }. Env var VITE_ADMIN_PINS is a JSON object e.g. '{"cga2026":"Admin","5678":"Scott"}'
@@ -44,9 +45,9 @@ const ADMIN_TAB_CONFIG = [
   { mode: 'scores', label: 'Tournament Setup', priority: 'primary', icon: '⛳' },
   { mode: 'pairings', label: 'Pairings', priority: 'primary', icon: '👥' },
   { mode: 'payments', label: 'Payments', priority: 'primary', icon: '💳' },
+  { mode: 'users', label: 'Users', priority: 'primary', icon: '🧑‍💼' },
   { mode: 'dashboard', label: 'Dashboard', priority: 'secondary' },
-  { mode: 'flights', label: 'Settings', priority: 'secondary' },
-  { mode: 'credits', label: 'Admin Tools', priority: 'secondary' },
+  { mode: 'operations', label: 'Operations', priority: 'secondary' },
   { mode: 'changelog', label: 'Changelog', priority: 'secondary' },
 ]
 
@@ -910,6 +911,7 @@ function AdminPanel({ currentUser }) {
   const { data: cloudPairings = {} } = useFireData(DB.listenPairings, {})
   const { data: cloudPayments = {} } = useFireData(DB.listenPayments, {})
   const { data: cloudCredits = {} } = useFireData(DB.listenCredits, {})
+  const { data: cloudUsers = [] } = useFireData(DB.listenUsers, [])
   const { data: allResults = {} } = useFireData(DB.listenResults, {})
   const { data: changelog = [] } = useFireData(DB.listenChangelog, [])
 
@@ -939,6 +941,9 @@ function AdminPanel({ currentUser }) {
   const [payments, setPayments] = useState(() => {
     try { return JSON.parse(localStorage.getItem(PAYMENTS_KEY)) || {} } catch { return {} }
   })
+  const [usersDraft, setUsersDraft] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(USERS_KEY)) || [] } catch { return [] }
+  })
   const [tournamentInfoDrafts, setTournamentInfoDrafts] = useState(() => {
     try { return JSON.parse(localStorage.getItem(TOURNAMENT_INFO_KEY)) || {} } catch { return {} }
   })
@@ -954,6 +959,9 @@ function AdminPanel({ currentUser }) {
   const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [creditInputs, setCreditInputs] = useState({})
+  const [userSearch, setUserSearch] = useState('')
+  const [showExportPanel, setShowExportPanel] = useState(false)
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'member' })
   const [showTournamentInfoEditor, setShowTournamentInfoEditor] = useState(false)
   const [showPastTournaments, setShowPastTournaments] = useState(false)
   const TOURNAMENT_MODES = ['dashboard', 'scores', 'pairings', 'payments']
@@ -973,6 +981,8 @@ function AdminPanel({ currentUser }) {
   const [creditsSaveStatus, setCreditsSaveStatus] = useState(null)
   const [paymentsSaving,  setPaymentsSaving]  = useState(false)
   const [paymentsSaveStatus, setPaymentsSaveStatus] = useState(null)
+  const [usersSaving,  setUsersSaving]  = useState(false)
+  const [usersSaveStatus, setUsersSaveStatus] = useState(null)
   const [publishSaving,  setPublishSaving]  = useState(false)
   const [publishSaveStatus, setPublishSaveStatus] = useState(null)
   const [publishPreview, setPublishPreview] = useState(null)
@@ -1046,6 +1056,7 @@ function AdminPanel({ currentUser }) {
   useEffect(() => { localStorage.setItem(MEMBERS_KEY,  JSON.stringify(membersOverride)) }, [membersOverride])
   useEffect(() => { localStorage.setItem(CREDITS_KEY,  JSON.stringify(credits))         }, [credits])
   useEffect(() => { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments))       }, [payments])
+  useEffect(() => { localStorage.setItem(USERS_KEY, JSON.stringify(usersDraft))       }, [usersDraft])
   useEffect(() => { localStorage.setItem(TOURNAMENT_INFO_KEY, JSON.stringify(tournamentInfoDrafts)) }, [tournamentInfoDrafts])
   useEffect(() => {
     if (!actionFeedback) return
@@ -1097,6 +1108,10 @@ function AdminPanel({ currentUser }) {
     const exists = schedule.some(t => t.id === tid)
     if (!exists) setTid(defaultTournamentId)
   }, [tid, defaultTournamentId])
+
+  useEffect(() => {
+    setUsersDraft(cloudUsers)
+  }, [cloudUsers])
 
   const paymentMap = payments[tid] ?? {}
 
@@ -1579,6 +1594,42 @@ function AdminPanel({ currentUser }) {
     return ok
   }
 
+  function addUser() {
+    if (!newUser.name.trim() || !newUser.email.trim()) return
+    const email = newUser.email.trim().toLowerCase()
+    if (usersDraft.some(u => (u.email ?? '').toLowerCase() === email)) return
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      name: newUser.name.trim(),
+      email,
+      role: newUser.role || 'member',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    }
+    setUsersDraft(prev => [...prev, entry].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '')))
+    setNewUser({ name: '', email: '', role: 'member' })
+  }
+
+  function updateUser(userId, field, value) {
+    setUsersDraft(prev => prev.map(u => (u.id === userId ? { ...u, [field]: value } : u)))
+  }
+
+  function toggleUserStatus(userId) {
+    setUsersDraft(prev => prev.map(u => (
+      u.id === userId
+        ? { ...u, status: u.status === 'disabled' ? 'active' : 'disabled' }
+        : u
+    )))
+  }
+
+  async function saveUsers() {
+    const ok = await withSaveState(setUsersSaving, setUsersSaveStatus, () =>
+      DB.saveUsers(usersDraft), setAdminError
+    )
+    if (ok) logChange('Users saved', `${usersDraft.length} user account(s)`)
+    return ok
+  }
+
   function updateTournamentInfoDraft(tournamentId, field, value) {
     if (!tournamentId) return
     setTournamentInfoDrafts(prev => ({
@@ -1602,6 +1653,13 @@ function AdminPanel({ currentUser }) {
 
   // Payments derived state
   const paymentPaidCount = Object.keys(paymentMap).length
+  const filteredUsers = useMemo(() => {
+    const search = userSearch.trim().toLowerCase()
+    return usersDraft
+      .filter(u => !search || `${u.name ?? ''} ${u.email ?? ''} ${u.role ?? ''}`.toLowerCase().includes(search))
+      .slice()
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+  }, [usersDraft, userSearch])
 
   const dashboardTid = tid || nextTournament?.id || ''
   const dashboardTournament = schedule.find(t => t.id === dashboardTid) ?? nextTournament ?? null
@@ -1672,6 +1730,13 @@ function AdminPanel({ currentUser }) {
       saving: paymentsSaving,
     },
     {
+      key: 'users',
+      label: 'Users',
+      dirty: stableSerialize(usersDraft) !== stableSerialize(cloudUsers),
+      saveAction: 'users',
+      saving: usersSaving,
+    },
+    {
       key: 'tournament-info',
       label: 'Tournament Info Drafts',
       dirty: Object.values(tournamentInfoDrafts).some(d => d && Object.keys(d).length > 0),
@@ -1684,6 +1749,7 @@ function AdminPanel({ currentUser }) {
     membersDirty, membersSaving,
     credits, cloudCredits, creditsSaving,
     payments, cloudPayments, paymentsSaving,
+    usersDraft, cloudUsers, usersSaving,
     tournamentInfoDrafts,
   ])
 
@@ -1693,10 +1759,6 @@ function AdminPanel({ currentUser }) {
   )
   const savableUnsavedDrafts = useMemo(
     () => unsavedDrafts.filter(section => section.saveAction),
-    [unsavedDrafts]
-  )
-  const unsavableUnsavedDrafts = useMemo(
-    () => unsavedDrafts.filter(section => !section.saveAction),
     [unsavedDrafts]
   )
   const hasUnsavedDrafts = unsavedDrafts.length > 0
@@ -1718,6 +1780,7 @@ function AdminPanel({ currentUser }) {
       if (section.saveAction === 'members') ok = await saveMembers()
       if (section.saveAction === 'credits') ok = await saveCredits()
       if (section.saveAction === 'payments') ok = await savePayments()
+      if (section.saveAction === 'users') ok = await saveUsers()
       if (!ok) failed.push(section.label)
     }
     if (failed.length > 0) {
@@ -1737,6 +1800,7 @@ function AdminPanel({ currentUser }) {
     if (key === 'pairings') setPairingsData(cloudPairings)
     if (key === 'payments') setPayments(cloudPayments)
     if (key === 'credits')  setCredits(cloudCredits)
+    if (key === 'users')  setUsersDraft(cloudUsers)
     if (key === 'members') {
       const base = Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
       setMembersOverride(base)
@@ -2075,6 +2139,7 @@ function AdminPanel({ currentUser }) {
                   setPairingsData(cloudPairings)
                   setPayments(cloudPayments)
                   setCredits(cloudCredits)
+                  setUsersDraft(cloudUsers)
                   setTournamentInfoDrafts({})
                   const base = Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
                   setMembersOverride(base)
@@ -2126,13 +2191,23 @@ function AdminPanel({ currentUser }) {
       )}
 
       {/* Mode tabs */}
-      <div className="sticky top-2 z-30 mb-5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur p-3 shadow-sm">
+      <div className="sticky top-2 z-30 mb-5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur p-3 shadow-sm space-y-3">
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setShowExportPanel(true)}
+            className="w-full sm:w-auto min-h-[44px] px-3 py-2 text-sm font-sans font-semibold rounded-lg border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+          >
+            Export
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'primary').map(tab => (
             <button
               key={tab.mode}
               onClick={() => setAdminMode(tab.mode)}
-              className={`flex-1 min-w-0 min-h-[44px] px-3 py-2.5 text-sm font-sans font-semibold rounded-lg transition-all border ${
+              className={`min-w-0 min-h-[48px] px-3 py-2.5 text-sm font-sans font-semibold rounded-lg transition-all border text-left ${
                 adminMode === tab.mode
                   ? 'bg-forest text-white border-forest shadow'
                   : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:border-forest hover:text-forest'
@@ -2149,12 +2224,12 @@ function AdminPanel({ currentUser }) {
           ))}
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'secondary').map(tab => (
             <button
               key={tab.mode}
               onClick={() => setAdminMode(tab.mode)}
-              className={`flex-1 min-w-0 min-h-[44px] px-2 py-2 text-xs font-sans font-semibold rounded-md transition-colors border ${
+              className={`min-w-0 min-h-[44px] px-2 py-2 text-xs font-sans font-semibold rounded-md transition-colors border ${
                 adminMode === tab.mode
                   ? 'bg-slate-800 text-white border-slate-800'
                   : 'bg-white text-gray-600 border-gray-300 hover:text-forest hover:border-forest'
@@ -2162,7 +2237,7 @@ function AdminPanel({ currentUser }) {
             >
               <span className="whitespace-nowrap">
                 {tab.label}
-                {tab.mode === 'credits' && creditNonZero > 0 && (
+                {tab.mode === 'operations' && creditNonZero > 0 && (
                   <span className="ml-1.5 bg-gold text-forest rounded-full px-1.5 py-0.5 text-[10px] font-bold">{creditNonZero}</span>
                 )}
               </span>
@@ -2232,7 +2307,6 @@ function AdminPanel({ currentUser }) {
         <ScoreEntryPanel
           allFlights={ALL_SCORE_TABS}
           tournamentData={data[tid] ?? {}}
-          tid={tid}
           poolMembersGrouped={poolMembersGrouped}
           poolTotalCount={poolTotalCount}
           poolSearch={poolSearch}
@@ -2319,38 +2393,37 @@ function AdminPanel({ currentUser }) {
       {/* ══════════════════════════════════════════════════════════════════════════
           FLIGHT MANAGEMENT MODE
       ══════════════════════════════════════════════════════════════════════════ */}
-      {adminMode === 'flights' && (
-        <FlightManagementPanel
-          effectiveMembers={effectiveMembers}
-          membersData={membersData}
-          flightSearch={flightSearch}
-          setFlightSearch={setFlightSearch}
-          editingMember={editingMember}
-          setEditingMember={setEditingMember}
-          updateMemberFlight={updateMemberFlight}
-          updateMemberPtm={updateMemberPtm}
-          updateMemberTee={updateMemberTee}
-          saveMembers={saveMembers}
-          membersSaving={membersSaving}
-          membersSaveStatus={membersSaveStatus}
-          flightTagStyles={flightTagStyles}
-          fileInputRef={fileInputRef}
-          handleXlsxFile={handleXlsxFile}
-          importPreview={importPreview}
-          setImportPreview={setImportPreview}
-          confirmImport={confirmImport}
-          importSaving={importSaving}
-          importStatus={importStatus}
-          importError={importError}
-          setImportError={setImportError}
-        />
-      )}
+      {adminMode === 'operations' && (
+        <div className="space-y-5">
+          <section className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-3">Player Management & Settings</p>
+            <FlightManagementPanel
+              effectiveMembers={effectiveMembers}
+              membersData={membersData}
+              flightSearch={flightSearch}
+              setFlightSearch={setFlightSearch}
+              editingMember={editingMember}
+              setEditingMember={setEditingMember}
+              updateMemberFlight={updateMemberFlight}
+              updateMemberPtm={updateMemberPtm}
+              updateMemberTee={updateMemberTee}
+              saveMembers={saveMembers}
+              membersSaving={membersSaving}
+              membersSaveStatus={membersSaveStatus}
+              flightTagStyles={flightTagStyles}
+              fileInputRef={fileInputRef}
+              handleXlsxFile={handleXlsxFile}
+              importPreview={importPreview}
+              setImportPreview={setImportPreview}
+              confirmImport={confirmImport}
+              importSaving={importSaving}
+              importStatus={importStatus}
+              importError={importError}
+              setImportError={setImportError}
+            />
+          </section>
 
-      {/* ════════════════════════════════════════════════════════════════════════
-          CREDIT ON BOOKS MODE
-      ════════════════════════════════════════════════════════════════════════ */}
-      {adminMode === 'credits' && (
-        <div>
+          <section>
           <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4">
             <div className="flex flex-wrap gap-2">
               <input
@@ -2489,7 +2562,24 @@ function AdminPanel({ currentUser }) {
               </table>
             </div>
           </div>
+          </section>
         </div>
+      )}
+
+      {adminMode === 'users' && (
+        <UsersPanel
+          users={filteredUsers}
+          userSearch={userSearch}
+          setUserSearch={setUserSearch}
+          newUser={newUser}
+          setNewUser={setNewUser}
+          addUser={addUser}
+          updateUser={updateUser}
+          toggleUserStatus={toggleUserStatus}
+          saveUsers={saveUsers}
+          usersSaving={usersSaving}
+          usersSaveStatus={usersSaveStatus}
+        />
       )}
 
       {/* ════════════════════════════════════════════════════════════════════════
@@ -2636,86 +2726,29 @@ function AdminPanel({ currentUser }) {
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════════════
-          EXPORTS  (always visible)
-      ════════════════════════════════════════════════════════════════════════ */}
-      <div className="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-forest px-4 py-2.5">
-          <span className="text-white font-sans text-sm font-semibold">Export Reports</span>
-        </div>
-        <div className="divide-y divide-gray-100">
-
-          {/* Tournament Info — PDF only */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-700 font-sans">Tournament Info</p>
-              <p className="text-[11px] text-gray-400 font-sans">Registration sheet with date, course, entry fee, and Venmo QR</p>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <PdfBtn onClick={() => setShowTournamentInfoEditor(true)} disabled={!tournamentInfo}>PDF</PdfBtn>
-            </div>
-          </div>
-
-          {/* Points to Make — PDF + Excel */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-700 font-sans">Points to Make — Full Roster</p>
-              <p className="text-[11px] text-gray-400 font-sans">All members grouped by flight with their PTM targets</p>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <PdfBtn onClick={() => exportPtmPDF(membersData)}>PDF</PdfBtn>
-              <XlsxBtn onClick={() => exportPtmXLSX(membersData)}>Excel</XlsxBtn>
-            </div>
-          </div>
-
-          {/* Tournament Results — PDF + Excel (only when scores entered) */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-700 font-sans">Tournament Results</p>
-              <p className="text-[11px] text-gray-400 font-sans">Per-flight leaderboard with rank, score, +/−, and POY points</p>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <PdfBtn onClick={() => exportResultsPDF(tournament, data[tid] ?? {})} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn>
-              <XlsxBtn onClick={() => exportResultsXLSX(tournament, data[tid] ?? {})} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn>
-            </div>
-          </div>
-
-          {/* Pairings — PDF only */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-700 font-sans">Pairings</p>
-              <p className="text-[11px] text-gray-400 font-sans">Tee-time groupings for the round</p>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <PdfBtn onClick={() => exportPairingsPDF(tournament, currentPairings)} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn>
-            </div>
-          </div>
-
-          {/* Payment Status — PDF + Excel */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-700 font-sans">Payment Status</p>
-              <p className="text-[11px] text-gray-400 font-sans">List of paid players with Venmo QR code</p>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn>
-              <XlsxBtn onClick={() => exportPaymentsXLSX(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn>
-            </div>
-          </div>
-
-          {/* Credit on Books — PDF only */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-700 font-sans">Credit on Books</p>
-              <p className="text-[11px] text-gray-400 font-sans">Member credit balances with totals</p>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn>
-            </div>
-          </div>
-
-        </div>
-      </div>
+      {showExportPanel && (
+        <ExportPanel
+          tournament={tournament}
+          tournamentInfo={tournamentInfo}
+          membersData={membersData}
+          totalPlayers={totalPlayers}
+          tournamentData={data[tid] ?? {}}
+          currentPairings={currentPairings}
+          paymentMap={paymentMap}
+          paymentPaidCount={paymentPaidCount}
+          credits={credits}
+          onClose={() => setShowExportPanel(false)}
+          onOpenTournamentInfoEditor={() => setShowTournamentInfoEditor(true)}
+          onExportPtmPDF={() => exportPtmPDF(membersData)}
+          onExportPtmXLSX={() => exportPtmXLSX(membersData)}
+          onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
+          onExportResultsXLSX={() => exportResultsXLSX(tournament, data[tid] ?? {})}
+          onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}
+          onExportPaymentsPDF={() => exportPaymentsPDF(tournament, paymentMap, membersData)}
+          onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData)}
+          onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
+        />
+      )}
 
       {showTournamentInfoEditor && tournamentInfo && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
@@ -3429,9 +3462,91 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
   )
 }
 
+function UsersPanel({
+  users, userSearch, setUserSearch, newUser, setNewUser,
+  addUser, updateUser, toggleUserStatus, saveUsers, usersSaving, usersSaveStatus,
+}) {
+  return (
+    <div className="space-y-4">
+      <section className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+        <div className="grid gap-2 sm:grid-cols-4">
+          <input value={newUser.name} onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))} placeholder="Full name" className="sm:col-span-2 border border-gray-300 rounded-md px-3 py-2 text-sm font-sans" />
+          <input type="email" value={newUser.email} onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))} placeholder="Email" className="border border-gray-300 rounded-md px-3 py-2 text-sm font-sans" />
+          <select value={newUser.role} onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value }))} className="border border-gray-300 rounded-md px-3 py-2 text-sm font-sans">
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={addUser} className="min-h-[44px] px-4 py-2 rounded-md bg-forest text-white text-sm font-semibold font-sans">Add User</button>
+          <SaveBtn onClick={saveUsers} saving={usersSaving} status={usersSaveStatus} />
+        </div>
+      </section>
+      <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <input type="text" value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Search users…" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-sans" />
+        </div>
+        <div className="divide-y divide-gray-100">
+          {users.map(user => (
+            <div key={user.id} className="p-4 grid gap-2 sm:grid-cols-12 sm:items-center">
+              <input value={user.name ?? ''} onChange={e => updateUser(user.id, 'name', e.target.value)} className="sm:col-span-3 border border-gray-300 rounded-md px-2.5 py-2 text-sm font-sans" aria-label={`Name for ${user.email}`} />
+              <input type="email" value={user.email ?? ''} onChange={e => updateUser(user.id, 'email', e.target.value)} className="sm:col-span-4 border border-gray-300 rounded-md px-2.5 py-2 text-sm font-sans" aria-label={`Email for ${user.name}`} />
+              <select value={user.role ?? 'member'} onChange={e => updateUser(user.id, 'role', e.target.value)} className="sm:col-span-2 border border-gray-300 rounded-md px-2.5 py-2 text-sm font-sans" aria-label={`Role for ${user.name}`}>
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button onClick={() => toggleUserStatus(user.id)} className={`sm:col-span-3 min-h-[44px] px-3 py-2 rounded-md text-sm font-semibold font-sans border ${user.status === 'disabled' ? 'border-gray-300 text-gray-600 bg-gray-100' : 'border-green-300 text-green-700 bg-green-50'}`}>
+                {user.status === 'disabled' ? 'Disabled' : 'Active'}
+              </button>
+            </div>
+          ))}
+          {users.length === 0 && <p className="px-4 py-8 text-sm text-gray-500 font-sans text-center">No users match your search.</p>}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ExportPanel({
+  tournament, tournamentInfo, totalPlayers, currentPairings, paymentPaidCount, credits, onClose,
+  onOpenTournamentInfoEditor, onExportPtmPDF, onExportPtmXLSX, onExportResultsPDF, onExportResultsXLSX,
+  onExportPairingsPDF, onExportPaymentsPDF, onExportPaymentsXLSX, onExportCreditsPDF,
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 p-4 flex items-end sm:items-center sm:justify-center">
+      <div className="w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-xl">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold font-sans text-forest">Export</h3>
+          <button onClick={onClose} className="px-2.5 py-1.5 text-xs rounded-md border border-gray-300">Close</button>
+        </div>
+        <div className="divide-y divide-gray-100">
+          <ExportRow title="Tournament Info" description="Registration sheet with date, course, entry fee, and Venmo QR"><PdfBtn onClick={onOpenTournamentInfoEditor} disabled={!tournamentInfo}>PDF</PdfBtn></ExportRow>
+          <ExportRow title="Points to Make — Full Roster" description="All members grouped by flight with their PTM targets"><PdfBtn onClick={onExportPtmPDF}>PDF</PdfBtn><XlsxBtn onClick={onExportPtmXLSX}>Excel</XlsxBtn></ExportRow>
+          <ExportRow title="Tournament Results" description="Per-flight leaderboard with rank, score, +/−, and POY points"><PdfBtn onClick={onExportResultsPDF} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportResultsXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
+          <ExportRow title="Pairings" description="Tee-time groupings for the round"><PdfBtn onClick={onExportPairingsPDF} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn></ExportRow>
+          <ExportRow title="Payment Status" description="List of paid players with Venmo QR code"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
+          <ExportRow title="Credit on Books" description="Member credit balances with totals"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn></ExportRow>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ExportRow({ title, description, children }) {
+  return (
+    <div className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-gray-700 font-sans">{title}</p>
+        <p className="text-[11px] text-gray-400 font-sans">{description}</p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  )
+}
+
 // ── Tournament Setup Panel (Score Entry) ──────────────────────────────────────
 function ScoreEntryPanel({
-  allFlights, tournamentData, tid,
+  allFlights, tournamentData,
   poolMembersGrouped, poolTotalCount, poolSearch, setPoolSearch,
   selectedPool, togglePoolSelect, toggleGroupSelect, addSelectedPlayers,
   removePlayerFromFlight, updatePlayerInFlight, clearFlightByName,
