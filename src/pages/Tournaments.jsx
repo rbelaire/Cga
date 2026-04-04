@@ -27,21 +27,23 @@ function FlightLeaderboards({ leaderboard }) {
       <h4 className="text-gold text-xs font-sans font-semibold uppercase tracking-widest mb-3">
         Full Leaderboard
       </h4>
-      <div className="flex flex-wrap gap-2 mb-4">
-        {flights.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFlight(f)}
-            className={`px-3 py-1.5 text-xs font-sans font-medium rounded transition-colors ${
-              flight === f
-                ? 'bg-gold text-forest'
-                : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
-            }`}
-          >
-            {f}
-            <span className="ml-1 opacity-60">({(leaderboard[f] || []).length})</span>
-          </button>
-        ))}
+      <div className="mb-4 -mx-1 px-1 overflow-x-auto">
+        <div className="flex gap-2 w-max min-w-full whitespace-nowrap">
+          {flights.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFlight(f)}
+              className={`px-3 py-1.5 text-xs font-sans font-medium rounded transition-colors ${
+                flight === f
+                  ? 'bg-gold text-forest'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
+              }`}
+            >
+              {f}
+              <span className="ml-1 opacity-60">({(leaderboard[f] || []).length})</span>
+            </button>
+          ))}
+        </div>
       </div>
       <div key={flight} className="animate-tab-in">
         <StandingsTable data={leaderboard[flight]} columns={scoreColumns} highlightTop={3} />

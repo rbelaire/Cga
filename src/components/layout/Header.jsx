@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
 const navLinks = [
+  { to: '/', label: 'Home' },
   { to: '/tournaments', label: 'Tournaments' },
   { to: '/standings', label: 'Standings' },
   { to: '/members', label: 'Members' },
@@ -51,15 +52,16 @@ export default function Header() {
                 key={to}
                 to={to}
                 className={({ isActive }) =>
-                  `px-3 py-2 text-sm font-sans font-medium rounded transition-colors duration-150 ${
+                  `px-3 py-2 text-sm font-sans font-medium rounded transition-colors duration-150 inline-flex items-center gap-1.5 ${
                     isActive
-                      ? 'text-gold bg-white/10 border-b-2 border-gold'
+                      ? 'text-gold bg-white/12 ring-1 ring-gold/40'
                       : highlight
                         ? 'text-gold/80 hover:text-gold hover:bg-white/5'
                         : 'text-white/90 hover:text-gold hover:bg-white/5'
                   }`
                 }
               >
+                <span className={`w-1.5 h-1.5 rounded-full ${highlight ? 'bg-gold/60' : 'bg-white/50'}`} />
                 {label}
               </NavLink>
             ))}
@@ -93,16 +95,21 @@ export default function Header() {
                 to={to}
                 onClick={() => setMenuOpen(false)}
                 className={({ isActive }) =>
-                  `block px-4 py-3 text-sm font-sans font-medium rounded ${
+                  `block px-4 py-3 text-sm font-sans font-medium rounded border ${
                     isActive
-                      ? 'text-gold bg-forest'
+                      ? 'text-gold bg-forest border-gold/40'
                       : highlight
-                        ? 'text-gold/80 hover:text-gold hover:bg-forest'
-                        : 'text-white/80 hover:text-gold hover:bg-forest'
+                        ? 'text-gold/80 border-transparent hover:text-gold hover:bg-forest'
+                        : 'text-white/80 border-transparent hover:text-gold hover:bg-forest'
                   }`
                 }
               >
-                {label}
+                {({ isActive }) => (
+                  <span className="inline-flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-gold' : highlight ? 'bg-gold/60' : 'bg-white/60'}`} />
+                    {label}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>

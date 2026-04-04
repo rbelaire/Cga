@@ -345,40 +345,44 @@ export default function Standings() {
       </div>
 
       {/* Mode tabs */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {modes.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setMode(key)}
-            className={`px-5 py-2 text-sm font-sans font-semibold rounded-lg transition-colors ${
-              mode === key ? 'bg-forest text-white' : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-forest'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="mb-6 -mx-1 px-1 overflow-x-auto">
+        <div className="flex gap-2 w-max min-w-full whitespace-nowrap">
+          {modes.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setMode(key)}
+              className={`px-5 py-2 text-sm font-sans font-semibold rounded-lg transition-colors ${
+                mode === key ? 'bg-forest text-white' : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-forest'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {mode === 'hdcp' && (
         <>
-          <div className="flex flex-wrap gap-2 mb-6">
-            {FLIGHTS.map((label, i) => {
-              const count = (standings?.flights?.[label] || []).length
-              return (
-                <button
-                  key={label}
-                  onClick={() => setTab(i)}
-                  className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
-                    tab === i
-                      ? 'bg-gold text-forest'
-                      : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
-                  }`}
-                >
-                  {label}
-                  <span className="ml-1.5 text-xs opacity-70">({count})</span>
-                </button>
-              )
-            })}
+          <div className="mb-6 -mx-1 px-1 overflow-x-auto">
+            <div className="flex gap-2 w-max min-w-full whitespace-nowrap">
+              {FLIGHTS.map((label, i) => {
+                const count = (standings?.flights?.[label] || []).length
+                return (
+                  <button
+                    key={label}
+                    onClick={() => setTab(i)}
+                    className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
+                      tab === i
+                        ? 'bg-gold text-forest'
+                        : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
+                    }`}
+                  >
+                    {label}
+                    <span className="ml-1.5 text-xs opacity-70">({count})</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
           <div key={tab} className="animate-tab-in">
             <StandingsTable data={flightData} columns={hdcpColumns} highlightTop={3} />

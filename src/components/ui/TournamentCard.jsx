@@ -20,7 +20,7 @@ export default function TournamentCard({ tournament, compact = false }) {
       }`}
     >
       {/* Date strip */}
-      <div className={`px-4 py-2 flex items-center justify-between ${isPast ? 'bg-gray-50 border-b border-gray-200' : 'bg-forest'}`}>
+      <div className={`px-4 py-1.5 flex items-center justify-between ${isPast ? 'bg-gray-50 border-b border-gray-200' : 'bg-forest'}`}>
         <span className={`font-mono text-sm font-medium stat-number ${isPast ? 'text-gray-500' : 'text-gold'}`}>
           {formatDate(date)}
         </span>
@@ -34,12 +34,12 @@ export default function TournamentCard({ tournament, compact = false }) {
       </div>
 
       {/* Body */}
-      <div className="p-4">
+      <div className="p-3.5">
         <h3 className="text-darktext font-serif text-xl font-semibold mb-1">{name}</h3>
-        <p className="text-gray-500 text-sm font-sans mb-3">{course}</p>
+        <p className="text-gray-500 text-sm font-sans mb-2">{course}</p>
 
         {!compact && (
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div className="flex flex-wrap gap-2 mb-2.5">
             <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-sans border border-gray-200">
               {format}
             </span>
@@ -50,7 +50,7 @@ export default function TournamentCard({ tournament, compact = false }) {
         )}
 
         {!compact && flights && flights.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
+          <div className="flex flex-wrap gap-1 mb-2.5">
             {flights.map((flight) => (
               <span key={flight} className="text-xs border border-gray-200 text-gray-500 px-2 py-0.5 rounded font-sans">
                 {flight}
@@ -64,7 +64,7 @@ export default function TournamentCard({ tournament, compact = false }) {
         )}
 
         {status === 'completed' && (
-          <div className="mt-3 flex flex-wrap items-center gap-4">
+          <div className="mt-2.5 flex flex-wrap items-center gap-3">
             <Link
               to="/tournaments"
               state={{ expand: id }}
