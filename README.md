@@ -17,6 +17,12 @@ npm install
 npm run dev
 ```
 
+Run tests:
+
+```bash
+npm test
+```
+
 > App runs at `http://localhost:5173/Cga/` in local Vite dev.
 
 ## Environment variables
@@ -71,6 +77,30 @@ The project currently uses **flat document paths under `cga/*`** rather than `cu
 - `cga/scores` → `{ data: { [tournamentId]: { [flight]: [...] } } }`
 - `cga/results` → `{ data: { [tournamentId]: resultDoc } }`
 - `cga/changelog` → `{ entries: [...] }` (admin audit history)
+- `cga/snapshots` → `{ entries: [{ id, type, ts, tid?, details, data }] }` (admin rollback snapshots)
+
+
+## Admin validation guardrails
+
+Admin saves and publish now run through shared validators in `src/services/admin/validation/` before writing to Firestore.
+
+Guardrails cover:
+- tournament ID validity
+- duplicate members/users
+- invalid score/PTM values
+- invalid credits/payments shape
+- pairing references to non-entered players
+- publish payload completeness and member references
+
+Invalid saves/publishes are blocked and surfaced as concise admin error banners.
+
+## Snapshots and restore
+
+Before key writes, admin stores snapshots in `cga/snapshots` for:
+- `scores`, `pairings`, `members`, `credits`, `payments`, `users`
+- publish-sensitive docs: `results` (per tournament), `standings`, `poy`
+
+Use the **Snapshots** admin tab to review recent snapshots and restore with explicit confirmation. Restore actions are recorded in changelog.
 
 ## Results page data source
 
