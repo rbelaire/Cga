@@ -31,6 +31,30 @@ export default function Home() {
   return (
     <>
       <HeroSection />
+
+      {/* Manager value banner */}
+      <section className="bg-forest/95 border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+            <p className="text-offwhite font-sans text-xs font-semibold uppercase tracking-widest shrink-0">
+              Built for the manager doing it all
+            </p>
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
+              {[
+                'Automatic POY points & standings',
+                'Flight assignments & score entry',
+                'Pairings & schedules — no spreadsheets',
+              ].map(item => (
+                <span key={item} className="flex items-center gap-1.5 text-gray-400 font-sans text-xs">
+                  <span className="text-gold text-[10px]">✓</span>
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <NextTournament />
       <QuickLinks />
 
