@@ -9,7 +9,7 @@ export default function NextTournament() {
 
   return (
     <section className="bg-white border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           {/* Info */}
           <div>
@@ -34,8 +34,14 @@ export default function NextTournament() {
           </div>
 
           {/* Countdown */}
-          <div className="flex flex-col items-start sm:items-end gap-4">
+          <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
             <CountdownTimer targetDate={next.date} />
+            <Link
+              to="/tournaments"
+              className="btn-primary w-full sm:w-auto text-center"
+            >
+              View Tournament
+            </Link>
             <Link to="/tournaments" className="text-sm text-forest hover:text-gold font-sans font-medium transition-colors">
               Full schedule →
             </Link>

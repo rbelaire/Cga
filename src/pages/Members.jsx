@@ -113,25 +113,27 @@ export default function Members() {
         <SearchBar value={query} onChange={setQuery} placeholder="Search members…" />
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
-        {TABS.map((label) => (
-          <button
-            key={label}
-            onClick={() => switchTab(label)}
-            className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
-              tab === label
-                ? 'bg-gold text-forest'
-                : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
-            }`}
-          >
-            {label}
-            {label !== 'All' && (
-              <span className="ml-1.5 text-xs opacity-70">
-                ({label === 'New Players' ? newPlayers.length : (byFlight[label] ?? []).length})
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="mb-6 -mx-1 px-1 overflow-x-auto">
+        <div className="flex gap-2 w-max min-w-full whitespace-nowrap">
+          {TABS.map((label) => (
+            <button
+              key={label}
+              onClick={() => switchTab(label)}
+              className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
+                tab === label
+                  ? 'bg-gold text-forest'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
+              }`}
+            >
+              {label}
+              {label !== 'All' && (
+                <span className="ml-1.5 text-xs opacity-70">
+                  ({label === 'New Players' ? newPlayers.length : (byFlight[label] ?? []).length})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       <p className="text-gray-500 font-sans text-sm mb-4">

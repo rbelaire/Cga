@@ -125,6 +125,8 @@ export default function StandingsTable({ data, columns, highlightTop = 3, showBu
     : data
 
   const metricCols = defaultColumns.filter(c => !['rank', 'name', 'trend'].includes(c.key))
+  const primaryMetricCol = metricCols.find((c) => ['poy', 'scratchPts', 'points'].includes(c.key))
+  const secondaryMetricCols = metricCols.filter((c) => c.key !== primaryMetricCol?.key)
 
   return (
     <div>
@@ -160,12 +162,21 @@ export default function StandingsTable({ data, columns, highlightTop = 3, showBu
                 </span>
               )}
             </div>
-            {/* Metric grid */}
-            {metricCols.length > 0 && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 pl-7">
-                {metricCols.map(col => (
-                  <div key={col.key} className="flex items-center justify-between gap-1">
-                    <span className="text-gray-400 font-sans text-xs">{col.label}</span>
+            {/* Primary metric */}
+            {primaryMetricCol && (
+              <div className="pl-7 mb-1.5">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400 font-sans">{primaryMetricCol.label}</p>
+                <div className="text-lg leading-tight">
+                  <CellValue col={primaryMetricCol} row={row} idx={idx} highlightTop={highlightTop} showBubble={showBubble} />
+                </div>
+              </div>
+            )}
+            {/* Secondary metrics */}
+            {secondaryMetricCols.length > 0 && (
+              <div className="pl-7 flex flex-wrap items-center gap-x-3 gap-y-1">
+                {secondaryMetricCols.map(col => (
+                  <div key={col.key} className="flex items-center gap-1">
+                    <span className="text-gray-400 font-sans text-[11px]">{col.label}:</span>
                     <span className="text-xs">
                       <CellValue col={col} row={row} idx={idx} highlightTop={highlightTop} showBubble={showBubble} />
                     </span>

@@ -204,19 +204,52 @@ const ruleSections = [
 // ── Sub-page components ───────────────────────────────────────────────────────
 
 function RulesTab() {
+  const groupedSections = [
+    {
+      title: 'Scoring',
+      items: [
+        { id: 'scoring', label: 'Scoring System' },
+        { id: 'handicap', label: 'Handicap & Points' },
+        { id: 'poy', label: 'POY Points' },
+      ],
+    },
+    {
+      title: 'Rules',
+      items: [
+        { id: 'on-course', label: 'On-Course Rules' },
+        { id: 'rainout', label: 'Rainout Tournaments' },
+        { id: 'eligibility-champ', label: 'Championship Eligibility' },
+      ],
+    },
+    {
+      title: 'Awards',
+      items: [
+        { id: 'awards', label: 'Annual Awards' },
+        { id: 'most-improved', label: 'Most & Least Improved' },
+      ],
+    },
+  ]
+
   return (
     <div>
-      <nav className="flex flex-wrap gap-2 mb-8">
-        {ruleSections.map(s => (
-          <a
-            key={s.id}
-            href={`#${s.id}`}
-            className="px-3 py-1.5 text-xs font-sans font-medium rounded-full bg-white border border-gray-200 text-forest hover:bg-gold hover:text-white hover:border-gold transition-colors"
-          >
-            {s.title}
-          </a>
+      <div className="space-y-4 mb-8">
+        {groupedSections.map((group) => (
+          <div key={group.title} className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="text-forest font-sans text-xs font-semibold uppercase tracking-widest mb-2">{group.title}</h2>
+            <div className="space-y-1">
+              {group.items.map((item) => (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  className="block text-sm font-sans text-darktext hover:text-gold transition-colors"
+                >
+                  {item.label}
+                </a>
+              ))}
+            </div>
+          </div>
         ))}
-      </nav>
+      </div>
       <div className="space-y-6 mb-10">
         {ruleSections.map(section => (
           <div key={section.id} id={section.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden scroll-mt-20">
@@ -394,18 +427,20 @@ export default function Info() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-2 flex-wrap mb-8">
-        {tabs.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`px-5 py-2 text-sm font-sans font-semibold rounded-lg transition-colors ${
-              tab === key ? 'bg-forest text-white' : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-forest'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="mb-8 -mx-1 px-1 overflow-x-auto">
+        <div className="flex gap-2 w-max min-w-full whitespace-nowrap">
+          {tabs.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`px-5 py-2 text-sm font-sans font-semibold rounded-lg transition-colors ${
+                tab === key ? 'bg-forest text-white' : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-forest'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'rules'       && <RulesTab />}
