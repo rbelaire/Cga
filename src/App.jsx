@@ -2,17 +2,13 @@ import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
 import Header from './components/layout/Header'
 import Footer from './components/layout/Footer'
 import Home from './pages/Home'
-import Schedule from './pages/Schedule'
-import Results from './pages/Results'
-import PointsToMake from './pages/PointsToMake'
+import Tournaments from './pages/Tournaments'
 import Standings from './pages/Standings'
 import Members from './pages/Members'
-import Eligibility from './pages/Eligibility'
-import Board from './pages/Board'
-import Sponsors from './pages/Sponsors'
-import Rules from './pages/Rules'
+import Info from './pages/Info'
 import Admin from './pages/Admin'
 import Pairings from './pages/Pairings'
+import Sponsors from './pages/Sponsors'
 
 function NotFound() {
   return (
@@ -32,18 +28,21 @@ export default function App() {
         <Header />
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/schedule" element={<Schedule />} />
-          <Route path="/results" element={<Results />} />
-          <Route path="/points-to-make" element={<PointsToMake />} />
+          <Route path="/tournaments" element={<Tournaments />} />
           <Route path="/standings" element={<Standings />} />
-          <Route path="/poy" element={<Navigate to="/standings" replace />} />
           <Route path="/members" element={<Members />} />
-          <Route path="/eligibility" element={<Eligibility />} />
-          <Route path="/board" element={<Board />} />
-          <Route path="/sponsors" element={<Sponsors />} />
-          <Route path="/rules" element={<Rules />} />
+          <Route path="/info" element={<Info />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/pairings/:tournamentId" element={<Pairings />} />
+          <Route path="/sponsors" element={<Sponsors />} />
+          {/* Legacy redirects */}
+          <Route path="/schedule" element={<Navigate to="/tournaments" replace />} />
+          <Route path="/results" element={<Navigate to="/tournaments" replace />} />
+          <Route path="/points-to-make" element={<Navigate to="/standings" replace />} />
+          <Route path="/poy" element={<Navigate to="/standings" replace />} />
+          <Route path="/rules" element={<Navigate to="/info" replace />} />
+          <Route path="/board" element={<Navigate to="/info" replace />} />
+          <Route path="/eligibility" element={<Navigate to="/info" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <Footer />

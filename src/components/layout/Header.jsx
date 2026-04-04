@@ -2,14 +2,10 @@ import { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
 const navLinks = [
-  { to: '/schedule', label: 'Schedule' },
-  { to: '/results', label: 'Results' },
-  { to: '/points-to-make', label: 'Points to Make' },
+  { to: '/tournaments', label: 'Tournaments' },
   { to: '/standings', label: 'Standings' },
   { to: '/members', label: 'Members' },
-  { to: '/rules', label: 'Rules' },
-  { to: '/board', label: 'Board' },
-  { to: '/sponsors', label: 'Sponsors' },
+  { to: '/info', label: 'Info' },
   { to: '/admin', label: 'Admin', highlight: true },
 ]
 
