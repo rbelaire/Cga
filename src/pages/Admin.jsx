@@ -874,7 +874,7 @@ export default function Admin() {
             type="password" value={pin} onChange={e => setPin(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && tryUnlock()}
             placeholder="PIN" autoFocus
-            className={`w-full border rounded px-3 py-2 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-forest ${err ? 'border-red-400' : 'border-gray-300'}`}
+            className={`w-full border rounded px-3 py-2 text-base font-sans focus:outline-none focus:ring-2 focus:ring-forest ${err ? 'border-red-400' : 'border-gray-300'}`}
           />
           {err && <p className="text-red-500 text-xs font-sans">Incorrect PIN.</p>}
           {authError && <p className="text-red-500 text-xs font-sans break-all">Firebase: {authError}</p>}
@@ -2114,49 +2114,47 @@ function AdminPanel() {
 
       {/* Mode tabs */}
       <div className="sticky top-2 z-30 mb-5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur p-3 shadow-sm">
-        <div className="overflow-x-auto pb-1">
-          <div className="flex gap-2 min-w-max md:min-w-0 md:flex-wrap">
-            {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'primary').map(tab => (
-              <button
-                key={tab.mode}
-                onClick={() => setAdminMode(tab.mode)}
-                className={`min-h-[44px] px-4 py-2.5 text-sm font-sans font-semibold rounded-lg transition-all border ${
-                  adminMode === tab.mode
-                    ? 'bg-forest text-white border-forest shadow'
-                    : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:border-forest hover:text-forest'
-                }`}
-              >
-                <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                  {tab.icon && <span aria-hidden="true">{tab.icon}</span>}
-                  <span>{tab.label}</span>
-                  {tab.mode === 'payments' && paymentPaidCount > 0 && (
-                    <span className="bg-green-500 text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold">{paymentPaidCount}</span>
-                  )}
-                </span>
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-2">
+          {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'primary').map(tab => (
+            <button
+              key={tab.mode}
+              onClick={() => setAdminMode(tab.mode)}
+              className={`flex-1 min-w-0 min-h-[44px] px-3 py-2.5 text-sm font-sans font-semibold rounded-lg transition-all border ${
+                adminMode === tab.mode
+                  ? 'bg-forest text-white border-forest shadow'
+                  : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:border-forest hover:text-forest'
+              }`}
+            >
+              <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                {tab.icon && <span aria-hidden="true">{tab.icon}</span>}
+                <span>{tab.label}</span>
+                {tab.mode === 'payments' && paymentPaidCount > 0 && (
+                  <span className="bg-green-500 text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold">{paymentPaidCount}</span>
+                )}
+              </span>
+            </button>
+          ))}
         </div>
 
-        <div className="mt-2 overflow-x-auto">
-          <div className="flex gap-2 min-w-max md:min-w-0 md:flex-wrap">
-            {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'secondary').map(tab => (
-              <button
-                key={tab.mode}
-                onClick={() => setAdminMode(tab.mode)}
-                className={`min-h-[44px] px-3.5 py-2 text-xs font-sans font-semibold rounded-md transition-colors border ${
-                  adminMode === tab.mode
-                    ? 'bg-slate-800 text-white border-slate-800'
-                    : 'bg-white text-gray-600 border-gray-300 hover:text-forest hover:border-forest'
-                }`}
-              >
+        <div className="mt-2 flex flex-wrap gap-2">
+          {ADMIN_TAB_CONFIG.filter(tab => tab.priority === 'secondary').map(tab => (
+            <button
+              key={tab.mode}
+              onClick={() => setAdminMode(tab.mode)}
+              className={`flex-1 min-w-0 min-h-[44px] px-2 py-2 text-xs font-sans font-semibold rounded-md transition-colors border ${
+                adminMode === tab.mode
+                  ? 'bg-slate-800 text-white border-slate-800'
+                  : 'bg-white text-gray-600 border-gray-300 hover:text-forest hover:border-forest'
+              }`}
+            >
+              <span className="whitespace-nowrap">
                 {tab.label}
                 {tab.mode === 'credits' && creditNonZero > 0 && (
                   <span className="ml-1.5 bg-gold text-forest rounded-full px-1.5 py-0.5 text-[10px] font-bold">{creditNonZero}</span>
                 )}
-              </button>
-            ))}
-          </div>
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
