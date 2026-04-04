@@ -653,52 +653,77 @@ function PdfBtn({ onClick, children, disabled = false }) {
 async function exportPaymentsPDF(tournament, paymentMap, membersList) {
   if (!tournament) return
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const pw = doc.internal.pageSize.getWidth()
   let y = await buildPdfHeader(doc, 'Payment Status', `${tournament.name} · ${fmtDate(tournament.date)}`)
 
-  const active = membersList
-    .filter(m => m.active !== false)
+  // Only paid members, sorted by last name
+  const paid = membersList
+    .filter(m => m.active !== false && paymentMap[m.name])
     .slice()
-    .sort((a, b) => {
-      const aPaid = paymentMap[a.name] ? 0 : 1
-      const bPaid = paymentMap[b.name] ? 0 : 1
-      if (aPaid !== bPaid) return aPaid - bPaid
-      return a.name.localeCompare(b.name)
-    })
-  const paidCount   = active.filter(m => paymentMap[m.name]).length
-  const unpaidCount = active.length - paidCount
+    .sort(compareByLastName)
+  const paidCount = paid.length
 
-  autoTable(doc, {
-    head: [['#', 'Player', 'Flight', 'Status']],
-    body: active.map((m, i) => [
-      i + 1, m.name, m.flight ?? 'Unassigned',
-      paymentMap[m.name] ? 'PAID' : '—',
-    ]),
-    startY: y, theme: 'striped',
-    headStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-    alternateRowStyles: { fillColor: [245, 248, 252] },
-    styles:             { fontSize: 8, cellPadding: 2.5 },
-    columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'center', cellWidth: 25 } },
-    margin: { left: 14, right: 14, bottom: 22 },
-    didParseCell(data) {
-      if (data.section !== 'body') return
-      const m = active[data.row.index]
-      if (!m) return
-      if (data.column.index === 3) {
-        if (paymentMap[m.name]) {
-          data.cell.styles.textColor = [0, 140, 60]
-          data.cell.styles.fontStyle = 'bold'
-        } else {
-          data.cell.styles.textColor = [180, 180, 180]
-        }
-      }
-    },
-  })
+  // ── Venmo block on page 1, right after header ──
   const venmoImage = await loadVenmoBase64()
-  const paymentsFinalY = doc.lastAutoTable?.finalY ?? y
-  drawVenmoPaymentBlock(doc, venmoImage, paymentsFinalY + 4)
+  if (venmoImage) {
+    const props = doc.getImageProperties(venmoImage.data)
+    const ratio = props.width / props.height
+    const imgH = 36
+    const imgW = imgH * ratio
+    const imgX = pw - 14 - imgW
+    doc.addImage(venmoImage.data, venmoImage.format, imgX, y, imgW, imgH)
+  }
 
-  addPdfFooter(doc, `${paidCount} paid · ${unpaidCount} unpaid · Generated ${new Date().toLocaleDateString()} · CGA`)
-  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-payment-status.pdf`)
+  // ── Count badge ──
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(28)
+  doc.setTextColor(...PDF_NAVY)
+  doc.text(String(paidCount), 14, y + 12)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(100, 100, 100)
+  doc.text(paidCount === 1 ? 'player paid' : 'players paid', 14, y + 19)
+  y += 40
+
+  // ── Multi-column player list ──
+  if (paidCount > 0) {
+    doc.setDrawColor(...PDF_GOLD)
+    doc.setLineWidth(0.4)
+    doc.line(14, y - 2, pw - 14, y - 2)
+
+    const colCount = paidCount <= 40 ? 3 : 4
+    const colWidth = (pw - 28) / colCount
+    const lineH = 5.2
+    const fontSize = paidCount <= 40 ? 8.5 : 7.5
+    const rows = Math.ceil(paidCount / colCount)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(fontSize)
+
+    paid.forEach((m, i) => {
+      const col = Math.floor(i / rows)
+      const row = i % rows
+      const x = 14 + col * colWidth + 1
+      const ly = y + 4 + row * lineH
+
+      // Alternating row shading
+      if (row % 2 === 0) {
+        doc.setFillColor(245, 248, 252)
+        doc.rect(14 + col * colWidth, ly - 3.6, colWidth, lineH, 'F')
+      }
+
+      // Number
+      doc.setTextColor(160, 160, 160)
+      doc.text(`${i + 1}.`, x, ly, { align: 'left' })
+
+      // Name
+      doc.setTextColor(30, 30, 30)
+      doc.text(m.name, x + 8, ly)
+    })
+  }
+
+  addPdfFooter(doc, `${paidCount} paid · Generated ${new Date().toLocaleDateString()} · CGA`)
+  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-payments.pdf`)
 }
 
 // ── PIN gate ───────────────────────────────────────────────────────────────────
