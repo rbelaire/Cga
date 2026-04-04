@@ -12,7 +12,7 @@
  */
 import { db } from './firebase'
 import {
-  doc, getDoc, setDoc, onSnapshot,
+  doc, getDoc, setDoc, onSnapshot, updateDoc, arrayUnion,
 } from 'firebase/firestore'
 
 const REF = (path) => doc(db, path)
@@ -86,4 +86,16 @@ export const DB = {
   saveResult:   (tid, data) => fsMerge('cga/results', { data: { [tid]: data } }),
   listenResult: (tid, cb) => fsListen('cga/results', d => cb(d?.data?.[tid] ?? null)),
   listenResults: (cb) => fsListen('cga/results', d => cb(d?.data ?? {})),
+
+  // Changelog / audit log  { entries: [...] }
+  appendChangelog: async (entry) => {
+    const ref = REF('cga/changelog')
+    try {
+      await updateDoc(ref, { entries: arrayUnion(entry) })
+    } catch {
+      // Document may not exist yet — create it
+      await setDoc(ref, { entries: [entry] })
+    }
+  },
+  listenChangelog: (cb) => fsListen('cga/changelog', d => cb(d?.entries ?? [])),
 }

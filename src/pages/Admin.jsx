@@ -39,6 +39,7 @@ const ADMIN_TAB_CONFIG = [
   { mode: 'dashboard', label: 'Dashboard', priority: 'secondary' },
   { mode: 'flights', label: 'Settings', priority: 'secondary' },
   { mode: 'credits', label: 'Admin Tools', priority: 'secondary' },
+  { mode: 'changelog', label: 'Changelog', priority: 'secondary' },
 ]
 
 const flightTagStyles = {
@@ -814,6 +815,32 @@ async function exportPaymentsPDF(tournament, paymentMap, membersList) {
   doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-payments.pdf`)
 }
 
+// ── Confirm dialog ────────────────────────────────────────────────────────────
+function ConfirmModal({ message, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-xl max-w-sm w-full p-5">
+        <p className="text-sm font-sans text-gray-800 mb-5 leading-relaxed">{message}</p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-xs font-sans font-semibold rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            autoFocus
+            onClick={onConfirm}
+            className="px-4 py-2 text-xs font-sans font-semibold rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── PIN gate ───────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@cga.local'
 
@@ -873,6 +900,7 @@ function AdminPanel() {
   const { data: cloudPayments = {} } = useFireData(DB.listenPayments, {})
   const { data: cloudCredits = {} } = useFireData(DB.listenCredits, {})
   const { data: allResults = {} } = useFireData(DB.listenResults, {})
+  const { data: changelog = [] } = useFireData(DB.listenChangelog, [])
 
   // Tournament score entry data
   const [data, setData] = useState(() => {
@@ -957,6 +985,27 @@ function AdminPanel() {
   const fileInputRef = useRef(null)
   const [recentActions, setRecentActions] = useState([])
   const [actionFeedback, setActionFeedback] = useState(null)
+  const [pendingConfirm, setPendingConfirm] = useState(null) // { message, resolve }
+
+  // In-app replacement for window.confirm — returns a Promise<boolean>
+  function openConfirm(message) {
+    return new Promise(resolve => setPendingConfirm({ message, resolve }))
+  }
+  function resolveConfirm(result) {
+    pendingConfirm?.resolve(result)
+    setPendingConfirm(null)
+  }
+
+  function logChange(action, details = '') {
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      ts: Date.now(),
+      action,
+      details,
+      tid: tid || null,
+    }
+    DB.appendChangelog(entry).catch(() => {}) // fire-and-forget, non-critical
+  }
 
   function registerUndoAction({ label, undo }) {
     const action = {
@@ -1173,8 +1222,8 @@ function AdminPanel() {
     flightSet(fl)
   }
 
-  function clearFlight() {
-    if (!window.confirm(`Clear all players from ${flight}?`)) return
+  async function clearFlight() {
+    if (!await openConfirm(`Clear all players from ${flight}?`)) return
     const snapshot = cloneForUndo(rawPlayers)
     flightSet([])
     if (!snapshot?.length) return
@@ -1263,8 +1312,8 @@ function AdminPanel() {
     }))
   }
 
-  function removeGroupManual(cardIdx) {
-    if (!window.confirm('Remove this pairing group? Players will become unpaired.')) return
+  async function removeGroupManual(cardIdx) {
+    if (!await openConfirm('Remove this pairing group? Players will become unpaired.')) return
     const updated = currentPairings.map(c => ({ ...c, players: [...c.players] }))
     const removedGroup = updated[cardIdx]
     if (!removedGroup) return
@@ -1338,8 +1387,8 @@ function AdminPanel() {
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
   }
 
-  function clearPairings() {
-    if (!window.confirm('Clear all pairings for this tournament?')) return
+  async function clearPairings() {
+    if (!await openConfirm('Clear all pairings for this tournament?')) return
     const snapshot = cloneForUndo(currentPairings)
     setPairingsData(prev => ({ ...prev, [tid]: [] }))
     setManualPairings(false)
@@ -1353,8 +1402,8 @@ function AdminPanel() {
     })
   }
 
-  function removePairedPlayer(cardIdx, playerIdx) {
-    if (!window.confirm('Remove this player from the pairing?')) return
+  async function removePairedPlayer(cardIdx, playerIdx) {
+    if (!await openConfirm('Remove this player from the pairing?')) return
     const removedPlayer = currentPairings[cardIdx]?.players?.[playerIdx]
     if (!removedPlayer) return
     const updated = currentPairings.map((c, ci) =>
@@ -1381,9 +1430,11 @@ function AdminPanel() {
 
   async function savePairings() {
     if (!tournament) return
-    return await withSaveState(setPairingsSaving, setPairingsSaveStatus, () =>
+    const ok = await withSaveState(setPairingsSaving, setPairingsSaveStatus, () =>
       DB.savePairings({ ...pairingsData }), setAdminError
     )
+    if (ok) logChange('Pairings saved', tournament?.name ?? tid)
+    return ok
   }
 
   // ── Flight management mutations ───────────────────────────────────────────────
@@ -1415,9 +1466,11 @@ function AdminPanel() {
       ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
       tee:    membersOverride[m.name]?.tee    ?? m.tee,
     }))
-    return await withSaveState(setMembersSaving, setMembersSaveStatus, () =>
+    const ok = await withSaveState(setMembersSaving, setMembersSaveStatus, () =>
       DB.saveMembers(updated), setAdminError
     )
+    if (ok) logChange('Members saved', `${updated.length} members`)
+    return ok
   }
 
   // ── Credit mutations ──────────────────────────────────────────────────────────
@@ -1438,43 +1491,46 @@ function AdminPanel() {
     })
   }
 
-  function clearAllCredits() {
-    if (!window.confirm('Clear ALL credit balances? This cannot be undone.')) return
+  async function clearAllCredits() {
+    if (!await openConfirm('Clear ALL credit balances? This cannot be undone.')) return
     setActionFeedback('Credits were cleared. Undo is not supported for bulk credit resets.')
     setCredits({})
   }
 
   async function saveCredits() {
-    return await withSaveState(setCreditsSaving, setCreditsSaveStatus, () =>
+    const ok = await withSaveState(setCreditsSaving, setCreditsSaveStatus, () =>
       DB.saveCredits(credits), setAdminError
     )
+    if (ok) logChange('Credits saved', `${Object.keys(credits).length} member(s) with balances`)
+    return ok
   }
 
   // ── Payment mutations ─────────────────────────────────────────────────────────
   function togglePayment(tournamentId, name) {
+    const currentMap = payments[tournamentId] ?? {}
+    const isNowPaid = !currentMap[name]
+
+    // Auto-add to score table when marking as paid (if not already entered)
+    if (isNowPaid) {
+      const alreadyAdded = ALL_SCORE_TABS.some(fl =>
+        (data[tournamentId]?.[fl] ?? []).some(p => p.name === name)
+      )
+      if (!alreadyAdded) {
+        const memberFlight = memberFlightLookup[name]
+        const targetFlight = FLIGHTS.includes(memberFlight) ? memberFlight : 'New Players'
+        const entry = { name, ptm: ptmLookup[name] ?? '', score: '', eligible: true }
+        setData(prev => {
+          const td = { ...(prev[tournamentId] ?? {}) }
+          td[targetFlight] = [...(td[targetFlight] ?? []), entry]
+          return { ...prev, [tournamentId]: td }
+        })
+      }
+    }
+
     setPayments(prev => {
       const tidMap = { ...(prev[tournamentId] ?? {}) }
-      const isNowPaid = !tidMap[name]
       if (tidMap[name]) delete tidMap[name]
       else tidMap[name] = true
-
-      // Auto-add to score table when marking as paid (if not already entered)
-      if (isNowPaid) {
-        const alreadyAdded = ALL_SCORE_TABS.some(fl =>
-          (data[tournamentId]?.[fl] ?? []).some(p => p.name === name)
-        )
-        if (!alreadyAdded) {
-          const memberFlight = memberFlightLookup[name]
-          const targetFlight = FLIGHTS.includes(memberFlight) ? memberFlight : 'New Players'
-          const entry = { name, ptm: ptmLookup[name] ?? '', score: '', eligible: true }
-          setData(prev => {
-            const td = { ...(prev[tournamentId] ?? {}) }
-            td[targetFlight] = [...(td[targetFlight] ?? []), entry]
-            return { ...prev, [tournamentId]: td }
-          })
-        }
-      }
-
       return { ...prev, [tournamentId]: tidMap }
     })
   }
@@ -1487,8 +1543,8 @@ function AdminPanel() {
     })
   }
 
-  function clearAllPayments(tournamentId) {
-    if (!window.confirm('Clear all payment records for this tournament?')) return
+  async function clearAllPayments(tournamentId) {
+    if (!await openConfirm('Clear all payment records for this tournament?')) return
     const previous = cloneForUndo(payments[tournamentId] ?? {})
     setPayments(prev => {
       const next = { ...prev }
@@ -1508,9 +1564,11 @@ function AdminPanel() {
   }
 
   async function savePayments() {
-    return await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, () =>
+    const ok = await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, () =>
       DB.savePayments(payments), setAdminError
     )
+    if (ok) logChange('Payments saved', `${Object.keys(paymentMap).length} paid for ${tournament?.name ?? tid}`)
+    return ok
   }
 
   function updateTournamentInfoDraft(tournamentId, field, value) {
@@ -1524,9 +1582,9 @@ function AdminPanel() {
     }))
   }
 
-  function resetTournamentInfoDraft(tournamentId) {
+  async function resetTournamentInfoDraft(tournamentId) {
     if (!tournamentId) return
-    if (!window.confirm('Discard unsaved tournament info changes?')) return
+    if (!await openConfirm('Discard unsaved tournament info changes?')) return
     setTournamentInfoDrafts(prev => {
       const next = { ...prev }
       delete next[tournamentId]
@@ -1657,6 +1715,20 @@ function AdminPanel() {
     }
     setSaveAllSaving(false)
     setTimeout(() => setSaveAllStatus(null), 3000)
+  }
+
+  // ── Discard (reset local → cloud) ─────────────────────────────────────────────
+  async function discardSection(key) {
+    if (!await openConfirm('Discard local changes and revert to the last saved cloud version?')) return
+    if (key === 'scores')   setData(cloudScores)
+    if (key === 'pairings') setPairingsData(cloudPairings)
+    if (key === 'payments') setPayments(cloudPayments)
+    if (key === 'credits')  setCredits(cloudCredits)
+    if (key === 'members') {
+      const base = Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
+      setMembersOverride(base)
+    }
+    if (key === 'tournament-info') setTournamentInfoDrafts({})
   }
 
   const paymentRoster = useMemo(() => {
@@ -1791,9 +1863,11 @@ function AdminPanel() {
 
   // ── Save scores draft to Firestore ───────────────────────────────────────────
   async function saveScores() {
-    return await withSaveState(setScoresSaving, setScoresSaveStatus, () =>
+    const ok = await withSaveState(setScoresSaving, setScoresSaveStatus, () =>
       DB.saveScores(data), setAdminError
     )
+    if (ok) logChange('Scores saved', `${totalPlayers} player(s) — ${tournament?.name ?? tid}`)
+    return ok
   }
 
   // ── Publish tournament results to Firestore ───────────────────────────────────
@@ -1887,13 +1961,18 @@ function AdminPanel() {
       : payloadOrTid
     if (!payload?.resultDoc) return
 
-    return await withSaveState(setPublishSaving, setPublishSaveStatus, async () => {
+    const ok = await withSaveState(setPublishSaving, setPublishSaveStatus, async () => {
       await Promise.all([
         DB.saveResult(payload.targetTid, payload.resultDoc),
         DB.savePoy(payload.newPoy),
         DB.saveStandings(payload.newStandings),
       ])
     }, setAdminError)
+    if (ok) {
+      const t = schedule.find(s => s.id === payload.targetTid)
+      logChange('Results published', t?.name ?? payload.targetTid)
+    }
+    return ok
   }
 
   function openPublishPreview(targetTid = tid) {
@@ -1965,32 +2044,70 @@ function AdminPanel() {
       </div>
 
       {hasUnsavedDrafts && (
-        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-amber-900 font-sans text-sm font-semibold">Unsaved changes detected.</p>
-              <p className="text-amber-700 font-sans text-xs mt-0.5">
-                Local changes exist in: {unsavedDrafts.map(item => item.label).join(', ')}.
-              </p>
-              {unsavableUnsavedDrafts.length > 0 && (
-                <p className="text-amber-700 font-sans text-xs mt-0.5">
-                  Requires manual publish: {unsavableUnsavedDrafts.map(item => item.label).join(', ')}.
-                </p>
-              )}
+        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-amber-900 font-sans text-sm font-semibold">Unsaved local changes</p>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={saveAllDirtyDrafts}
+                disabled={saveAllSaving || anySectionSaving || savableUnsavedDrafts.length === 0}
+                className="px-3 py-1.5 text-xs font-sans font-semibold rounded-md bg-forest text-white disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {saveAllSaving ? 'Saving…' : 'Save All'}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!await openConfirm('Discard ALL local changes and revert everything to the last saved cloud version?')) return
+                  setData(cloudScores)
+                  setPairingsData(cloudPairings)
+                  setPayments(cloudPayments)
+                  setCredits(cloudCredits)
+                  setTournamentInfoDrafts({})
+                  const base = Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
+                  setMembersOverride(base)
+                }}
+                disabled={saveAllSaving || anySectionSaving}
+                className="px-3 py-1.5 text-xs font-sans font-semibold rounded-md border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                Discard All
+              </button>
             </div>
-            <button
-              onClick={saveAllDirtyDrafts}
-              disabled={saveAllSaving || anySectionSaving || savableUnsavedDrafts.length === 0}
-              className="px-4 py-2 text-xs font-sans font-semibold rounded-md bg-forest text-white disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {saveAllSaving ? 'Saving All…' : 'Save All'}
-            </button>
+          </div>
+          <div className="border-t border-amber-200 divide-y divide-amber-100">
+            {unsavedDrafts.map(item => (
+              <div key={item.key} className="px-4 py-2 flex items-center justify-between gap-3">
+                <span className="text-amber-800 font-sans text-xs">{item.label}</span>
+                <div className="flex items-center gap-1.5">
+                  {item.saveAction && (
+                    <button
+                      onClick={() => {
+                        if (item.saveAction === 'scores')   saveScores()
+                        if (item.saveAction === 'pairings') savePairings()
+                        if (item.saveAction === 'members')  saveMembers()
+                        if (item.saveAction === 'credits')  saveCredits()
+                        if (item.saveAction === 'payments') savePayments()
+                      }}
+                      disabled={item.saving}
+                      className="px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-forest/40 text-forest hover:bg-forest/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {item.saving ? 'Saving…' : 'Save'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => discardSection(item.key)}
+                    className="px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
           {saveAllStatus === 'ok' && (
-            <p className="text-green-700 font-sans text-xs mt-2">All savable sections synced to cloud.</p>
+            <p className="px-4 py-2 text-green-700 font-sans text-xs border-t border-amber-200">All savable sections synced to cloud.</p>
           )}
           {saveAllStatus === 'err' && (
-            <p className="text-red-700 font-sans text-xs mt-2">Some sections failed to sync. Review the error banner and retry.</p>
+            <p className="px-4 py-2 text-red-700 font-sans text-xs border-t border-amber-200">Some sections failed to sync. Review the error banner and retry.</p>
           )}
         </div>
       )}
@@ -2225,36 +2342,35 @@ function AdminPanel() {
       ════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'credits' && (
         <div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
-            <div className="flex-1 min-w-48">
+          <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4">
+            <div className="flex flex-wrap gap-2">
               <input
                 type="text"
                 value={creditSearch}
                 onChange={e => setCreditSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full border border-gray-200 rounded px-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
+                className="flex-1 min-w-[140px] border border-gray-200 rounded px-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
               />
-            </div>
-            <div className="flex items-center gap-2 ml-auto">
-              <div className="text-xs font-sans text-gray-500">
-                <span className="font-semibold text-forest">{creditNonZero}</span> with balance ·{' '}
-                <span className={`font-semibold stat-number ${creditTotal > 0 ? 'text-green-600' : creditTotal < 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                  {creditTotal < 0 ? '−' : ''}${Math.abs(creditTotal).toFixed(2)}
-                </span>{' '}
-                total
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-sans text-gray-500 whitespace-nowrap">
+                  <span className="font-semibold text-forest">{creditNonZero}</span> with balance ·{' '}
+                  <span className={`font-semibold stat-number ${creditTotal > 0 ? 'text-green-600' : creditTotal < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {creditTotal < 0 ? '−' : ''}${Math.abs(creditTotal).toFixed(2)}
+                  </span>{' total'}
+                </span>
+                <SaveBtn onClick={saveCredits} saving={creditsSaving} status={creditsSaveStatus} />
+                <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
+                  Credits PDF
+                </PdfBtn>
+                {Object.keys(credits).length > 0 && (
+                  <button
+                    onClick={clearAllCredits}
+                    className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors whitespace-nowrap"
+                  >
+                    Clear All
+                  </button>
+                )}
               </div>
-              <SaveBtn onClick={saveCredits} saving={creditsSaving} status={creditsSaveStatus} />
-              <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
-                Export Credits PDF
-              </PdfBtn>
-              {Object.keys(credits).length > 0 && (
-                <button
-                  onClick={clearAllCredits}
-                  className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
-                >
-                  Clear All
-                </button>
-              )}
             </div>
           </div>
 
@@ -2368,40 +2484,49 @@ function AdminPanel() {
       )}
 
       {/* ════════════════════════════════════════════════════════════════════════
+          CHANGELOG MODE
+      ════════════════════════════════════════════════════════════════════════ */}
+      {adminMode === 'changelog' && (
+        <ChangelogPanel changelog={changelog} />
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════════
           PAYMENTS MODE
       ════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'payments' && (
         <div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
-            <div className="flex-1 min-w-48">
+          <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4">
+            <div className="flex flex-wrap gap-2">
               <input
                 type="text"
                 value={paymentSearch}
                 onChange={e => setPaymentSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full border border-gray-200 rounded px-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
+                className="flex-1 min-w-[140px] border border-gray-200 rounded px-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
               />
-            </div>
-            <div className="flex items-center gap-2 ml-auto">
-              <div className="text-xs font-sans text-gray-500">
-                <span className="font-semibold text-green-600">{paymentPaidCount}</span> of{' '}
-                <span className="font-semibold text-forest">{membersData.filter(m => m.active !== false).length}</span> paid
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-sans text-gray-500 whitespace-nowrap">
+                  <span className="font-semibold text-green-600">{paymentPaidCount}</span>
+                  {' / '}
+                  <span className="font-semibold text-forest">{membersData.filter(m => m.active !== false).length}</span>
+                  {' paid'}
+                </span>
+                <SaveBtn onClick={savePayments} saving={paymentsSaving} status={paymentsSaveStatus} />
+                <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>
+                  PDF
+                </PdfBtn>
+                <XlsxBtn onClick={() => exportPaymentsXLSX(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>
+                  Excel
+                </XlsxBtn>
+                {paymentPaidCount > 0 && (
+                  <button
+                    onClick={() => clearAllPayments(tid)}
+                    className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors whitespace-nowrap"
+                  >
+                    Clear All
+                  </button>
+                )}
               </div>
-              <SaveBtn onClick={savePayments} saving={paymentsSaving} status={paymentsSaveStatus} />
-              <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>
-                PDF
-              </PdfBtn>
-              <XlsxBtn onClick={() => exportPaymentsXLSX(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>
-                Excel
-              </XlsxBtn>
-              {paymentPaidCount > 0 && (
-                <button
-                  onClick={() => clearAllPayments(tid)}
-                  className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors"
-                >
-                  Clear All
-                </button>
-              )}
             </div>
           </div>
 
@@ -2689,6 +2814,14 @@ function AdminPanel() {
           </div>
         </div>
       )}
+
+      {pendingConfirm && (
+        <ConfirmModal
+          message={pendingConfirm.message}
+          onConfirm={() => resolveConfirm(true)}
+          onCancel={() => resolveConfirm(false)}
+        />
+      )}
     </PageWrapper>
   )
 }
@@ -2854,6 +2987,60 @@ function SaveBtn({ onClick, saving, status, label = 'Save to Cloud', className =
       )}
       {!saving && status !== 'ok' && status !== 'err' && label}
     </button>
+  )
+}
+
+// ── Changelog Panel ────────────────────────────────────────────────────────────
+const ACTION_LABELS = {
+  'Scores saved':      { color: 'bg-blue-100 text-blue-700',   dot: 'bg-blue-400'   },
+  'Pairings saved':    { color: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-400' },
+  'Payments saved':    { color: 'bg-green-100 text-green-700',  dot: 'bg-green-400'  },
+  'Credits saved':     { color: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-400'  },
+  'Members saved':     { color: 'bg-teal-100 text-teal-700',    dot: 'bg-teal-400'   },
+  'Results published': { color: 'bg-red-100 text-red-700',      dot: 'bg-red-500'    },
+}
+function fmtLogTime(ts) {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+function ChangelogPanel({ changelog }) {
+  const sorted = [...changelog].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0))
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
+        <span className="text-white font-sans text-sm font-semibold">Changelog / Audit Log</span>
+        <span className="text-white/50 font-sans text-xs">{sorted.length} entries</span>
+      </div>
+      {sorted.length === 0 ? (
+        <p className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
+          No changes recorded yet. Actions will appear here after saving.
+        </p>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {sorted.map(entry => {
+            const style = ACTION_LABELS[entry.action] ?? { color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' }
+            return (
+              <div key={entry.id} className="flex items-start gap-3 px-4 py-3">
+                <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${style.dot}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`text-[11px] font-sans font-semibold px-1.5 py-0.5 rounded ${style.color}`}>
+                      {entry.action}
+                    </span>
+                    {entry.details && (
+                      <span className="text-xs font-sans text-gray-600 truncate">{entry.details}</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] font-sans text-gray-400 mt-0.5">{fmtLogTime(entry.ts)}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
