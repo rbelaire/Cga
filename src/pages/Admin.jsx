@@ -26,6 +26,14 @@ const CREDITS_KEY  = 'cga_credits_v1'
 const PAYMENTS_KEY = 'cga_payments_v1'
 const TOURNAMENT_INFO_KEY = 'cga_tournament_info_v1'
 const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
+// Multi-PIN map: { [pin]: userName }. Env var VITE_ADMIN_PINS is a JSON object e.g. '{"cga2026":"Admin","5678":"Scott"}'
+const PINS = (() => {
+  try {
+    const raw = import.meta.env.VITE_ADMIN_PINS
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore bad JSON */ }
+  return { [PIN]: 'Admin' }
+})()
 const MAX_RECENT_ACTIONS = 5
 
 const PDF_NAVY = [27,  59,  111]
@@ -845,18 +853,21 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@cga.local'
 
 export default function Admin() {
-  const [pin,       setPin]       = useState('')
-  const [unlocked,  setUnlocked]  = useState(false)
-  const [err,       setErr]       = useState(false)
-  const [loading,   setLoading]   = useState(false)
-  const [authError, setAuthError] = useState(null)
+  const [pin,        setPin]        = useState('')
+  const [unlocked,   setUnlocked]   = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [err,        setErr]        = useState(false)
+  const [loading,    setLoading]    = useState(false)
+  const [authError,  setAuthError]  = useState(null)
 
   const tryUnlock = async () => {
-    if (pin !== PIN) { setErr(true); setTimeout(() => setErr(false), 1500); return }
+    const userName = PINS[pin]
+    if (!userName) { setErr(true); setTimeout(() => setErr(false), 1500); return }
     setLoading(true)
     setAuthError(null)
     try {
-      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pin)
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, PIN)
+      setCurrentUser(userName)
       setUnlocked(true)
     } catch (e) {
       setAuthError(e.message)
@@ -886,11 +897,11 @@ export default function Admin() {
     </PageWrapper>
   )
 
-  return <AdminPanel />
+  return <AdminPanel currentUser={currentUser} />
 }
 
 // ── Admin panel ────────────────────────────────────────────────────────────────
-function AdminPanel() {
+function AdminPanel({ currentUser }) {
   // Live data from Firebase
   const { data: membersData = [] } = useFireData(DB.listenMembers, [])
   const { data: currentStandings } = useFireData(DB.listenStandings, { flights: {} })
@@ -1003,6 +1014,7 @@ function AdminPanel() {
       action,
       details,
       tid: tid || null,
+      user: currentUser || 'Admin',
     }
     DB.appendChangelog(entry).catch(() => {}) // fire-and-forget, non-critical
   }
@@ -3031,7 +3043,10 @@ function ChangelogPanel({ changelog }) {
                       <span className="text-xs font-sans text-gray-600 truncate">{entry.details}</span>
                     )}
                   </div>
-                  <p className="text-[11px] font-sans text-gray-400 mt-0.5">{fmtLogTime(entry.ts)}</p>
+                  <p className="text-[11px] font-sans text-gray-400 mt-0.5">
+                    {fmtLogTime(entry.ts)}
+                    {entry.user && <span className="ml-2 text-gray-400">— {entry.user}</span>}
+                  </p>
                 </div>
               </div>
             )
