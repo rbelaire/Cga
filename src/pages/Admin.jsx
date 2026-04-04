@@ -2601,7 +2601,7 @@ function DashboardPanel({
             </div>
             <div className="flex items-center gap-2">
               <Link
-                to="/results"
+                to="/tournaments"
                 state={{ expand: lastPublishedTournament.id }}
                 className="px-3 py-2 text-xs font-sans font-semibold rounded-md bg-white text-gray-600 border border-gray-300 hover:text-forest hover:border-forest"
               >

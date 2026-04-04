@@ -36,7 +36,7 @@ export default function NextTournament() {
           {/* Countdown */}
           <div className="flex flex-col items-start sm:items-end gap-4">
             <CountdownTimer targetDate={next.date} />
-            <Link to="/schedule" className="text-sm text-forest hover:text-gold font-sans font-medium transition-colors">
+            <Link to="/tournaments" className="text-sm text-forest hover:text-gold font-sans font-medium transition-colors">
               Full schedule →
             </Link>
           </div>

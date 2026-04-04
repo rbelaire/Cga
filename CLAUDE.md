@@ -7,8 +7,16 @@
 
 ## Routing
 Uses `HashRouter` (`#/path`). Routes are defined in `src/App.jsx`.
+
+**Main routes:**
+- `/` — Home
+- `/tournaments` — Schedule + Results combined (upcoming cards + completed accordion)
+- `/standings` — HDCP POY / Scratch / Points to Make tabs
+- `/members` — Member directory
+- `/info` — Rules, Eligibility, Board tabs
 - `/admin` — PIN-gated admin panel (PIN: `cga2026`)
-- `/eligibility` — hidden from nav
+
+**Legacy redirects** (→ new route): `/schedule`, `/results` → `/tournaments`; `/points-to-make` → `/standings`; `/rules`, `/board`, `/eligibility` → `/info`
 
 ## Data Files
 | File | Purpose |
@@ -36,18 +44,17 @@ ineligible players get poy: 0 but still hold their position in the scale
 `['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']`
 
 ## Adding a New Tournament
-1. Create `src/data/results/YYYY-slug.json` matching the schema of `2026-koasati-flow-control.json`
-2. Add a static import in `src/pages/Results.jsx` and add to `resultFiles` map
-3. Update `src/data/standings.json` and `src/data/poy.json`
-4. Set `status: "completed"` on the tournament in `schedule.json`
+1. Add entry to `src/data/schedule.json` with `status: "upcoming"`
+2. Use the admin panel (`/admin`) to enter scores and publish results to Firebase
+3. Set `status: "completed"` on the tournament in `schedule.json` once done
 
-The admin panel (`/admin`) can generate the JSON exports automatically.
+Results are stored in Firebase (`cga/results`) and displayed automatically on `/tournaments`.
 
 ## Key Components
 | Component | Notes |
 |-----------|-------|
 | `StandingsTable` | Sortable table; shows empty state when data is empty; `min-w-[540px]` for mobile scroll |
-| `TournamentCard` | Completed cards use `bg-gray-50`; links to Results via `state={{ expand: id }}` |
+| `TournamentCard` | Completed cards use `bg-gray-50`; links to `/tournaments` via `state={{ expand: id }}` |
 | `MemberCard` | Dims unassigned members (no `flight`/`ptm`); hides null `memberSince` |
 | `Header` | Sticky, active nav item gets `bg-white/10` highlight |
 
