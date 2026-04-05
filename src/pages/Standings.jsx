@@ -35,34 +35,24 @@ function roundPtm(val) {
   return Math.round(val)
 }
 
-function ScoreCell({ value, ptm }) {
+function ScoreCell({ value }) {
   if (value == null) return <span className="text-gray-300 stat-number">—</span>
-  if (ptm == null) return <span className="stat-number text-gray-500">{value}</span>
-  const diff = value - ptm
-  const color = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-500'
-  const icon = diff > 0 ? '▲' : diff < 0 ? '▼' : null
-  return (
-    <span className={`stat-number font-medium ${color} inline-flex items-center gap-0.5`}>
-      {icon && <span className="text-xs leading-none">{icon}</span>}
-      {value}
-    </span>
-  )
+  return <span className="stat-number text-darktext font-medium">{value}</span>
 }
 
-function TrendArrow({ ptm, ptmAtFlowControl }) {
-  if (ptmAtFlowControl == null || ptm == null) return null
-  const roundedCurrent = roundPtm(ptm)
-  const roundedPrev = roundPtm(ptmAtFlowControl)
-  if (roundedCurrent > roundedPrev) {
+function TrendArrow({ ptmDelta }) {
+  if (typeof ptmDelta !== 'number') return null
+  if (Math.abs(ptmDelta) < Number.EPSILON) return null
+  if (ptmDelta > 0) {
     return (
-      <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="PTM increased">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
       </svg>
     )
   }
-  if (roundedCurrent < roundedPrev) {
+  if (ptmDelta < 0) {
     return (
-      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="PTM decreased">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
       </svg>
     )
@@ -89,26 +79,25 @@ function SortHeader({ label, colKey, sortKey, sortDir, onSort, className = '', t
   )
 }
 
-function PtmTab({ ptmList, liveMembers }) {
+function PtmTab({ ptmList, liveMembers, ptmDeltaLookup }) {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
   const [showAll, setShowAll] = useState(false)
 
-  function memberToPtmRow(m) {
-    const history = Array.isArray(m.history) ? m.history : Array(7).fill(null)
-    const rounds = history.filter(v => typeof v === 'number').length
-    return { name: m.name, tee: m.tee ?? null, ptm: m.ptm ?? null, ptmAtFlowControl: m.ptmAtFlowControl ?? null, history, rounds }
-  }
-
   const ptmData = useMemo(() => {
+    const memberToPtmRow = (m) => {
+      const history = Array.isArray(m.history) ? m.history : Array(7).fill(null)
+      const rounds = history.filter(v => typeof v === 'number').length
+      return { name: m.name, tee: m.tee ?? null, ptm: m.ptm ?? null, history, rounds, ptmDelta: ptmDeltaLookup[m.name] ?? null }
+    }
     return (liveMembers ?? []).map(m => {
       if (Array.isArray(m.history) && m.history.some(v => v != null)) return memberToPtmRow(m)
       const ptmEntry = ptmList?.find(p => p.name === m.name)
-      if (ptmEntry) return ptmEntry
+      if (ptmEntry) return { ...ptmEntry, ptmDelta: ptmDeltaLookup[m.name] ?? null }
       return memberToPtmRow(m)
     })
-  }, [liveMembers, ptmList])
+  }, [liveMembers, ptmList, ptmDeltaLookup])
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -121,7 +110,7 @@ function PtmTab({ ptmList, liveMembers }) {
   }, [search, ptmData])
 
   const active = useMemo(
-    () => showAll ? filtered : filtered.filter(p => p.ptm != null || p.ptmAtFlowControl != null),
+    () => showAll ? filtered : filtered.filter(p => p.ptm != null),
     [filtered, showAll]
   )
 
@@ -165,11 +154,6 @@ function PtmTab({ ptmList, liveMembers }) {
 
       <div className="flex flex-wrap gap-4 mb-5 text-sm font-sans text-gray-500">
         <span>Showing <span className="text-darktext font-semibold stat-number">{sorted.length}</span> players</span>
-        <span>·</span>
-        <span>
-          <span className="text-green-600 font-semibold">▲ Green</span> = above PTM &nbsp;·&nbsp;
-          <span className="text-red-500 font-semibold">▼ Red</span> = below PTM
-        </span>
       </div>
 
       {/* Mobile cards */}
@@ -188,7 +172,7 @@ function PtmTab({ ptmList, liveMembers }) {
                   <span className="flex items-center gap-1">
                     <span className="text-xs text-gray-400 font-sans">PTM</span>
                     <span className="stat-number font-bold text-forest">{displayPtm}</span>
-                    <TrendArrow ptm={player.ptm} ptmAtFlowControl={player.ptmAtFlowControl} />
+                    <TrendArrow ptmDelta={player.ptmDelta} />
                   </span>
                 ) : <span className="text-gray-300 stat-number text-sm">—</span>}
               </div>
@@ -196,7 +180,7 @@ function PtmTab({ ptmList, liveMembers }) {
                 {player.history.slice(0, 5).map((score, hi) => (
                   <div key={hi} className="flex flex-col items-center">
                     <span className="text-gray-400 font-sans text-xs leading-none mb-0.5">{HISTORY_LABELS[hi]}</span>
-                    <ScoreCell value={score} ptm={displayPtm} />
+                    <ScoreCell value={score} />
                   </div>
                 ))}
                 <span className="ml-auto stat-number text-gray-400 text-xs self-end">{player.rounds}/7</span>
@@ -237,12 +221,12 @@ function PtmTab({ ptmList, liveMembers }) {
                     {displayPtm != null ? (
                       <span className="flex items-center gap-1">
                         <span className="stat-number font-bold text-forest text-base">{displayPtm}</span>
-                        <TrendArrow ptm={player.ptm} ptmAtFlowControl={player.ptmAtFlowControl} />
+                        <TrendArrow ptmDelta={player.ptmDelta} />
                       </span>
                     ) : <span className="text-gray-300 stat-number">—</span>}
                   </td>
                   {player.history.map((score, hi) => (
-                    <td key={hi} className="px-4 py-2.5"><ScoreCell value={score} ptm={displayPtm} /></td>
+                    <td key={hi} className="px-4 py-2.5"><ScoreCell value={score} /></td>
                   ))}
                   <td className="px-4 py-2.5"><span className="stat-number text-gray-400 text-xs">{player.rounds}/7</span></td>
                 </tr>
@@ -294,13 +278,15 @@ export default function Standings() {
     return lookup
   }, [ptmList])
 
-  const koasatiPtmLookup = useMemo(() => {
+  const ptmDeltaLookup = useMemo(() => {
     const lookup = {}
-    for (const player of ptmList || []) {
-      if (player.name && typeof player.ptmAtFlowControl === 'number') lookup[player.name] = player.ptmAtFlowControl
+    for (const flight of FLIGHTS) {
+      for (const player of standings?.flights?.[flight] || []) {
+        if (player?.name && typeof player.ptmDelta === 'number') lookup[player.name] = player.ptmDelta
+      }
     }
     return lookup
-  }, [ptmList])
+  }, [standings])
 
   const liveMemberFlightLookup = useMemo(() => {
     const lookup = {}
@@ -313,16 +299,10 @@ export default function Standings() {
   const flightData = useMemo(
     () => FLIGHTS.flatMap((flight) => (standings?.flights?.[flight] || []).map(row => {
       const rounds = roundsFromPtm[row.name]
-      const baselinePtm = koasatiPtmLookup[row.name]
-      const ptmDelta =
-        typeof row.ptm === 'number' && typeof baselinePtm === 'number'
-          ? +(row.ptm - baselinePtm).toFixed(2)
-          : null
       const nextRowBase = { ...row, flight }
-      const nextRow = ptmDelta == null ? nextRowBase : { ...nextRowBase, ptmDelta }
-      return rounds != null ? { ...nextRow, rounds } : nextRow
+      return rounds != null ? { ...nextRowBase, rounds } : nextRowBase
     })),
-    [standings, roundsFromPtm, koasatiPtmLookup]
+    [standings, roundsFromPtm]
   )
 
   const filteredFlightData = useMemo(
@@ -431,7 +411,7 @@ export default function Standings() {
 
       {mode === 'ptm' && (
         <div className="animate-tab-in">
-          <PtmTab ptmList={filteredPtmList} liveMembers={filteredLiveMembers} />
+          <PtmTab ptmList={filteredPtmList} liveMembers={filteredLiveMembers} ptmDeltaLookup={ptmDeltaLookup} />
         </div>
       )}
     </PageWrapper>
