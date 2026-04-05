@@ -278,8 +278,8 @@ function PtmTab({ ptmList, liveMembers }) {
 
 export default function Standings() {
   useEffect(() => { document.title = 'Standings | CGA 2026' }, [])
-  const [mode, setMode] = useState('hdcp')
-  const [tab, setTab] = useState(0)
+  const [mode, setMode] = useState('ptm')
+  const [selectedFlight, setSelectedFlight] = useState('All')
 
   const { data: standings } = useFireData(DB.listenStandings, { flights: {} })
   const { data: ptmList } = useFireData(DB.listenPtm, [])
@@ -302,23 +302,62 @@ export default function Standings() {
     return lookup
   }, [ptmList])
 
-  const currentFlight = FLIGHTS[tab]
+  const liveMemberFlightLookup = useMemo(() => {
+    const lookup = {}
+    for (const member of liveMembers || []) {
+      if (member?.name && member?.flight) lookup[member.name] = member.flight
+    }
+    return lookup
+  }, [liveMembers])
+
   const flightData = useMemo(
-    () => (standings?.flights?.[currentFlight] || []).map(row => {
+    () => FLIGHTS.flatMap((flight) => (standings?.flights?.[flight] || []).map(row => {
       const rounds = roundsFromPtm[row.name]
       const baselinePtm = koasatiPtmLookup[row.name]
       const ptmDelta =
         typeof row.ptm === 'number' && typeof baselinePtm === 'number'
           ? +(row.ptm - baselinePtm).toFixed(2)
           : null
-      const nextRow = ptmDelta == null ? row : { ...row, ptmDelta }
+      const nextRowBase = { ...row, flight }
+      const nextRow = ptmDelta == null ? nextRowBase : { ...nextRowBase, ptmDelta }
       return rounds != null ? { ...nextRow, rounds } : nextRow
-    }),
-    [standings, currentFlight, roundsFromPtm, koasatiPtmLookup]
+    })),
+    [standings, roundsFromPtm, koasatiPtmLookup]
   )
 
-  const scratchData = useMemo(() => computeScratch(allResults ?? {}), [allResults])
-  const latestTournament = flightData.find(p => p.latestTournament)?.latestTournament ?? null
+  const filteredFlightData = useMemo(
+    () => selectedFlight === 'All' ? flightData : flightData.filter(row => row.flight === selectedFlight),
+    [flightData, selectedFlight]
+  )
+
+  const scratchData = useMemo(
+    () => computeScratch(allResults ?? {}).map(row => ({
+      ...row,
+      flight: liveMemberFlightLookup[row.name] ?? null,
+    })),
+    [allResults, liveMemberFlightLookup]
+  )
+
+  const filteredScratchData = useMemo(
+    () => selectedFlight === 'All' ? scratchData : scratchData.filter(row => row.flight === selectedFlight),
+    [scratchData, selectedFlight]
+  )
+
+  const filteredPtmList = useMemo(
+    () => selectedFlight === 'All'
+      ? ptmList
+      : (ptmList ?? []).filter(player => liveMemberFlightLookup[player.name] === selectedFlight),
+    [ptmList, selectedFlight, liveMemberFlightLookup]
+  )
+
+  const filteredLiveMembers = useMemo(
+    () => selectedFlight === 'All'
+      ? liveMembers
+      : (liveMembers ?? []).filter(member => member.flight === selectedFlight),
+    [liveMembers, selectedFlight]
+  )
+
+  const latestTournament = filteredFlightData.find(p => p.latestTournament)?.latestTournament ?? null
 
   const modes = [
     { key: 'hdcp',    label: 'HDCP POY' },
@@ -361,44 +400,38 @@ export default function Standings() {
         </div>
       </div>
 
+      <div className="mb-6 flex items-center gap-3">
+        <label htmlFor="standings-flight-filter" className="text-sm font-sans font-medium text-gray-600">
+          Flight:
+        </label>
+        <select
+          id="standings-flight-filter"
+          value={selectedFlight}
+          onChange={(e) => setSelectedFlight(e.target.value)}
+          className="px-3 py-2 text-sm font-sans rounded-lg border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold"
+        >
+          <option value="All">All</option>
+          {FLIGHTS.map((flight) => (
+            <option key={flight} value={flight}>{flight}</option>
+          ))}
+        </select>
+      </div>
+
       {mode === 'hdcp' && (
-        <>
-          <div className="mb-6 -mx-1 px-1 overflow-x-auto">
-            <div className="flex gap-2 w-max min-w-full whitespace-nowrap">
-              {FLIGHTS.map((label, i) => {
-                const count = (standings?.flights?.[label] || []).length
-                return (
-                  <button
-                    key={label}
-                    onClick={() => setTab(i)}
-                    className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
-                      tab === i
-                        ? 'bg-gold text-forest'
-                        : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
-                    }`}
-                  >
-                    {label}
-                    <span className="ml-1.5 text-xs opacity-70">({count})</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-          <div key={tab} className="animate-tab-in">
-            <StandingsTable data={flightData} columns={hdcpColumns} highlightTop={3} />
-          </div>
-        </>
+        <div className="animate-tab-in">
+          <StandingsTable data={filteredFlightData} columns={hdcpColumns} highlightTop={3} />
+        </div>
       )}
 
       {mode === 'scratch' && (
         <div className="animate-tab-in">
-          <StandingsTable data={scratchData} columns={scratchColumns} highlightTop={3} showBubble={false} />
+          <StandingsTable data={filteredScratchData} columns={scratchColumns} highlightTop={3} showBubble={false} />
         </div>
       )}
 
       {mode === 'ptm' && (
         <div className="animate-tab-in">
-          <PtmTab ptmList={ptmList} liveMembers={liveMembers} />
+          <PtmTab ptmList={filteredPtmList} liveMembers={filteredLiveMembers} />
         </div>
       )}
     </PageWrapper>
