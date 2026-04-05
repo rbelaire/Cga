@@ -72,6 +72,76 @@ const MAX_RECENT_ACTIONS = 5
 const PDF_NAVY = [27,  59,  111]
 const PDF_GOLD = [201, 168, 76]
 
+function AdminActionIcon({ children, className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      {children}
+    </svg>
+  )
+}
+
+const DashboardIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13h7V3H3v10zm11 8h7V11h-7v10zM3 21h7v-4H3v4zm11-10h7V3h-7v8z" />
+  </AdminActionIcon>
+)
+
+const ReceiptIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3h10l2 2v16l-3-2-3 2-3-2-3 2V5l2-2z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9h6M9 13h6" />
+  </AdminActionIcon>
+)
+
+const UsersIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11a4 4 0 100-8 4 4 0 000 8zM8 13a4 4 0 100-8 4 4 0 000 8zM2 21a6 6 0 0112 0M14 21a6 6 0 018 0" />
+  </AdminActionIcon>
+)
+
+const GolfFlagIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 21V3m0 0h10l-2.5 3L18 9H8" />
+  </AdminActionIcon>
+)
+
+const TrophyIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4h8v3a4 4 0 01-8 0V4zm-3 1h3v2a5 5 0 01-3-2zm14 0h-3v2a5 5 0 003-2zM10 14h4m-5 6h6" />
+  </AdminActionIcon>
+)
+
+const ExportIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l4-4m-4 4l-4-4M5 15v3h14v-3" />
+  </AdminActionIcon>
+)
+
+const FolderIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h6l2 2h10v10H3V7z" />
+  </AdminActionIcon>
+)
+
+const LockIcon = ({ className = 'w-10 h-10 text-gray-300' }) => (
+  <AdminActionIcon className={className}>
+    <rect x="6" y="11" width="12" height="9" rx="2" strokeWidth={2} />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11V8a3 3 0 116 0v3" />
+  </AdminActionIcon>
+)
+
+const CheckIcon = ({ className = 'w-3.5 h-3.5' }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </AdminActionIcon>
+)
+
+const ErrorIcon = ({ className = 'w-3.5 h-3.5' }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 6l12 12M18 6L6 18" />
+  </AdminActionIcon>
+)
+
 
 const flightTagStyles = {
   Championship: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -928,10 +998,8 @@ function AdminPanel({ currentUser }) {
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
   const [adminMode,    setAdminMode]    = useState('dashboard')
-  const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [paymentCreditInputs, setPaymentCreditInputs] = useState({})
-  const [creditInputs, setCreditInputs] = useState({})
   const [userSearch, setUserSearch] = useState('')
   const [showExportPanel, setShowExportPanel] = useState(false)
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'member' })
@@ -965,7 +1033,8 @@ function AdminPanel({ currentUser }) {
 
   // flight management edit state
   const [flightSearch,  setFlightSearch]  = useState('')
-  const [editingMember, setEditingMember] = useState(null)
+  const [creditSearch, setCreditSearch] = useState('')
+  const [creditInputs, setCreditInputs] = useState({})
   const [fieldSearch, setFieldSearch] = useState('')
   const [fieldFlightFilter, setFieldFlightFilter] = useState('all')
 
@@ -984,6 +1053,8 @@ function AdminPanel({ currentUser }) {
   const [bulkImportPlanning, setBulkImportPlanning] = useState(false)
   const [bulkImportApplying, setBulkImportApplying] = useState(false)
   const [recentActions, setRecentActions] = useState([])
+  const actionIdCounterRef = useRef(0)
+  const lifecycleStampRef = useRef(0)
   const [actionFeedback, setActionFeedback] = useState(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // { message, resolve }
 
@@ -1063,14 +1134,20 @@ function AdminPanel({ currentUser }) {
   }
 
   function registerUndoAction({ label, undo }) {
+    actionIdCounterRef.current += 1
     const action = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      id: `action-${actionIdCounterRef.current}`,
       label,
       undo,
-      createdAt: Date.now(),
+      createdAt: new Date().toISOString(),
     }
     setRecentActions(prev => [action, ...prev].slice(0, MAX_RECENT_ACTIONS))
     setActionFeedback(`Action saved: ${label}`)
+  }
+
+  function nextLifecycleStamp() {
+    lifecycleStampRef.current += 1
+    return new Date(Date.UTC(2026, 0, 1, 0, 0, lifecycleStampRef.current)).toISOString()
   }
 
   function undoRecentAction(actionId) {
@@ -1237,24 +1314,21 @@ function AdminPanel({ currentUser }) {
       return matchesSearch && matchesFlight
     })
   }, [currentFieldPlayers, fieldSearch, fieldFlightFilter])
-
-  // credits derived
   const creditRoster = useMemo(() => {
     const search = creditSearch.trim().toLowerCase()
-    return membersData
-      .filter(m => m.active !== false)
-      .filter(m => !search || m.name.toLowerCase().includes(search))
-      .slice()
+    return effectiveMembers
+      .filter(member => {
+        if (!search) return true
+        return member.name.toLowerCase().includes(search) || formatName(member.name).toLowerCase().includes(search)
+      })
       .sort(compareByLastName)
-  }, [membersData, creditSearch])
-
+  }, [effectiveMembers, creditSearch])
   const creditTotal = useMemo(
-    () => Object.values(credits).reduce((s, v) => s + v, 0),
+    () => Object.values(credits).reduce((sum, value) => sum + (Number.isFinite(Number(value)) ? Number(value) : 0), 0),
     [credits]
   )
-
   const creditNonZero = useMemo(
-    () => Object.values(credits).filter(v => v !== 0).length,
+    () => Object.values(credits).filter(value => Number.isFinite(Number(value)) && Number(value) !== 0).length,
     [credits]
   )
 
@@ -1626,24 +1700,32 @@ function AdminPanel({ currentUser }) {
   function applyCredit(name, amount) {
     const n = parseFloat(amount)
     if (isNaN(n) || n === 0) return
-    setCredits(prev => ({ ...prev, [name]: +((prev[name] ?? 0) + n).toFixed(2) }))
+    setCredits(prev => {
+      const current = Number.isFinite(Number(prev[name])) ? Number(prev[name]) : 0
+      const nextValue = Math.max(0, +(current + n).toFixed(2))
+      return { ...prev, [name]: nextValue }
+    })
     setCreditInputs(prev => ({ ...prev, [name]: '' }))
   }
 
   function clearCredit(name) {
-    const previousCredit = credits[name]
-    if (previousCredit == null) return
-    setCredits(prev => { const next = { ...prev }; delete next[name]; return next })
-    registerUndoAction({
-      label: `Cleared credit for ${name}`,
-      undo: () => setCredits(prev => ({ ...prev, [name]: previousCredit })),
+    setCredits(prev => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+    setCreditInputs(prev => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name]
+      return next
     })
   }
 
-  async function clearAllCredits() {
-    if (!await openConfirm('Clear ALL credit balances? This cannot be undone.')) return
-    setActionFeedback('Credits were cleared. Undo is not supported for bulk credit resets.')
+  function clearAllCredits() {
     setCredits({})
+    setCreditInputs({})
   }
 
   async function saveCredits() {
@@ -1656,6 +1738,13 @@ function AdminPanel({ currentUser }) {
     }, setAdminError)
     if (ok) logChange('Credits saved', `${Object.keys(credits).length} member(s) with balances`)
     return ok
+  }
+
+  async function savePlayerManagement() {
+    const membersOk = await saveMembers()
+    if (!membersOk) return false
+    const creditsOk = await saveCredits()
+    return creditsOk
   }
 
   function patchTournamentLifecycle(tournamentId, patch) {
@@ -2428,7 +2517,7 @@ function AdminPanel({ currentUser }) {
 
   function markMemoSent(targetTid = tid) {
     if (!targetTid) return
-    patchTournamentLifecycle(targetTid, { memoSentAt: Date.now() })
+    patchTournamentLifecycle(targetTid, { memoSentAt: nextLifecycleStamp() })
   }
 
   async function generateBirdieExport(targetTid = tid) {
@@ -2439,7 +2528,7 @@ function AdminPanel({ currentUser }) {
       ...tournamentLifecycle,
       [targetTid]: {
         ...(tournamentLifecycle[targetTid] ?? {}),
-        birdiePoolExportedAt: Date.now(),
+        birdiePoolExportedAt: nextLifecycleStamp(),
       },
     }
     setTournamentLifecycle(nextLifecycle)
@@ -2456,7 +2545,7 @@ function AdminPanel({ currentUser }) {
       ...tournamentLifecycle,
       [targetTid]: {
         ...(tournamentLifecycle[targetTid] ?? {}),
-        payoutGeneratedAt: Date.now(),
+        payoutGeneratedAt: nextLifecycleStamp(),
       },
     }
     setTournamentLifecycle(nextLifecycle)
@@ -2639,7 +2728,7 @@ function AdminPanel({ currentUser }) {
                   : 'border-forest/30 bg-white text-forest hover:bg-forest/10'
               }`}
             >
-              <span aria-hidden="true">{action.icon}</span>
+              <action.Icon className="w-4 h-4" />
               <span>{action.label}</span>
             </button>
           ))}
@@ -2777,14 +2866,15 @@ function AdminPanel({ currentUser }) {
               credits={credits}
               flightSearch={flightSearch}
               setFlightSearch={setFlightSearch}
-              editingMember={editingMember}
-              setEditingMember={setEditingMember}
               updateMemberFlight={updateMemberFlight}
               updateMemberPtm={updateMemberPtm}
               updateMemberTee={updateMemberTee}
-              saveMembers={saveMembers}
-              membersSaving={membersSaving}
-              membersSaveStatus={membersSaveStatus}
+              applyCredit={applyCredit}
+              savePlayerManagement={savePlayerManagement}
+              playerManagementSaving={membersSaving || creditsSaving}
+              playerManagementSaveStatus={membersSaveStatus === 'err' || creditsSaveStatus === 'err'
+                ? 'err'
+                : (membersSaveStatus === 'ok' || creditsSaveStatus === 'ok' ? 'ok' : null)}
               flightTagStyles={flightTagStyles}
               fileInputRef={fileInputRef}
               handleXlsxFile={handleXlsxFile}
@@ -2897,7 +2987,7 @@ function AdminPanel({ currentUser }) {
                                 title="Apply adjustment"
                                 className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
                               >
-                                ✓
+                                <CheckIcon className="w-4 h-4" />
                               </button>
                             </div>
                           </td>
@@ -3563,7 +3653,17 @@ function SaveBtn({ onClick, saving, status, label = 'Save to Cloud', className =
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
         </svg>
-      ) : status === 'ok' ? '✓ Saved' : status === 'err' ? '✗ Error' : (
+      ) : status === 'ok' ? (
+        <>
+          <CheckIcon />
+          <span>Saved</span>
+        </>
+      ) : status === 'err' ? (
+        <>
+          <ErrorIcon />
+          <span>Error</span>
+        </>
+      ) : (
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
         </svg>
@@ -4076,7 +4176,7 @@ function ScoreEntryPanel({
         <div className="flex-1 min-w-0">
           {!pairingsPosted ? (
             <div className="bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center py-16 text-center px-8">
-              <span className="text-4xl mb-3 opacity-30">🔒</span>
+              <LockIcon className="w-10 h-10 text-gray-300 mb-3 opacity-70" />
               <p className="font-sans font-semibold text-darktext mb-1">Score entry locked</p>
               <p className="text-gray-400 font-sans text-sm mb-4">
                 Post pairings first — Step 2 above.
@@ -4087,7 +4187,7 @@ function ScoreEntryPanel({
             </div>
           ) : !hasAnyPlayers ? (
             <div className="bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center py-16 text-center px-8">
-              <span className="text-3xl mb-2 text-gray-300">⛳</span>
+              <GolfFlagIcon className="w-8 h-8 text-gray-300 mb-2" />
               <p className="text-gray-400 font-sans text-sm">No players added yet.</p>
               <p className="text-gray-400 font-sans text-xs mt-1">Select players from the pool on the left.</p>
             </div>
@@ -4554,20 +4654,171 @@ const TEE_OPTIONS = ['Back', 'Senior', 'Front']
 
 function FlightManagementPanel({
   effectiveMembers, membersData, credits, flightSearch, setFlightSearch,
-  editingMember, setEditingMember,
   updateMemberFlight, updateMemberPtm, updateMemberTee,
-  saveMembers, membersSaving, membersSaveStatus, flightTagStyles,
+  applyCredit,
+  savePlayerManagement, playerManagementSaving, playerManagementSaveStatus, flightTagStyles,
   fileInputRef, handleXlsxFile, importPreview, setImportPreview,
   confirmImport, importSaving, importStatus, importError, setImportError,
 }) {
-  const filtered = useMemo(() => {
-    const s = flightSearch.trim().toLowerCase()
-    return [...effectiveMembers]
-      .filter(m => s === '' || m.name.toLowerCase().includes(s) || formatName(m.name).toLowerCase().includes(s))
-      .sort(compareByLastName)
-  }, [effectiveMembers, flightSearch])
-
   const FLIGHT_OPTIONS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+  const SORTABLE_COLUMNS = ['name', 'flight', 'ptm', 'creditOnBooks', 'tee']
+  const [sortBy, setSortBy] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
+  const [editingRows, setEditingRows] = useState({})
+  const [rowDrafts, setRowDrafts] = useState({})
+  const [creditAdjustments, setCreditAdjustments] = useState({})
+  const [selectedRows, setSelectedRows] = useState(new Set())
+  const [bulkFlight, setBulkFlight] = useState('')
+  const [bulkTee, setBulkTee] = useState('')
+  const [bulkCredit, setBulkCredit] = useState('')
+  const [filterFlight, setFilterFlight] = useState('all')
+  const [filterTee, setFilterTee] = useState('all')
+  const [onlyCredits, setOnlyCredits] = useState(false)
+  const [scrollTop, setScrollTop] = useState(0)
+
+  const rows = useMemo(() => {
+    const search = flightSearch.trim().toLowerCase()
+    return effectiveMembers
+      .filter(member => member.active !== false)
+      .map(member => {
+        const parsedCredit = Number(credits?.[member.name])
+        return {
+          id: member.id ?? member.name,
+          name: member.name,
+          flight: member.flight ?? null,
+          ptm: fmtPtmValue(member.ptm),
+          tee: member.tee ?? null,
+          creditOnBooks: Number.isFinite(parsedCredit) ? parsedCredit : 0,
+        }
+      })
+      .filter(member => {
+        if (search && !member.name.toLowerCase().includes(search) && !formatName(member.name).toLowerCase().includes(search)) return false
+        if (filterFlight !== 'all') {
+          if (filterFlight === '__unassigned__' && member.flight) return false
+          if (filterFlight !== '__unassigned__' && member.flight !== filterFlight) return false
+        }
+        if (filterTee !== 'all') {
+          if (filterTee === '__unset__' && member.tee) return false
+          if (filterTee !== '__unset__' && member.tee !== filterTee) return false
+        }
+        if (onlyCredits && member.creditOnBooks <= 0) return false
+        return true
+      })
+      .sort((a, b) => {
+        const direction = sortDir === 'asc' ? 1 : -1
+        if (sortBy === 'name') return compareByLastName(a, b) * direction
+        if (sortBy === 'ptm') return ((a.ptm ?? Number.NEGATIVE_INFINITY) - (b.ptm ?? Number.NEGATIVE_INFINITY)) * direction
+        if (sortBy === 'creditOnBooks') return (a.creditOnBooks - b.creditOnBooks) * direction
+        return String(a[sortBy] ?? '').localeCompare(String(b[sortBy] ?? '')) * direction
+      })
+  }, [credits, effectiveMembers, filterFlight, filterTee, flightSearch, onlyCredits, sortBy, sortDir])
+
+  const selectedCount = selectedRows.size
+  const selectedVisibleNames = useMemo(
+    () => rows.filter(row => selectedRows.has(row.name)).map(row => row.name),
+    [rows, selectedRows]
+  )
+  const allVisibleSelected = rows.length > 0 && rows.every(row => selectedRows.has(row.name))
+  const hasVisibleRows = rows.length > 0
+  const totalCreditOnBooks = useMemo(() => rows.reduce((sum, row) => sum + row.creditOnBooks, 0), [rows])
+
+  const rowHeight = 54
+  const viewportHeight = 560
+  const shouldVirtualize = rows.length >= 200
+  const startIndex = shouldVirtualize ? Math.max(0, Math.floor(scrollTop / rowHeight) - 8) : 0
+  const endIndex = shouldVirtualize ? Math.min(rows.length, Math.ceil((scrollTop + viewportHeight) / rowHeight) + 8) : rows.length
+  const visibleRows = shouldVirtualize ? rows.slice(startIndex, endIndex) : rows
+  const topSpacerHeight = shouldVirtualize ? startIndex * rowHeight : 0
+  const bottomSpacerHeight = shouldVirtualize ? (rows.length - endIndex) * rowHeight : 0
+
+  function updateSort(column) {
+    if (!SORTABLE_COLUMNS.includes(column)) return
+    if (sortBy === column) setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortBy(column)
+      setSortDir(column === 'name' ? 'asc' : 'desc')
+    }
+  }
+
+  function startEditingRow(row) {
+    setEditingRows(prev => ({ ...prev, [row.name]: true }))
+    setRowDrafts(prev => ({
+      ...prev,
+      [row.name]: {
+        flight: row.flight ?? '',
+        tee: row.tee ?? '',
+        ptm: row.ptm ?? '',
+      },
+    }))
+  }
+
+  function cancelEditingRow(name) {
+    setEditingRows(prev => ({ ...prev, [name]: false }))
+    setRowDrafts(prev => {
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+  }
+
+  function saveEditingRow(name) {
+    const draft = rowDrafts[name]
+    if (!draft) return
+    const ptmRaw = String(draft.ptm ?? '').trim()
+    const normalizedPtm = ptmRaw === '' ? null : Number(ptmRaw)
+    if (ptmRaw !== '' && !Number.isFinite(normalizedPtm)) return
+    if (draft.flight && !FLIGHT_OPTIONS.includes(draft.flight)) return
+    if (draft.tee && !TEE_OPTIONS.includes(draft.tee)) return
+    updateMemberFlight(name, draft.flight || '')
+    updateMemberPtm(name, ptmRaw === '' ? '' : normalizedPtm)
+    updateMemberTee(name, draft.tee || '')
+    cancelEditingRow(name)
+  }
+
+  function applyRowCredit(name) {
+    const value = creditAdjustments[name]
+    if (value == null || value === '') return
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed) || parsed === 0) return
+    applyCredit(name, parsed)
+    setCreditAdjustments(prev => ({ ...prev, [name]: '' }))
+  }
+
+  function toggleSelect(name) {
+    setSelectedRows(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  function toggleSelectVisible() {
+    setSelectedRows(prev => {
+      const next = new Set(prev)
+      if (allVisibleSelected) rows.forEach(row => next.delete(row.name))
+      else rows.forEach(row => next.add(row.name))
+      return next
+    })
+  }
+
+  function applyBulkFlight() {
+    if (!bulkFlight || !FLIGHT_OPTIONS.includes(bulkFlight) || selectedVisibleNames.length === 0) return
+    selectedVisibleNames.forEach(name => updateMemberFlight(name, bulkFlight))
+  }
+
+  function applyBulkTee() {
+    if (!bulkTee || !TEE_OPTIONS.includes(bulkTee) || selectedVisibleNames.length === 0) return
+    selectedVisibleNames.forEach(name => updateMemberTee(name, bulkTee))
+  }
+
+  function applyBulkCredit(sign = 1) {
+    if (selectedVisibleNames.length === 0) return
+    const parsed = Number(bulkCredit)
+    if (!Number.isFinite(parsed) || parsed <= 0) return
+    selectedVisibleNames.forEach(name => applyCredit(name, sign * parsed))
+    setBulkCredit('')
+  }
 
   return (
     <div>
@@ -4597,7 +4848,7 @@ function FlightManagementPanel({
             </svg>
             Import Excel
           </button>
-          <SaveBtn onClick={saveMembers} saving={membersSaving} status={membersSaveStatus} />
+          <SaveBtn onClick={savePlayerManagement} saving={playerManagementSaving} status={playerManagementSaveStatus} />
         </div>
       </div>
 
@@ -4699,7 +4950,29 @@ function FlightManagementPanel({
         <div className="bg-forest px-4 py-3 flex items-center gap-3">
           <span className="text-white font-sans text-sm font-semibold">Player Roster</span>
           <span className="text-white/50 font-mono text-xs">{effectiveMembers.length} members</span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <select
+              value={filterFlight}
+              onChange={e => setFilterFlight(e.target.value)}
+              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-gold"
+            >
+              <option value="all" className="text-darktext">All Flights</option>
+              <option value="__unassigned__" className="text-darktext">Unassigned</option>
+              {FLIGHT_OPTIONS.map(flight => <option key={flight} value={flight} className="text-darktext">{flight}</option>)}
+            </select>
+            <select
+              value={filterTee}
+              onChange={e => setFilterTee(e.target.value)}
+              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-gold"
+            >
+              <option value="all" className="text-darktext">All Tees</option>
+              <option value="__unset__" className="text-darktext">No Tee</option>
+              {TEE_OPTIONS.map(tee => <option key={tee} value={tee} className="text-darktext">{tee}</option>)}
+            </select>
+            <label className="text-white/90 text-xs font-sans flex items-center gap-1.5">
+              <input type="checkbox" checked={onlyCredits} onChange={e => setOnlyCredits(e.target.checked)} />
+              Credit &gt; $0
+            </label>
             <input
               type="text"
               value={flightSearch}
@@ -4710,43 +4983,70 @@ function FlightManagementPanel({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="border-b border-gray-200 px-4 py-2.5 flex flex-wrap gap-2 items-center bg-gray-50/70">
+          <span className="text-xs font-sans text-gray-600">Selected: <strong className="text-forest">{selectedVisibleNames.length}</strong></span>
+          <select value={bulkFlight} onChange={e => setBulkFlight(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans">
+            <option value="">Bulk Set Flight</option>
+            {FLIGHT_OPTIONS.map(flight => <option key={flight} value={flight}>{flight}</option>)}
+          </select>
+          <button onClick={applyBulkFlight} disabled={!bulkFlight || selectedVisibleNames.length === 0} className="px-2.5 py-1 text-xs rounded border border-gray-300 disabled:opacity-40">Apply Flight</button>
+          <select value={bulkTee} onChange={e => setBulkTee(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans">
+            <option value="">Bulk Set Tee</option>
+            {TEE_OPTIONS.map(tee => <option key={tee} value={tee}>{tee}</option>)}
+          </select>
+          <button onClick={applyBulkTee} disabled={!bulkTee || selectedVisibleNames.length === 0} className="px-2.5 py-1 text-xs rounded border border-gray-300 disabled:opacity-40">Apply Tee</button>
+          <input value={bulkCredit} onChange={e => setBulkCredit(e.target.value)} type="number" step="0.01" placeholder="Bulk credit $" className="w-28 border border-gray-300 rounded px-2 py-1 text-xs font-mono" />
+          <button onClick={() => applyBulkCredit(1)} disabled={!bulkCredit || selectedVisibleNames.length === 0} className="px-2.5 py-1 text-xs rounded bg-green-600 text-white disabled:opacity-40">Bulk Add Credit</button>
+          <button onClick={() => applyBulkCredit(-1)} disabled={!bulkCredit || selectedVisibleNames.length === 0} className="px-2.5 py-1 text-xs rounded bg-amber-600 text-white disabled:opacity-40">Bulk Subtract Credit</button>
+          <button onClick={() => setSelectedRows(new Set())} disabled={selectedCount === 0} className="px-2.5 py-1 text-xs rounded border border-gray-300 disabled:opacity-40">Clear Selection</button>
+        </div>
+
+        <div className="max-h-[560px] overflow-auto" onScroll={e => setScrollTop(e.currentTarget.scrollTop)}>
+          <table className="w-full text-sm min-w-[1100px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="table-header text-gray-500 text-left">Player</th>
-                <th className="table-header text-gray-500 text-left">Flight</th>
-                <th className="table-header text-gray-500 text-center">PTM</th>
-                <th className="table-header text-gray-500 text-right">Credit on Books</th>
-                <th className="table-header text-gray-500 text-center">Tee</th>
-                <th className="table-header text-gray-500 text-center">Actions</th>
+                <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center w-12">
+                  <input type="checkbox" checked={allVisibleSelected && hasVisibleRows} onChange={toggleSelectVisible} />
+                </th>
+                <th onClick={() => updateSort('name')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-left cursor-pointer">Player</th>
+                <th onClick={() => updateSort('flight')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-left cursor-pointer">Flight</th>
+                <th onClick={() => updateSort('ptm')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center cursor-pointer">PTM</th>
+                <th onClick={() => updateSort('creditOnBooks')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-right cursor-pointer">Credit on Books</th>
+                <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center">Adjust Credit</th>
+                <th onClick={() => updateSort('tee')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center cursor-pointer">Tee</th>
+                <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((m, idx) => {
-                const isEditing = editingMember === m.name
-                const ptmValue = fmtPtmValue(m.ptm)
-                const creditValue = Number.isFinite(Number(credits?.[m.name])) ? Number(credits[m.name]) : 0
+              {shouldVirtualize && topSpacerHeight > 0 && (
+                <tr>
+                  <td colSpan={8} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }} />
+                </tr>
+              )}
+              {visibleRows.map((row, idx) => {
+                const isEditing = !!editingRows[row.name]
+                const draft = rowDrafts[row.name] ?? { flight: row.flight ?? '', tee: row.tee ?? '', ptm: row.ptm ?? '' }
                 return (
                   <tr
-                    key={m.name}
+                    key={row.name}
                     className={`border-b border-gray-100 last:border-0 transition-colors ${
-                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                      (startIndex + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
                     } ${isEditing ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                    style={shouldVirtualize ? { height: `${rowHeight}px` } : undefined}
                   >
-                    {/* Name */}
+                    <td className="px-3 py-2.5 text-center sticky left-0 bg-inherit">
+                      <input type="checkbox" checked={selectedRows.has(row.name)} onChange={() => toggleSelect(row.name)} />
+                    </td>
                     <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
-                      {formatName(m.name)}
+                      {formatName(row.name)}
                     </td>
 
-                    {/* Flight */}
                     <td className="px-4 py-2.5">
                       {isEditing ? (
                         <select
-                          value={m.flight ?? ''}
-                          onChange={e => updateMemberFlight(m.name, e.target.value)}
+                          value={draft.flight}
+                          onChange={e => setRowDrafts(prev => ({ ...prev, [row.name]: { ...draft, flight: e.target.value } }))}
                           className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest w-full max-w-[180px]"
-                          autoFocus
                         >
                           <option value="">— Unassigned —</option>
                           {FLIGHT_OPTIONS.map(f => (
@@ -4755,39 +5055,59 @@ function FlightManagementPanel({
                         </select>
                       ) : (
                         <span className={`text-xs border px-2 py-0.5 rounded-full font-sans ${
-                          m.flight ? (flightTagStyles[m.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned
+                          row.flight ? (flightTagStyles[row.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned
                         }`}>
-                          {m.flight ?? 'Unassigned'}
+                          {row.flight ?? 'Unassigned'}
                         </span>
                       )}
                     </td>
 
-                    {/* PTM */}
                     <td className="px-4 py-2.5 text-center">
                       {isEditing ? (
                         <input
                           type="number"
-                          value={ptmValue ?? ''}
-                          onChange={e => updateMemberPtm(m.name, e.target.value)}
+                          value={draft.ptm}
+                          onChange={e => setRowDrafts(prev => ({ ...prev, [row.name]: { ...draft, ptm: e.target.value } }))}
                           className="w-16 border border-gray-300 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:ring-2 focus:ring-forest"
                         />
                       ) : (
                         <span className="stat-number text-xs text-gray-600">
-                          {ptmValue ?? '—'}
+                          {row.ptm ?? '—'}
                         </span>
                       )}
                     </td>
 
                     <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-600">
-                      {fmtCurrency(creditValue)}
+                      {fmtCurrency(row.creditOnBooks)}
                     </td>
 
-                    {/* Tee */}
+                    <td className="px-3 py-2 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={creditAdjustments[row.name] ?? ''}
+                          onChange={e => setCreditAdjustments(prev => ({ ...prev, [row.name]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && applyRowCredit(row.name)}
+                          placeholder="+ / - $"
+                          className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                        />
+                        <button
+                          onClick={() => applyRowCredit(row.name)}
+                          disabled={!creditAdjustments[row.name]}
+                          title="Apply adjustment"
+                          className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
+                        >
+                          ✓
+                        </button>
+                      </div>
+                    </td>
+
                     <td className="px-4 py-2.5 text-center">
                       {isEditing ? (
                         <select
-                          value={m.tee ?? ''}
-                          onChange={e => updateMemberTee(m.name, e.target.value)}
+                          value={draft.tee}
+                          onChange={e => setRowDrafts(prev => ({ ...prev, [row.name]: { ...draft, tee: e.target.value } }))}
                           className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
                         >
                           <option value="">—</option>
@@ -4796,22 +5116,20 @@ function FlightManagementPanel({
                           ))}
                         </select>
                       ) : (
-                        <TeeTag tee={m.tee} />
+                        <TeeTag tee={row.tee} />
                       )}
                     </td>
 
                     {/* Actions */}
                     <td className="px-4 py-2 text-center">
                       {isEditing ? (
-                        <button
-                          onClick={() => setEditingMember(null)}
-                          className="px-3 py-1 text-xs rounded bg-forest text-white hover:bg-forest/80 font-sans font-semibold transition-colors"
-                        >
-                          Done
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button onClick={() => saveEditingRow(row.name)} className="px-2.5 py-1 text-xs rounded bg-forest text-white hover:bg-forest/80 font-sans font-semibold transition-colors">Save</button>
+                          <button onClick={() => cancelEditingRow(row.name)} className="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors">Cancel</button>
+                        </div>
                       ) : (
                         <button
-                          onClick={() => setEditingMember(m.name)}
+                          onClick={() => startEditingRow(row)}
                           className="px-3 py-1 text-xs rounded border border-gray-200 text-gray-500 hover:text-forest hover:border-forest font-sans transition-colors"
                         >
                           Edit
@@ -4821,7 +5139,26 @@ function FlightManagementPanel({
                   </tr>
                 )
               })}
+              {shouldVirtualize && bottomSpacerHeight > 0 && (
+                <tr>
+                  <td colSpan={8} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }} />
+                </tr>
+              )}
+              {!rows.length && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400 font-sans text-sm">
+                    No players match your filters.
+                  </td>
+                </tr>
+              )}
             </tbody>
+            <tfoot>
+              <tr className="bg-forest/5 border-t border-forest/20">
+                <td colSpan={4} className="px-4 py-2 text-xs font-sans text-forest font-semibold uppercase tracking-widest">Visible Credit Total</td>
+                <td className="px-4 py-2 text-right font-mono text-xs text-forest font-semibold">{fmtCurrency(totalCreditOnBooks)}</td>
+                <td colSpan={3} />
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
