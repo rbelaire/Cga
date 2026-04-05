@@ -918,10 +918,8 @@ function AdminPanel({ currentUser }) {
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
   const [adminMode,    setAdminMode]    = useState('dashboard')
-  const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [paymentCreditInputs, setPaymentCreditInputs] = useState({})
-  const [creditInputs, setCreditInputs] = useState({})
   const [userSearch, setUserSearch] = useState('')
   const [showExportPanel, setShowExportPanel] = useState(false)
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'member' })
@@ -955,7 +953,6 @@ function AdminPanel({ currentUser }) {
 
   // flight management edit state
   const [flightSearch,  setFlightSearch]  = useState('')
-  const [editingMember, setEditingMember] = useState(null)
   const [fieldSearch, setFieldSearch] = useState('')
   const [fieldFlightFilter, setFieldFlightFilter] = useState('all')
 
@@ -1218,26 +1215,6 @@ function AdminPanel({ currentUser }) {
       return matchesSearch && matchesFlight
     })
   }, [currentFieldPlayers, fieldSearch, fieldFlightFilter])
-
-  // credits derived
-  const creditRoster = useMemo(() => {
-    const search = creditSearch.trim().toLowerCase()
-    return membersData
-      .filter(m => m.active !== false)
-      .filter(m => !search || m.name.toLowerCase().includes(search))
-      .slice()
-      .sort(compareByLastName)
-  }, [membersData, creditSearch])
-
-  const creditTotal = useMemo(
-    () => Object.values(credits).reduce((s, v) => s + v, 0),
-    [credits]
-  )
-
-  const creditNonZero = useMemo(
-    () => Object.values(credits).filter(v => v !== 0).length,
-    [credits]
-  )
 
   // ── Score data mutations ──────────────────────────────────────────────────────
   function togglePoolSelect(name) {
@@ -1607,24 +1584,11 @@ function AdminPanel({ currentUser }) {
   function applyCredit(name, amount) {
     const n = parseFloat(amount)
     if (isNaN(n) || n === 0) return
-    setCredits(prev => ({ ...prev, [name]: +((prev[name] ?? 0) + n).toFixed(2) }))
-    setCreditInputs(prev => ({ ...prev, [name]: '' }))
-  }
-
-  function clearCredit(name) {
-    const previousCredit = credits[name]
-    if (previousCredit == null) return
-    setCredits(prev => { const next = { ...prev }; delete next[name]; return next })
-    registerUndoAction({
-      label: `Cleared credit for ${name}`,
-      undo: () => setCredits(prev => ({ ...prev, [name]: previousCredit })),
+    setCredits(prev => {
+      const current = Number.isFinite(Number(prev[name])) ? Number(prev[name]) : 0
+      const nextValue = Math.max(0, +(current + n).toFixed(2))
+      return { ...prev, [name]: nextValue }
     })
-  }
-
-  async function clearAllCredits() {
-    if (!await openConfirm('Clear ALL credit balances? This cannot be undone.')) return
-    setActionFeedback('Credits were cleared. Undo is not supported for bulk credit resets.')
-    setCredits({})
   }
 
   async function saveCredits() {
@@ -1637,6 +1601,13 @@ function AdminPanel({ currentUser }) {
     }, setAdminError)
     if (ok) logChange('Credits saved', `${Object.keys(credits).length} member(s) with balances`)
     return ok
+  }
+
+  async function savePlayerManagement() {
+    const membersOk = await saveMembers()
+    if (!membersOk) return false
+    const creditsOk = await saveCredits()
+    return creditsOk
   }
 
   function patchTournamentLifecycle(tournamentId, patch) {
@@ -2660,14 +2631,15 @@ function AdminPanel({ currentUser }) {
               credits={credits}
               flightSearch={flightSearch}
               setFlightSearch={setFlightSearch}
-              editingMember={editingMember}
-              setEditingMember={setEditingMember}
               updateMemberFlight={updateMemberFlight}
               updateMemberPtm={updateMemberPtm}
               updateMemberTee={updateMemberTee}
-              saveMembers={saveMembers}
-              membersSaving={membersSaving}
-              membersSaveStatus={membersSaveStatus}
+              applyCredit={applyCredit}
+              savePlayerManagement={savePlayerManagement}
+              playerManagementSaving={membersSaving || creditsSaving}
+              playerManagementSaveStatus={membersSaveStatus === 'err' || creditsSaveStatus === 'err'
+                ? 'err'
+                : (membersSaveStatus === 'ok' || creditsSaveStatus === 'ok' ? 'ok' : null)}
               flightTagStyles={flightTagStyles}
               fileInputRef={fileInputRef}
               handleXlsxFile={handleXlsxFile}
@@ -2679,147 +2651,6 @@ function AdminPanel({ currentUser }) {
               importError={importError}
               setImportError={setImportError}
             />
-          </section>
-
-          <section>
-          <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4">
-            <div className="flex flex-wrap gap-2">
-              <input
-                type="text"
-                value={creditSearch}
-                onChange={e => setCreditSearch(e.target.value)}
-                placeholder="Search members…"
-                className="flex-1 min-w-[140px] border border-gray-200 rounded px-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-sans text-gray-500 whitespace-nowrap">
-                  <span className="font-semibold text-forest">{creditNonZero}</span> with balance ·{' '}
-                  <span className={`font-semibold stat-number ${creditTotal > 0 ? 'text-green-600' : creditTotal < 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                    {creditTotal < 0 ? '−' : ''}${Math.abs(creditTotal).toFixed(2)}
-                  </span>{' total'}
-                </span>
-                <SaveBtn onClick={saveCredits} saving={creditsSaving} status={creditsSaveStatus} />
-                <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
-                  Credits PDF
-                </PdfBtn>
-                {Object.keys(credits).length > 0 && (
-                  <button
-                    onClick={clearAllCredits}
-                    className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors whitespace-nowrap"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
-              <span className="text-white font-sans text-sm font-semibold">Member Credit Balances</span>
-              <span className="text-white/50 font-sans text-xs">{creditRoster.length} members</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[540px]">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="table-header text-gray-400 text-left">Player</th>
-                    <th className="table-header text-gray-400 text-left">Flight</th>
-                    <th className="table-header text-gray-400 text-right">Balance</th>
-                    <th className="table-header text-gray-400 text-center">Add / Subtract</th>
-                    <th className="table-header text-gray-400 w-8"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {creditRoster.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
-                        No members match your search.
-                      </td>
-                    </tr>
-                  ) : (
-                    creditRoster.map((m, idx) => {
-                      const balance = credits[m.name] ?? 0
-                      const input   = creditInputs[m.name] ?? ''
-                      return (
-                        <tr
-                          key={m.name}
-                          className={`border-b border-gray-100 last:border-0 transition-colors ${
-                            balance !== 0 ? 'hover:bg-amber-50/30' : 'hover:bg-gray-50'
-                          } ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
-                        >
-                          <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
-                            {formatName(m.name)}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[m.flight] ?? flightTagStyles.Unassigned}`}>
-                              {m.flight ?? 'Unassigned'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right">
-                            <span className={`stat-number text-sm font-bold ${
-                              balance > 0 ? 'text-green-600' : balance < 0 ? 'text-red-500' : 'text-gray-300'
-                            }`}>
-                              {balance < 0 ? '−' : ''}${Math.abs(balance).toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={input}
-                                onChange={e => setCreditInputs(prev => ({ ...prev, [m.name]: e.target.value }))}
-                                onKeyDown={e => e.key === 'Enter' && applyCredit(m.name, input)}
-                                placeholder="+/− $"
-                                className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                              />
-                              <button
-                                onClick={() => applyCredit(m.name, input)}
-                                disabled={!input}
-                                title="Apply adjustment"
-                                className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
-                              >
-                                ✓
-                              </button>
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            {balance !== 0 && (
-                              <button
-                                onClick={() => clearCredit(m.name)}
-                                title="Clear balance"
-                                className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors"
-                              >
-                                ×
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-                {creditNonZero > 0 && (
-                  <tfoot>
-                    <tr className="bg-forest/5 border-t-2 border-forest/20">
-                      <td colSpan={2} className="px-4 py-2.5 font-sans text-xs font-semibold uppercase tracking-widest text-forest">
-                        Total on Books
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <span className={`stat-number text-sm font-bold ${
-                          creditTotal > 0 ? 'text-green-600' : creditTotal < 0 ? 'text-red-500' : 'text-gray-400'
-                        }`}>
-                          {creditTotal < 0 ? '−' : ''}${Math.abs(creditTotal).toFixed(2)}
-                        </span>
-                      </td>
-                      <td colSpan={2} />
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </div>
           </section>
         </div>
       )}
@@ -4414,20 +4245,171 @@ const TEE_OPTIONS = ['Back', 'Senior', 'Front']
 
 function FlightManagementPanel({
   effectiveMembers, membersData, credits, flightSearch, setFlightSearch,
-  editingMember, setEditingMember,
   updateMemberFlight, updateMemberPtm, updateMemberTee,
-  saveMembers, membersSaving, membersSaveStatus, flightTagStyles,
+  applyCredit,
+  savePlayerManagement, playerManagementSaving, playerManagementSaveStatus, flightTagStyles,
   fileInputRef, handleXlsxFile, importPreview, setImportPreview,
   confirmImport, importSaving, importStatus, importError, setImportError,
 }) {
-  const filtered = useMemo(() => {
-    const s = flightSearch.trim().toLowerCase()
-    return [...effectiveMembers]
-      .filter(m => s === '' || m.name.toLowerCase().includes(s) || formatName(m.name).toLowerCase().includes(s))
-      .sort(compareByLastName)
-  }, [effectiveMembers, flightSearch])
-
   const FLIGHT_OPTIONS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+  const SORTABLE_COLUMNS = ['name', 'flight', 'ptm', 'creditOnBooks', 'tee']
+  const [sortBy, setSortBy] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
+  const [editingRows, setEditingRows] = useState({})
+  const [rowDrafts, setRowDrafts] = useState({})
+  const [creditAdjustments, setCreditAdjustments] = useState({})
+  const [selectedRows, setSelectedRows] = useState(new Set())
+  const [bulkFlight, setBulkFlight] = useState('')
+  const [bulkTee, setBulkTee] = useState('')
+  const [bulkCredit, setBulkCredit] = useState('')
+  const [filterFlight, setFilterFlight] = useState('all')
+  const [filterTee, setFilterTee] = useState('all')
+  const [onlyCredits, setOnlyCredits] = useState(false)
+  const [scrollTop, setScrollTop] = useState(0)
+
+  const rows = useMemo(() => {
+    const search = flightSearch.trim().toLowerCase()
+    return effectiveMembers
+      .filter(member => member.active !== false)
+      .map(member => {
+        const parsedCredit = Number(credits?.[member.name])
+        return {
+          id: member.id ?? member.name,
+          name: member.name,
+          flight: member.flight ?? null,
+          ptm: fmtPtmValue(member.ptm),
+          tee: member.tee ?? null,
+          creditOnBooks: Number.isFinite(parsedCredit) ? parsedCredit : 0,
+        }
+      })
+      .filter(member => {
+        if (search && !member.name.toLowerCase().includes(search) && !formatName(member.name).toLowerCase().includes(search)) return false
+        if (filterFlight !== 'all') {
+          if (filterFlight === '__unassigned__' && member.flight) return false
+          if (filterFlight !== '__unassigned__' && member.flight !== filterFlight) return false
+        }
+        if (filterTee !== 'all') {
+          if (filterTee === '__unset__' && member.tee) return false
+          if (filterTee !== '__unset__' && member.tee !== filterTee) return false
+        }
+        if (onlyCredits && member.creditOnBooks <= 0) return false
+        return true
+      })
+      .sort((a, b) => {
+        const direction = sortDir === 'asc' ? 1 : -1
+        if (sortBy === 'name') return compareByLastName(a, b) * direction
+        if (sortBy === 'ptm') return ((a.ptm ?? Number.NEGATIVE_INFINITY) - (b.ptm ?? Number.NEGATIVE_INFINITY)) * direction
+        if (sortBy === 'creditOnBooks') return (a.creditOnBooks - b.creditOnBooks) * direction
+        return String(a[sortBy] ?? '').localeCompare(String(b[sortBy] ?? '')) * direction
+      })
+  }, [credits, effectiveMembers, filterFlight, filterTee, flightSearch, onlyCredits, sortBy, sortDir])
+
+  const selectedCount = selectedRows.size
+  const selectedVisibleNames = useMemo(
+    () => rows.filter(row => selectedRows.has(row.name)).map(row => row.name),
+    [rows, selectedRows]
+  )
+  const allVisibleSelected = rows.length > 0 && rows.every(row => selectedRows.has(row.name))
+  const hasVisibleRows = rows.length > 0
+  const totalCreditOnBooks = useMemo(() => rows.reduce((sum, row) => sum + row.creditOnBooks, 0), [rows])
+
+  const rowHeight = 54
+  const viewportHeight = 560
+  const shouldVirtualize = rows.length >= 200
+  const startIndex = shouldVirtualize ? Math.max(0, Math.floor(scrollTop / rowHeight) - 8) : 0
+  const endIndex = shouldVirtualize ? Math.min(rows.length, Math.ceil((scrollTop + viewportHeight) / rowHeight) + 8) : rows.length
+  const visibleRows = shouldVirtualize ? rows.slice(startIndex, endIndex) : rows
+  const topSpacerHeight = shouldVirtualize ? startIndex * rowHeight : 0
+  const bottomSpacerHeight = shouldVirtualize ? (rows.length - endIndex) * rowHeight : 0
+
+  function updateSort(column) {
+    if (!SORTABLE_COLUMNS.includes(column)) return
+    if (sortBy === column) setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortBy(column)
+      setSortDir(column === 'name' ? 'asc' : 'desc')
+    }
+  }
+
+  function startEditingRow(row) {
+    setEditingRows(prev => ({ ...prev, [row.name]: true }))
+    setRowDrafts(prev => ({
+      ...prev,
+      [row.name]: {
+        flight: row.flight ?? '',
+        tee: row.tee ?? '',
+        ptm: row.ptm ?? '',
+      },
+    }))
+  }
+
+  function cancelEditingRow(name) {
+    setEditingRows(prev => ({ ...prev, [name]: false }))
+    setRowDrafts(prev => {
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+  }
+
+  function saveEditingRow(name) {
+    const draft = rowDrafts[name]
+    if (!draft) return
+    const ptmRaw = String(draft.ptm ?? '').trim()
+    const normalizedPtm = ptmRaw === '' ? null : Number(ptmRaw)
+    if (ptmRaw !== '' && !Number.isFinite(normalizedPtm)) return
+    if (draft.flight && !FLIGHT_OPTIONS.includes(draft.flight)) return
+    if (draft.tee && !TEE_OPTIONS.includes(draft.tee)) return
+    updateMemberFlight(name, draft.flight || '')
+    updateMemberPtm(name, ptmRaw === '' ? '' : normalizedPtm)
+    updateMemberTee(name, draft.tee || '')
+    cancelEditingRow(name)
+  }
+
+  function applyRowCredit(name) {
+    const value = creditAdjustments[name]
+    if (value == null || value === '') return
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed) || parsed === 0) return
+    applyCredit(name, parsed)
+    setCreditAdjustments(prev => ({ ...prev, [name]: '' }))
+  }
+
+  function toggleSelect(name) {
+    setSelectedRows(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  function toggleSelectVisible() {
+    setSelectedRows(prev => {
+      const next = new Set(prev)
+      if (allVisibleSelected) rows.forEach(row => next.delete(row.name))
+      else rows.forEach(row => next.add(row.name))
+      return next
+    })
+  }
+
+  function applyBulkFlight() {
+    if (!bulkFlight || !FLIGHT_OPTIONS.includes(bulkFlight) || selectedVisibleNames.length === 0) return
+    selectedVisibleNames.forEach(name => updateMemberFlight(name, bulkFlight))
+  }
+
+  function applyBulkTee() {
+    if (!bulkTee || !TEE_OPTIONS.includes(bulkTee) || selectedVisibleNames.length === 0) return
+    selectedVisibleNames.forEach(name => updateMemberTee(name, bulkTee))
+  }
+
+  function applyBulkCredit(sign = 1) {
+    if (selectedVisibleNames.length === 0) return
+    const parsed = Number(bulkCredit)
+    if (!Number.isFinite(parsed) || parsed <= 0) return
+    selectedVisibleNames.forEach(name => applyCredit(name, sign * parsed))
+    setBulkCredit('')
+  }
 
   return (
     <div>
@@ -4457,7 +4439,7 @@ function FlightManagementPanel({
             </svg>
             Import Excel
           </button>
-          <SaveBtn onClick={saveMembers} saving={membersSaving} status={membersSaveStatus} />
+          <SaveBtn onClick={savePlayerManagement} saving={playerManagementSaving} status={playerManagementSaveStatus} />
         </div>
       </div>
 
@@ -4559,7 +4541,29 @@ function FlightManagementPanel({
         <div className="bg-forest px-4 py-3 flex items-center gap-3">
           <span className="text-white font-sans text-sm font-semibold">Player Roster</span>
           <span className="text-white/50 font-mono text-xs">{effectiveMembers.length} members</span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <select
+              value={filterFlight}
+              onChange={e => setFilterFlight(e.target.value)}
+              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-gold"
+            >
+              <option value="all" className="text-darktext">All Flights</option>
+              <option value="__unassigned__" className="text-darktext">Unassigned</option>
+              {FLIGHT_OPTIONS.map(flight => <option key={flight} value={flight} className="text-darktext">{flight}</option>)}
+            </select>
+            <select
+              value={filterTee}
+              onChange={e => setFilterTee(e.target.value)}
+              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-gold"
+            >
+              <option value="all" className="text-darktext">All Tees</option>
+              <option value="__unset__" className="text-darktext">No Tee</option>
+              {TEE_OPTIONS.map(tee => <option key={tee} value={tee} className="text-darktext">{tee}</option>)}
+            </select>
+            <label className="text-white/90 text-xs font-sans flex items-center gap-1.5">
+              <input type="checkbox" checked={onlyCredits} onChange={e => setOnlyCredits(e.target.checked)} />
+              Credit &gt; $0
+            </label>
             <input
               type="text"
               value={flightSearch}
@@ -4570,43 +4574,70 @@ function FlightManagementPanel({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="border-b border-gray-200 px-4 py-2.5 flex flex-wrap gap-2 items-center bg-gray-50/70">
+          <span className="text-xs font-sans text-gray-600">Selected: <strong className="text-forest">{selectedVisibleNames.length}</strong></span>
+          <select value={bulkFlight} onChange={e => setBulkFlight(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans">
+            <option value="">Bulk Set Flight</option>
+            {FLIGHT_OPTIONS.map(flight => <option key={flight} value={flight}>{flight}</option>)}
+          </select>
+          <button onClick={applyBulkFlight} disabled={!bulkFlight || selectedVisibleNames.length === 0} className="px-2.5 py-1 text-xs rounded border border-gray-300 disabled:opacity-40">Apply Flight</button>
+          <select value={bulkTee} onChange={e => setBulkTee(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans">
+            <option value="">Bulk Set Tee</option>
+            {TEE_OPTIONS.map(tee => <option key={tee} value={tee}>{tee}</option>)}
+          </select>
+          <button onClick={applyBulkTee} disabled={!bulkTee || selectedVisibleNames.length === 0} className="px-2.5 py-1 text-xs rounded border border-gray-300 disabled:opacity-40">Apply Tee</button>
+          <input value={bulkCredit} onChange={e => setBulkCredit(e.target.value)} type="number" step="0.01" placeholder="Bulk credit $" className="w-28 border border-gray-300 rounded px-2 py-1 text-xs font-mono" />
+          <button onClick={() => applyBulkCredit(1)} disabled={!bulkCredit || selectedVisibleNames.length === 0} className="px-2.5 py-1 text-xs rounded bg-green-600 text-white disabled:opacity-40">Bulk Add Credit</button>
+          <button onClick={() => applyBulkCredit(-1)} disabled={!bulkCredit || selectedVisibleNames.length === 0} className="px-2.5 py-1 text-xs rounded bg-amber-600 text-white disabled:opacity-40">Bulk Subtract Credit</button>
+          <button onClick={() => setSelectedRows(new Set())} disabled={selectedCount === 0} className="px-2.5 py-1 text-xs rounded border border-gray-300 disabled:opacity-40">Clear Selection</button>
+        </div>
+
+        <div className="max-h-[560px] overflow-auto" onScroll={e => setScrollTop(e.currentTarget.scrollTop)}>
+          <table className="w-full text-sm min-w-[1100px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="table-header text-gray-500 text-left">Player</th>
-                <th className="table-header text-gray-500 text-left">Flight</th>
-                <th className="table-header text-gray-500 text-center">PTM</th>
-                <th className="table-header text-gray-500 text-right">Credit on Books</th>
-                <th className="table-header text-gray-500 text-center">Tee</th>
-                <th className="table-header text-gray-500 text-center">Actions</th>
+                <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center w-12">
+                  <input type="checkbox" checked={allVisibleSelected && hasVisibleRows} onChange={toggleSelectVisible} />
+                </th>
+                <th onClick={() => updateSort('name')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-left cursor-pointer">Player</th>
+                <th onClick={() => updateSort('flight')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-left cursor-pointer">Flight</th>
+                <th onClick={() => updateSort('ptm')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center cursor-pointer">PTM</th>
+                <th onClick={() => updateSort('creditOnBooks')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-right cursor-pointer">Credit on Books</th>
+                <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center">Adjust Credit</th>
+                <th onClick={() => updateSort('tee')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center cursor-pointer">Tee</th>
+                <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((m, idx) => {
-                const isEditing = editingMember === m.name
-                const ptmValue = fmtPtmValue(m.ptm)
-                const creditValue = Number.isFinite(Number(credits?.[m.name])) ? Number(credits[m.name]) : 0
+              {shouldVirtualize && topSpacerHeight > 0 && (
+                <tr>
+                  <td colSpan={8} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }} />
+                </tr>
+              )}
+              {visibleRows.map((row, idx) => {
+                const isEditing = !!editingRows[row.name]
+                const draft = rowDrafts[row.name] ?? { flight: row.flight ?? '', tee: row.tee ?? '', ptm: row.ptm ?? '' }
                 return (
                   <tr
-                    key={m.name}
+                    key={row.name}
                     className={`border-b border-gray-100 last:border-0 transition-colors ${
-                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
+                      (startIndex + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
                     } ${isEditing ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                    style={shouldVirtualize ? { height: `${rowHeight}px` } : undefined}
                   >
-                    {/* Name */}
+                    <td className="px-3 py-2.5 text-center sticky left-0 bg-inherit">
+                      <input type="checkbox" checked={selectedRows.has(row.name)} onChange={() => toggleSelect(row.name)} />
+                    </td>
                     <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
-                      {formatName(m.name)}
+                      {formatName(row.name)}
                     </td>
 
-                    {/* Flight */}
                     <td className="px-4 py-2.5">
                       {isEditing ? (
                         <select
-                          value={m.flight ?? ''}
-                          onChange={e => updateMemberFlight(m.name, e.target.value)}
+                          value={draft.flight}
+                          onChange={e => setRowDrafts(prev => ({ ...prev, [row.name]: { ...draft, flight: e.target.value } }))}
                           className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest w-full max-w-[180px]"
-                          autoFocus
                         >
                           <option value="">— Unassigned —</option>
                           {FLIGHT_OPTIONS.map(f => (
@@ -4615,39 +4646,59 @@ function FlightManagementPanel({
                         </select>
                       ) : (
                         <span className={`text-xs border px-2 py-0.5 rounded-full font-sans ${
-                          m.flight ? (flightTagStyles[m.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned
+                          row.flight ? (flightTagStyles[row.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned
                         }`}>
-                          {m.flight ?? 'Unassigned'}
+                          {row.flight ?? 'Unassigned'}
                         </span>
                       )}
                     </td>
 
-                    {/* PTM */}
                     <td className="px-4 py-2.5 text-center">
                       {isEditing ? (
                         <input
                           type="number"
-                          value={ptmValue ?? ''}
-                          onChange={e => updateMemberPtm(m.name, e.target.value)}
+                          value={draft.ptm}
+                          onChange={e => setRowDrafts(prev => ({ ...prev, [row.name]: { ...draft, ptm: e.target.value } }))}
                           className="w-16 border border-gray-300 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:ring-2 focus:ring-forest"
                         />
                       ) : (
                         <span className="stat-number text-xs text-gray-600">
-                          {ptmValue ?? '—'}
+                          {row.ptm ?? '—'}
                         </span>
                       )}
                     </td>
 
                     <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-600">
-                      {fmtCurrency(creditValue)}
+                      {fmtCurrency(row.creditOnBooks)}
                     </td>
 
-                    {/* Tee */}
+                    <td className="px-3 py-2 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={creditAdjustments[row.name] ?? ''}
+                          onChange={e => setCreditAdjustments(prev => ({ ...prev, [row.name]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && applyRowCredit(row.name)}
+                          placeholder="+ / - $"
+                          className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                        />
+                        <button
+                          onClick={() => applyRowCredit(row.name)}
+                          disabled={!creditAdjustments[row.name]}
+                          title="Apply adjustment"
+                          className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
+                        >
+                          ✓
+                        </button>
+                      </div>
+                    </td>
+
                     <td className="px-4 py-2.5 text-center">
                       {isEditing ? (
                         <select
-                          value={m.tee ?? ''}
-                          onChange={e => updateMemberTee(m.name, e.target.value)}
+                          value={draft.tee}
+                          onChange={e => setRowDrafts(prev => ({ ...prev, [row.name]: { ...draft, tee: e.target.value } }))}
                           className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
                         >
                           <option value="">—</option>
@@ -4656,22 +4707,20 @@ function FlightManagementPanel({
                           ))}
                         </select>
                       ) : (
-                        <TeeTag tee={m.tee} />
+                        <TeeTag tee={row.tee} />
                       )}
                     </td>
 
                     {/* Actions */}
                     <td className="px-4 py-2 text-center">
                       {isEditing ? (
-                        <button
-                          onClick={() => setEditingMember(null)}
-                          className="px-3 py-1 text-xs rounded bg-forest text-white hover:bg-forest/80 font-sans font-semibold transition-colors"
-                        >
-                          Done
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button onClick={() => saveEditingRow(row.name)} className="px-2.5 py-1 text-xs rounded bg-forest text-white hover:bg-forest/80 font-sans font-semibold transition-colors">Save</button>
+                          <button onClick={() => cancelEditingRow(row.name)} className="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors">Cancel</button>
+                        </div>
                       ) : (
                         <button
-                          onClick={() => setEditingMember(m.name)}
+                          onClick={() => startEditingRow(row)}
                           className="px-3 py-1 text-xs rounded border border-gray-200 text-gray-500 hover:text-forest hover:border-forest font-sans transition-colors"
                         >
                           Edit
@@ -4681,7 +4730,26 @@ function FlightManagementPanel({
                   </tr>
                 )
               })}
+              {shouldVirtualize && bottomSpacerHeight > 0 && (
+                <tr>
+                  <td colSpan={8} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }} />
+                </tr>
+              )}
+              {!rows.length && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400 font-sans text-sm">
+                    No players match your filters.
+                  </td>
+                </tr>
+              )}
             </tbody>
+            <tfoot>
+              <tr className="bg-forest/5 border-t border-forest/20">
+                <td colSpan={4} className="px-4 py-2 text-xs font-sans text-forest font-semibold uppercase tracking-widest">Visible Credit Total</td>
+                <td className="px-4 py-2 text-right font-mono text-xs text-forest font-semibold">{fmtCurrency(totalCreditOnBooks)}</td>
+                <td colSpan={3} />
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
