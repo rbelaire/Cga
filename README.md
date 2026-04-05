@@ -8,14 +8,15 @@ The CGA site is a React + Firebase web app for tournament operations and member-
 
 - Public pages show schedule, pairings, standings, members, and club info.
 - The admin area manages entries, payments, pairings, scores, publish, and rollback workflows.
-- Firestore is the live source of truth for all operational data.
+- Firestore remains the live source of truth for operational CGA tournament data under `cga/*`.
+- New user-scoped Firebase collections support login profiles and lightweight preferences.
 
 ## Stack
 
 - React 19 + Vite
 - Tailwind CSS
 - React Router (HashRouter)
-- Firebase Firestore + Firebase Auth
+- Firebase Auth + Firestore + Storage utilities
 - GitHub Pages (GitHub Actions deploy)
 
 ## Local development
@@ -41,7 +42,9 @@ npm run build
 
 ## Environment variables
 
-Set these in `.env.local` for local dev and in GitHub Actions secrets for deployments:
+Copy `.env.example` to `.env.local` and fill all values.
+
+### Client SDK (required)
 
 - `VITE_FIREBASE_API_KEY`
 - `VITE_FIREBASE_AUTH_DOMAIN`
@@ -49,9 +52,64 @@ Set these in `.env.local` for local dev and in GitHub Actions secrets for deploy
 - `VITE_FIREBASE_STORAGE_BUCKET`
 - `VITE_FIREBASE_MESSAGING_SENDER_ID`
 - `VITE_FIREBASE_APP_ID`
-- `VITE_ADMIN_EMAIL` (optional, defaults to `admin@cga.local`)
-- `VITE_ADMIN_PIN` (optional fallback PIN)
-- `VITE_ADMIN_PINS` (optional JSON map for multi-user PIN labels)
+
+### App Hosting / Next-compatible aliases (optional in this Vite app, included for cross-project parity)
+
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+
+### Admin SDK (for future server-side scripts)
+
+- `FIREBASE_ADMIN_PROJECT_ID`
+- `FIREBASE_ADMIN_CLIENT_EMAIL`
+- `FIREBASE_ADMIN_PRIVATE_KEY`
+
+### Optional admin overrides
+
+- `VITE_ADMIN_EMAIL`
+- `VITE_ADMIN_PIN`
+- `VITE_ADMIN_PINS`
+
+## Firebase architecture
+
+### Client initialization
+
+- `src/lib/firebase/client.js` initializes Firebase once and exports `auth`, `db`, and `storage`.
+- `src/firebase.js` re-exports these for backward compatibility.
+
+### Auth and role-ready profiles
+
+- `/login` route supports:
+  - Email/password sign-in
+  - Google sign-in popup
+- Protected route wrapper enforces auth for `/admin`.
+- User profile docs are created/merged in Firestore `users/{uid}` with `roles` array for future role expansion.
+
+### Firestore lightweight user collections
+
+Typed (JSDoc) helpers are in `src/lib/firebase/firestore.js` for:
+
+- `users`
+- `savedFilters`
+- `savedViews`
+- `favorites`
+
+Current user-facing usage:
+
+- Tournaments page filter preference persistence (`savedFilters`)
+- Expanded tournament view persistence (`savedViews`)
+- Tournament favorites (`favorites`)
+
+### Storage utilities
+
+`src/lib/firebase/storage.js` includes upload-ready helpers for user-scoped paths:
+
+- `getUserUploadRef(uid, fileName)`
+- `uploadUserFile(uid, file)`
 
 ## Data flow
 
@@ -65,11 +123,14 @@ Admin local draft state (localStorage)
 Public pages
   -> subscribe to Firestore in real-time via useFireData()
   -> render live data when available
+
+User personalization (signed in)
+  -> save lightweight preferences to savedFilters / savedViews / favorites
 ```
 
-## Firestore structure (current implementation)
+## Firestore structure
 
-The app currently uses **flat document paths under `cga/*`**.
+### Existing operational docs (unchanged)
 
 - `cga/members` → `{ list: [...] }`
 - `cga/standings` → `{ flights: {...} }`
@@ -78,73 +139,46 @@ The app currently uses **flat document paths under `cga/*`**.
 - `cga/pairings` → `{ map: { [tournamentId]: [...] } }`
 - `cga/payments` → `{ data: { [tournamentId]: { [member]: true } } }`
 - `cga/credits` → `{ balances: { [member]: number } }`
-- `cga/creditTransactions` → `{ entries: [{ member, amount, date, note?, reference?, source? }] }`
+- `cga/creditTransactions` → `{ entries: [...] }`
 - `cga/users` → `{ list: [...] }`
 - `cga/scores` → `{ data: { [tournamentId]: { [flight]: [...] } } }`
 - `cga/results` → `{ data: { [tournamentId]: resultDoc } }`
 - `cga/changelog` → `{ entries: [...] }`
-- `cga/snapshots` → `{ entries: [{ id, type, ts, tid?, details, data }] }`
+- `cga/snapshots` → `{ entries: [...] }`
 
-## Admin safety model
+### New lightweight docs
 
-Admin saves and publish flow through validators in `src/services/admin/validation/`.
+- `users/{uid}` → profile + role-ready auth claims mirror
+- `savedFilters/{uid_page}` → user filters per page
+- `savedViews/{uid_page}` → user UI preferences per page
+- `favorites/{uid_entityType_entityId}` → favorites metadata
 
-Guardrails include:
-- tournament ID validity,
-- duplicate member/user detection,
-- invalid score/PTM values,
-- malformed credits/payments structures,
-- pairing references to unknown players,
-- publish payload completeness/member references.
+## Security rules
 
-Invalid writes are blocked and surfaced as admin error banners.
+Starter rules are included:
 
-## Snapshots and restore
+- `firestore.rules`
+- `storage.rules`
+- `firebase.json`
 
-Before key writes, the app captures rollback snapshots for:
-- `scores`, `pairings`, `members`, `credits`, `payments`, `users`,
-- publish-sensitive docs: `results` (per tournament), `standings`, `poy`.
+These default to conservative user ownership for the new user-scoped collections.
 
-From the **Snapshots** admin tab, admins can restore with explicit confirmation. Restore actions are written to changelog history.
+## Deployment notes
 
-## Bulk Import (Admin)
-
-The Admin area now includes a **Bulk Import** tab for safe spreadsheet imports.
-
-- Supported import types: **Credits**, **Tournaments**, **Results**.
-- Accepted file formats: **.xlsx** and **.csv**.
-- Dry run is required before apply and reports:
-  - rows detected,
-  - valid/invalid rows,
-  - rows to add,
-  - duplicates skipped,
-  - conflicts and blocking validation errors.
-- Default mode is **add-only** (no overwrite / no silent replacement).
-- Duplicate matching is conservative:
-  - Credits: `member + date + amount + note + reference`
-  - Tournaments: `tournamentId`
-  - Results: `tournamentId + flight + member`
-- Before apply, the app snapshots affected docs; after apply it logs a changelog entry.
-- Templates are downloadable directly in the Bulk Import panel (`cga-credits-template.csv`, `cga-tournaments-template.csv`, `cga-results-template.csv`).
-
-## Routing notes
-
-- Tournament result rendering is in `src/pages/Tournaments.jsx`.
-- There is no standalone `Results.jsx` route.
-- Legacy `/results` URL redirects to `/tournaments`.
-
-## Key files
-
-- `src/db.js` — Firestore data-access layer
-- `src/hooks/useFireData.js` — realtime subscription hook
-- `src/pages/Admin.jsx` — admin UI/workflow
-- `src/services/admin/` — publish, audit, validation services
-- `src/pages/Tournaments.jsx` — completed tournament results UI
-- `src/data/schedule.json` — season schedule metadata
-
-## Deployment
+### Existing deployment
 
 Pushes to `main` deploy to GitHub Pages through the repo workflow.
+
+### Firebase App Hosting readiness
+
+This repository now includes Firebase config/rules and environment naming parity (`NEXT_PUBLIC_*`) so the project can be adapted for Firebase App Hosting later without reworking app-level Firebase modules.
+
+General flow when moving to App Hosting:
+
+1. Create/attach Firebase project.
+2. Set env variables in App Hosting backend.
+3. Deploy Firestore/Storage rules (`firebase deploy --only firestore:rules,storage`).
+4. Configure build/start commands for the chosen runtime.
 
 ## Additional documentation
 

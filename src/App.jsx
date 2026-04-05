@@ -10,6 +10,8 @@ import Admin from './pages/Admin'
 import Pairings from './pages/Pairings'
 import Sponsors from './pages/Sponsors'
 import TournamentDetail from './pages/TournamentDetail'
+import Login from './pages/Login'
+import ProtectedRoute from './components/auth/ProtectedRoute'
 
 function NotFound() {
   return (
@@ -34,7 +36,8 @@ export default function App() {
           <Route path="/standings" element={<Standings />} />
           <Route path="/members" element={<Members />} />
           <Route path="/info" element={<Info />} />
-          <Route path="/admin" element={<Admin />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/pairings/:tournamentId" element={<Pairings />} />
           <Route path="/sponsors" element={<Sponsors />} />
           {/* Legacy redirects */}

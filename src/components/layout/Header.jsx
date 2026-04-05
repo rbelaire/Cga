@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
 const navLinks = [
   { to: '/', label: 'Home' },
@@ -13,6 +14,7 @@ const navLinks = [
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const { user, signOut } = useAuth()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -28,7 +30,6 @@ export default function Header() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
             <img
               src={`${import.meta.env.BASE_URL}cga-logo.png`}
@@ -45,7 +46,6 @@ export default function Header() {
             </div>
           </Link>
 
-          {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-1">
             {navLinks.map(({ to, label, highlight }) => (
               <NavLink
@@ -65,9 +65,21 @@ export default function Header() {
                 {label}
               </NavLink>
             ))}
+            {user ? (
+              <button
+                type="button"
+                onClick={signOut}
+                className="ml-2 px-3 py-2 text-xs font-semibold rounded border border-gold/40 text-gold hover:bg-white/10"
+              >
+                Sign out
+              </button>
+            ) : (
+              <NavLink to="/login" className="ml-2 px-3 py-2 text-xs font-semibold rounded border border-white/30 text-white hover:bg-white/10">
+                Login
+              </NavLink>
+            )}
           </nav>
 
-          {/* Mobile hamburger */}
           <button
             className="lg:hidden text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-gold"
             onClick={() => setMenuOpen(!menuOpen)}
@@ -85,7 +97,6 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {menuOpen && (
         <div className="lg:hidden bg-forest-dark border-t border-forest-light/30">
           <nav className="px-4 py-3 flex flex-col gap-1">
@@ -112,6 +123,22 @@ export default function Header() {
                 )}
               </NavLink>
             ))}
+            {user ? (
+              <button
+                type="button"
+                onClick={() => {
+                  signOut()
+                  setMenuOpen(false)
+                }}
+                className="text-left px-4 py-3 text-sm font-medium rounded border border-gold/40 text-gold"
+              >
+                Sign out
+              </button>
+            ) : (
+              <NavLink to="/login" onClick={() => setMenuOpen(false)} className="block px-4 py-3 text-sm font-medium rounded border border-white/30 text-white/80">
+                Login
+              </NavLink>
+            )}
           </nav>
         </div>
       )}
