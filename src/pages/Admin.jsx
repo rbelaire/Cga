@@ -100,6 +100,42 @@ function calcFlightPOY(players) {
 const fmtPM  = pm => pm == null ? '—' : pm > 0 ? `+${pm}` : `${pm}`
 const fmtPOY = p  => p.poy == null ? '—' : p.eligible === false ? 'X' : p.poy % 1 === 0 ? String(p.poy) : p.poy.toFixed(1)
 
+function sanitizeResultsData(flightData = {}) {
+  const cleanNumber = (value) => {
+    if (value === '' || value == null) return null
+    const num = Number(value)
+    return Number.isFinite(num) ? num : null
+  }
+  const cleanText = (value) => {
+    if (value == null) return ''
+    return String(value).replace(/[^\x20-\x7E]/g, '').trim()
+  }
+
+  return Object.fromEntries(FLIGHTS.map((flight) => {
+    const rows = Array.isArray(flightData?.[flight]) ? flightData[flight] : []
+    const normalizedRows = rows
+      .filter(Boolean)
+      .map((row) => {
+        const score = cleanNumber(row?.score)
+        const ptm = cleanNumber(row?.ptm)
+        return {
+          ...row,
+          name: cleanText(row?.name),
+          score,
+          ptm,
+          preEventPtm: ptm,
+          plusMinus: (score == null || ptm == null) ? null : score - ptm,
+        }
+      })
+      .filter(row => row.name)
+    return [flight, normalizedRows]
+  }))
+}
+
+function hasAnyScores(sanitizedFlightData = {}) {
+  return FLIGHTS.some(flight => (sanitizedFlightData[flight] ?? []).some(player => player.score != null))
+}
+
 // ── Excel roster parsing ──────────────────────────────────────────────────────
 function normalizeTee(t) {
   if (!t) return null
@@ -604,8 +640,26 @@ async function exportPtmPDF(membersList) {
 
 // ── PDF: Tournament Results ────────────────────────────────────────────────────
 async function exportResultsPDF(tournament, flightData) {
-  if (!tournament) return
+  if (!tournament) {
+    const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+    let y = await buildPdfHeader(doc, 'Tournament Results', 'No tournament selected')
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...PDF_NAVY)
+    doc.setFontSize(13)
+    doc.text('No tournament selected', 14, y)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(90, 90, 90)
+    doc.text('Select a tournament, then export results again.', 14, y + 7)
+    addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · CGA`)
+    doc.save('cga-tournament-results.pdf')
+    return
+  }
   const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  doc.setFont('helvetica')
+  const sanitizedFlightData = sanitizeResultsData(flightData)
+  const resultsPosted = hasAnyScores(sanitizedFlightData)
+  const totalPlayers = FLIGHTS.reduce((sum, fl) => sum + (sanitizedFlightData[fl]?.length ?? 0), 0)
   let y = await buildPdfHeader(
     doc, 'Tournament Results',
     `${tournament.name} · ${fmtDate(tournament.date)} · ${tournament.course}`
@@ -615,28 +669,87 @@ async function exportResultsPDF(tournament, flightData) {
     '2nd Flight':   [55, 60, 165], '3rd Flight': [20, 120, 80],
     '4th Flight':   [100, 40, 150], '5th Flight': [180, 50, 100],
   }
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(14)
+  doc.setTextColor(...PDF_NAVY)
+  doc.text(tournament.name ?? 'Tournament Results', 14, y)
+  y += 5
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(85, 85, 85)
+  doc.text(`${fmtDate(tournament.date)} · ${tournament.course}`, 14, y)
+  y += 8
+
+  if (totalPlayers === 0) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(...PDF_NAVY)
+    doc.text('No players registered', 14, y)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(110, 110, 110)
+    doc.text('Add players to flights before exporting tournament results.', 14, y + 7)
+    addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · CGA`)
+    doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.pdf`)
+    return
+  }
+
+  if (!resultsPosted) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.setTextColor(...PDF_NAVY)
+    doc.text('Tournament Results', 14, y)
+    y += 7
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(11)
+    doc.setTextColor(95, 95, 95)
+    doc.text('Results pending — scores not yet posted', 14, y)
+    y += 8
+
+    autoTable(doc, {
+      head: [['Registered Players', 'Flight', 'Pre-event PTM']],
+      body: FLIGHTS.flatMap(fl => (sanitizedFlightData[fl] ?? []).map((player) => [
+        player.name,
+        fl,
+        player.preEventPtm == null ? '—' : player.preEventPtm,
+      ])),
+      startY: y,
+      theme: 'striped',
+      headStyles: { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      styles: { fontSize: 8, cellPadding: 1.8, textColor: [35, 35, 35], lineColor: [226, 232, 240], lineWidth: 0.15 },
+      columnStyles: { 2: { halign: 'center', cellWidth: 24 } },
+      margin: { left: 14, right: 14 },
+    })
+
+    addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · CGA`)
+    doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.pdf`)
+    return
+  }
+
   for (const fl of FLIGHTS) {
-    const rawPs = flightData[fl] ?? []
+    const rawPs = sanitizedFlightData[fl] ?? []
     const ps    = calcFlightPOY(rawPs)
-    if (!ps.length) continue
+    const hasPostedScoresInFlight = ps.some(p => p.score != null)
+    if (!ps.length || !hasPostedScoresInFlight) continue
     const ranked   = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
     const unranked = ps.filter(p => p.rank == null)
     const rows     = [...ranked, ...unranked]
     const color = flightColors[fl] ?? PDF_NAVY
-    y = ensurePdfSpace(doc, y, 24)
+    y = ensurePdfSpace(doc, y, 26)
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
-    doc.text(fl.toUpperCase(), 14, y + 4)
+    doc.text(`${fl.toUpperCase()} (${rows.length})`, 14, y + 4)
     autoTable(doc, {
-      head: [['Rank', 'Player', 'PTM', 'Score', '+/−', 'POY Pts']],
+      head: [['Rank', 'Player', 'PTM', 'Score', 'Net', 'POY Pts']],
       body: rows.map(p => [
-        p.rank ?? '—', p.name + (p.eligible === false ? ' *' : ''), p.ptm ?? '—', p.score ?? '—',
+        p.rank ?? '—', p.name + (p.eligible === false ? ' *' : ''), p.preEventPtm ?? '—', p.score ?? '—',
         p.plusMinus == null ? '—' : p.plusMinus > 0 ? `+${p.plusMinus}` : String(p.plusMinus),
-        fmtPOY(p),
+        p.poy == null && p.score != null ? 'Pending' : fmtPOY(p),
       ]),
       startY: y + 6, theme: 'striped',
       headStyles:         { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      alternateRowStyles: { fillColor: [245, 248, 252] },
-      styles:             { fontSize: 8, cellPadding: 2 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      styles:             { fontSize: 8, cellPadding: 1.8, textColor: [30, 30, 30], lineColor: [226, 232, 240], lineWidth: 0.15 },
       columnStyles: { 0: { halign: 'center', cellWidth: 14 }, 2: { halign: 'center', cellWidth: 14 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'center', cellWidth: 14 }, 5: { halign: 'center', cellWidth: 22 } },
       margin: { left: 14, right: 14 },
       didParseCell(data) {
@@ -706,23 +819,24 @@ async function exportCreditsPDF(credits, membersList) {
 // ── Excel: Tournament Results ─────────────────────────────────────────────────
 function exportResultsXLSX(tournament, flightData) {
   if (!tournament) return
+  const sanitizedFlightData = sanitizeResultsData(flightData)
   const wb = XLSX.utils.book_new()
   for (const fl of FLIGHTS) {
-    const rawPs = flightData[fl] ?? []
+    const rawPs = sanitizedFlightData[fl] ?? []
     const ps = calcFlightPOY(rawPs)
     if (!ps.length) continue
     const ranked   = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
     const unranked = ps.filter(p => p.rank == null)
     const rows = [...ranked, ...unranked]
     const wsData = [
-      ['Rank', 'Player', 'PTM', 'Score', '+/-', 'POY Pts', 'Eligible'],
+      ['Rank', 'Player', 'PTM', 'Score', 'Net', 'POY Pts', 'Eligible'],
       ...rows.map(p => [
         p.rank ?? '',
         p.name,
-        p.ptm ?? '',
+        p.preEventPtm ?? '',
         p.score ?? '',
         p.plusMinus == null ? '' : p.plusMinus,
-        p.poy == null ? '' : p.poy,
+        p.poy == null && p.score != null ? 'Pending' : (p.poy == null ? '' : p.poy),
         p.eligible === false ? 'No' : 'Yes',
       ]),
     ]
