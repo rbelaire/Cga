@@ -107,6 +107,42 @@ function calcFlightPOY(players) {
 const fmtPM  = pm => pm == null ? '—' : pm > 0 ? `+${pm}` : `${pm}`
 const fmtPOY = p  => p.poy == null ? '—' : p.eligible === false ? 'X' : p.poy % 1 === 0 ? String(p.poy) : p.poy.toFixed(1)
 
+function sanitizeResultsData(flightData = {}) {
+  const cleanNumber = (value) => {
+    if (value === '' || value == null) return null
+    const num = Number(value)
+    return Number.isFinite(num) ? num : null
+  }
+  const cleanText = (value) => {
+    if (value == null) return ''
+    return String(value).replace(/[^\x20-\x7E]/g, '').trim()
+  }
+
+  return Object.fromEntries(FLIGHTS.map((flight) => {
+    const rows = Array.isArray(flightData?.[flight]) ? flightData[flight] : []
+    const normalizedRows = rows
+      .filter(Boolean)
+      .map((row) => {
+        const score = cleanNumber(row?.score)
+        const ptm = cleanNumber(row?.ptm)
+        return {
+          ...row,
+          name: cleanText(row?.name),
+          score,
+          ptm,
+          preEventPtm: ptm,
+          plusMinus: (score == null || ptm == null) ? null : score - ptm,
+        }
+      })
+      .filter(row => row.name)
+    return [flight, normalizedRows]
+  }))
+}
+
+function hasAnyScores(sanitizedFlightData = {}) {
+  return FLIGHTS.some(flight => (sanitizedFlightData[flight] ?? []).some(player => player.score != null))
+}
+
 // ── Excel roster parsing ──────────────────────────────────────────────────────
 function normalizeTee(t) {
   if (!t) return null
@@ -459,23 +495,24 @@ async function exportCreditsPDF(credits, membersList) {
 // ── Excel: Tournament Results ─────────────────────────────────────────────────
 function exportResultsXLSX(tournament, flightData) {
   if (!tournament) return
+  const sanitizedFlightData = sanitizeResultsData(flightData)
   const wb = XLSX.utils.book_new()
   for (const fl of FLIGHTS) {
-    const rawPs = flightData[fl] ?? []
+    const rawPs = sanitizedFlightData[fl] ?? []
     const ps = calcFlightPOY(rawPs)
     if (!ps.length) continue
     const ranked   = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
     const unranked = ps.filter(p => p.rank == null)
     const rows = [...ranked, ...unranked]
     const wsData = [
-      ['Rank', 'Player', 'PTM', 'Score', '+/-', 'POY Pts', 'Eligible'],
+      ['Rank', 'Player', 'PTM', 'Score', 'Net', 'POY Pts', 'Eligible'],
       ...rows.map(p => [
         p.rank ?? '',
         p.name,
-        p.ptm ?? '',
+        p.preEventPtm ?? '',
         p.score ?? '',
         p.plusMinus == null ? '' : p.plusMinus,
-        p.poy == null ? '' : p.poy,
+        p.poy == null && p.score != null ? 'Pending' : (p.poy == null ? '' : p.poy),
         p.eligible === false ? 'No' : 'Yes',
       ]),
     ]
