@@ -2469,8 +2469,6 @@ function AdminPanel({ currentUser }) {
 
       <section className="mb-6">
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setAdminMode('operations')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Player Management</button>
-          <button type="button" onClick={() => setAdminMode('users')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Member Management</button>
           <button type="button" onClick={() => setAdminMode('snapshots')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Snapshots</button>
           <button type="button" onClick={() => setAdminMode('changelog')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Changelog</button>
         </div>
