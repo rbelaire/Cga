@@ -1059,7 +1059,7 @@ function AdminPanel({ currentUser }) {
   const [tid,          setTid]          = useState(defaultTournamentId)
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
-  const [adminMode,    setAdminMode]    = useState('payments')
+  const [adminMode,    setAdminMode]    = useState('dashboard')
   const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [paymentCreditInputs, setPaymentCreditInputs] = useState({})
@@ -1098,6 +1098,8 @@ function AdminPanel({ currentUser }) {
   // flight management edit state
   const [flightSearch,  setFlightSearch]  = useState('')
   const [editingMember, setEditingMember] = useState(null)
+  const [fieldSearch, setFieldSearch] = useState('')
+  const [fieldFlightFilter, setFieldFlightFilter] = useState('all')
 
   // Excel import state
   const [importPreview,  setImportPreview]  = useState(null)   // { matched, unmatched } | null
@@ -1301,7 +1303,10 @@ function AdminPanel({ currentUser }) {
   )
 
   // Pairings derived state
-  const currentPairings = pairingsData[tid] ?? []
+  const currentPairings = useMemo(
+    () => pairingsData[tid] ?? [],
+    [pairingsData, tid]
+  )
   const pairedNames     = useMemo(
     () => new Set(currentPairings.flatMap(c => c.players.map(p => p.name))),
     [currentPairings]
@@ -1314,6 +1319,47 @@ function AdminPanel({ currentUser }) {
     ).sort((a, b) => compareByLastName(a, b)),
     [data, tid, pairedNames]
   )
+  const fieldPairingLookup = useMemo(() => {
+    const lookup = {}
+    currentPairings.forEach((card, idx) => {
+      const label = card?.pairing || `Group ${idx + 1}`
+      ;(card.players ?? []).forEach(player => {
+        if (player?.name) lookup[player.name] = label
+      })
+    })
+    return lookup
+  }, [currentPairings])
+  const currentFieldPlayers = useMemo(() => {
+    const membersLookup = Object.fromEntries(effectiveMembers.map(member => [member.name, member]))
+    const byName = {}
+    ALL_SCORE_TABS.forEach(flight => {
+      ;(data[tid]?.[flight] ?? []).forEach(player => {
+        const name = player?.name
+        if (!name) return
+        const rosterRecord = membersLookup[name] ?? {}
+        byName[name] = {
+          name,
+          flight: player.flight ?? rosterRecord.flight ?? (flight === 'New Players' ? null : flight),
+          tee: player.tee ?? rosterRecord.tee ?? null,
+          ptm: player.ptm ?? rosterRecord.ptm ?? null,
+          pairing: fieldPairingLookup[name] ?? null,
+        }
+      })
+    })
+    return Object.values(byName).sort(compareByLastName)
+  }, [data, tid, effectiveMembers, fieldPairingLookup])
+  const filteredFieldPlayers = useMemo(() => {
+    const search = fieldSearch.trim().toLowerCase()
+    return currentFieldPlayers.filter(player => {
+      const matchesSearch = !search || player.name.toLowerCase().includes(search) || formatName(player.name).toLowerCase().includes(search)
+      const matchesFlight = fieldFlightFilter === 'all'
+        ? true
+        : fieldFlightFilter === '__unassigned__'
+          ? !player.flight
+          : player.flight === fieldFlightFilter
+      return matchesSearch && matchesFlight
+    })
+  }, [currentFieldPlayers, fieldSearch, fieldFlightFilter])
 
   // credits derived
   const creditRoster = useMemo(() => {
@@ -1936,7 +1982,7 @@ function AdminPanel({ currentUser }) {
   }), [dashboardTid, dashboardTournament, data, pairingsData, payments, allResults, tournamentLifecycle])
   const workflowActions = useMemo(() => ({
     memo: { label: 'Send Tournament Memo', mode: null },
-    field: { label: 'Open Entries', mode: 'payments' },
+    field: { label: 'Open Field', mode: 'field' },
     pairingsLifecycle: { label: 'Generate / Edit Pairings', mode: 'pairings' },
     birdie: { label: 'Export Birdie Pool', mode: null },
     scoresLifecycle: { label: 'Open Scores / Results', mode: 'scores' },
@@ -2046,20 +2092,16 @@ function AdminPanel({ currentUser }) {
     () => dirtyRegistry.some(section => section.saving),
     [dirtyRegistry]
   )
-  const canShowResultsAction = Boolean(allResults?.[tid]) || dashboardWorkflow.counts.resultsPublished
   const keyWorkflowStats = `${paymentPaidCount} Paid / ${totalPlayers} Entered`
   const primaryActions = [
-    { key: 'payments', label: 'Payments', mode: 'payments', icon: '💳' },
-    { key: 'pairings', label: 'Pairings', mode: 'pairings', icon: '👥' },
-    { key: 'scores', label: 'Scores', mode: 'scores', icon: '⛳' },
-    ...(canShowResultsAction ? [{ key: 'results', label: 'Results', mode: 'scores', icon: '🏆' }] : []),
-  ]
-  const secondaryActions = [
-    { key: 'setup', label: 'Setup Tournament', onClick: () => setAdminMode('operations') },
-    { key: 'users', label: 'Manage Users', onClick: () => setAdminMode('users') },
-    { key: 'export', label: 'Export', onClick: () => setShowExportPanel(true) },
-    { key: 'snapshots', label: 'Snapshots', onClick: () => setAdminMode('snapshots') },
-    { key: 'changelog', label: 'Changelog', onClick: () => setAdminMode('changelog') },
+    { key: 'overview', label: 'Overview', icon: '📊', onClick: () => setAdminMode('dashboard'), active: adminMode === 'dashboard' },
+    { key: 'entries', label: 'Entries', icon: '🧾', onClick: () => setAdminMode('payments'), active: adminMode === 'payments' },
+    { key: 'field', label: 'Field', icon: '🏌️', onClick: () => setAdminMode('field'), active: adminMode === 'field' },
+    { key: 'pairings', label: 'Pairings', icon: '👥', onClick: () => setAdminMode('pairings'), active: adminMode === 'pairings' },
+    { key: 'scores', label: 'Scores', icon: '⛳', onClick: () => setAdminMode('scores'), active: adminMode === 'scores' },
+    { key: 'results', label: 'Results', icon: '🏆', onClick: () => setAdminMode('scores'), active: false },
+    { key: 'exports', label: 'Exports', icon: '📤', onClick: () => setShowExportPanel(true), active: false },
+    { key: 'settings', label: 'Settings', icon: '⚙️', onClick: () => setAdminMode('operations'), active: adminMode === 'operations' || adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
   ]
 
   async function saveAllDirtyDrafts() {
@@ -2512,14 +2554,14 @@ function AdminPanel({ currentUser }) {
       </section>
 
       <section className="mb-6">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
           {primaryActions.map(action => (
             <button
               key={action.key}
               type="button"
-              onClick={() => setAdminMode(action.mode)}
+              onClick={action.onClick}
               className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-sans font-semibold transition-colors ${
-                adminMode === action.mode
+                action.active
                   ? 'border-forest bg-forest text-white shadow-sm'
                   : 'border-forest/30 bg-white text-forest hover:bg-forest/10'
               }`}
@@ -2533,21 +2575,15 @@ function AdminPanel({ currentUser }) {
 
       <section className="mb-6">
         <div className="flex flex-wrap gap-2">
-          {secondaryActions.map(action => (
-            <button
-              key={action.key}
-              type="button"
-              onClick={action.onClick}
-              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext"
-            >
-              {action.label}
-            </button>
-          ))}
+          <button type="button" onClick={() => setAdminMode('operations')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Field Setup</button>
+          <button type="button" onClick={() => setAdminMode('users')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Manage Users</button>
+          <button type="button" onClick={() => setAdminMode('snapshots')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Snapshots</button>
+          <button type="button" onClick={() => setAdminMode('changelog')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Changelog</button>
         </div>
       </section>
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          TOURNAMENT SETUP MODE
+          SCORING OPERATIONS MODE
       ══════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'scores' && (
         <ScoreEntryPanel
@@ -2577,8 +2613,6 @@ function AdminPanel({ currentUser }) {
           onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
           pairingsPosted={pairingsPosted}
           onGoToPairings={() => setAdminMode('pairings')}
-          workflow={dashboardWorkflow}
-          onOpenExport={() => setShowExportPanel(true)}
         />
       )}
 
@@ -2598,11 +2632,34 @@ function AdminPanel({ currentUser }) {
           publishSaving={publishSaving}
           onGoToScores={() => setAdminMode('scores')}
           onGoToPayments={() => setAdminMode('payments')}
+          onGoToField={() => setAdminMode('field')}
           onGoToPairings={() => setAdminMode('pairings')}
           onMarkMemoSent={() => markMemoSent(dashboardTid)}
           onExportBirdiePool={() => generateBirdieExport(dashboardTid)}
           onGeneratePayout={() => generatePayoutDocument(dashboardTid)}
           onGoToResults={() => setAdminMode('scores')}
+        />
+      )}
+
+      {adminMode === 'field' && (
+        <FieldPanel
+          tournament={tournament}
+          fieldPlayers={filteredFieldPlayers}
+          fieldCount={currentFieldPlayers.length}
+          fieldCap={dashboardWorkflow.counts.fieldCap}
+          fieldSearch={fieldSearch}
+          setFieldSearch={setFieldSearch}
+          fieldFlightFilter={fieldFlightFilter}
+          setFieldFlightFilter={setFieldFlightFilter}
+          editingMember={editingMember}
+          setEditingMember={setEditingMember}
+          updateMemberFlight={updateMemberFlight}
+          updateMemberPtm={updateMemberPtm}
+          updateMemberTee={updateMemberTee}
+          saveMembers={saveMembers}
+          membersSaving={membersSaving}
+          membersSaveStatus={membersSaveStatus}
+          flightTagStyles={flightTagStyles}
         />
       )}
 
@@ -2646,12 +2703,12 @@ function AdminPanel({ currentUser }) {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          FLIGHT MANAGEMENT MODE
+          FIELD SETUP & SETTINGS MODE
       ══════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'operations' && (
         <div className="space-y-5">
           <section className="bg-white border border-gray-200 rounded-lg p-4">
-            <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-3">Player Management & Settings</p>
+            <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-3">Field Setup</p>
             <FlightManagementPanel
               effectiveMembers={effectiveMembers}
               membersData={membersData}
@@ -3157,11 +3214,11 @@ function AdminPanel({ currentUser }) {
 function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
-  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout, onGoToResults,
+  onGoToScores, onGoToPayments, onGoToField, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout, onGoToResults,
 }) {
   const lifecycleActions = {
     memo: { label: 'Mark Sent', action: onMarkMemoSent },
-    field: { label: 'Open Entries', action: onGoToPayments },
+    field: { label: 'Open Field', action: onGoToField },
     pairingsLifecycle: { label: workflow.counts.pairingsState === 'published' ? 'Edit Pairings' : 'Generate Pairings', action: onGoToPairings },
     birdie: { label: 'Export', action: onExportBirdiePool },
     scoresLifecycle: { label: workflow.counts.resultsPublished ? 'View Results' : 'Enter Scores', action: workflow.counts.resultsPublished ? onGoToResults : onGoToScores },
@@ -3170,6 +3227,26 @@ function DashboardPanel({
 
   return (
     <div className="space-y-5">
+      <section className="bg-white border border-gray-200 rounded-lg p-5">
+        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Overview</p>
+        <h2 className="text-darktext font-serif text-2xl font-semibold mb-1">{selectedTournament?.name ?? 'No tournament selected'}</h2>
+        <p className="text-gray-500 font-sans text-sm mb-4">{selectedTournament?.date ? fmtDate(selectedTournament.date) : 'No date available'}</p>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <MetricCard label="Field" value={`${workflow.counts.enteredCount} / ${workflow.counts.fieldCap}`} detail={`${Math.max(workflow.counts.fieldCap - workflow.counts.enteredCount, 0)} spots remaining`} />
+          <MetricCard label="Paid" value={`${workflow.counts.paidCount}`} detail={workflow.counts.enteredCount > 0 ? `${workflow.counts.enteredCount - workflow.counts.paidCount} unpaid` : 'No entries yet'} />
+          <MetricCard label="Pairings" value={workflow.counts.pairingsState === 'published' ? 'Published' : workflow.counts.pairingsState === 'draft' ? 'Draft' : 'Not Started'} detail={`${workflow.counts.pairedCount}/${workflow.counts.enteredCount || 0} grouped`} />
+          <MetricCard label="Scores" value={`${workflow.counts.scoredCount}/${workflow.counts.enteredCount || 0}`} detail={workflow.counts.scoredCount === 0 ? 'Not started' : workflow.counts.scoredCount >= workflow.counts.enteredCount && workflow.counts.enteredCount > 0 ? 'Complete' : 'In progress'} />
+          <MetricCard label="Results / Payout" value={workflow.counts.resultsPublished ? 'Published' : 'Pending'} detail={workflow.lifecycleSteps.find(step => step.key === 'payout')?.label ?? 'Payout status unavailable'} />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button onClick={onGoToPayments} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Entries</button>
+          <button onClick={onGoToField} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Field</button>
+          <button onClick={onGoToPairings} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Pairings</button>
+          <button onClick={onGoToScores} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Scores</button>
+          <button onClick={onGoToResults} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Results</button>
+        </div>
+      </section>
+
       <section className="bg-white border border-gray-200 rounded-lg p-5">
         <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Next Tournament</p>
         {nextTournament ? (
@@ -3193,31 +3270,6 @@ function DashboardPanel({
       )}
 
       <section className="bg-white border border-gray-200 rounded-lg p-5">
-        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest">Tournament Overview</p>
-        <h3 className="text-darktext font-serif text-xl font-semibold">{selectedTournament?.name ?? 'No tournament selected'}</h3>
-        {selectedTournament?.date && <p className="text-gray-500 font-sans text-sm mb-4">{fmtDateShort(selectedTournament.date)}</p>}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Header</p>
-            <p className="font-sans text-sm text-darktext mt-1">Date: {selectedTournament?.date ?? '—'}</p>
-            <p className="stat-number text-2xl text-forest mt-2">{workflow.counts.paidCount} / {workflow.counts.fieldCap}</p>
-            <p className="text-xs text-gray-500 font-sans">Field count</p>
-          </div>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Pairings State</p>
-            <p className="font-sans text-sm font-semibold mt-1 text-forest capitalize">{workflow.counts.pairingsState}</p>
-            <button onClick={onGoToPairings} className="mt-2 text-xs font-sans font-semibold text-forest hover:underline">Pairings</button>
-          </div>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Quick Links</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button onClick={onGoToPayments} className="text-xs font-sans font-semibold text-forest hover:underline">Entries</button>
-              <button onClick={onGoToPairings} className="text-xs font-sans font-semibold text-forest hover:underline">Pairings</button>
-              <button onClick={onGoToScores} className="text-xs font-sans font-semibold text-forest hover:underline">Scoring</button>
-              <button onClick={onGoToResults} className="text-xs font-sans font-semibold text-forest hover:underline">Results</button>
-            </div>
-          </div>
-        </div>
         <TournamentWorkflowTracker workflow={{ steps: workflow.lifecycleSteps }} actions={lifecycleActions} />
       </section>
 
@@ -3250,6 +3302,16 @@ function DashboardPanel({
           <p className="text-gray-500 font-sans text-sm">No published tournament results found.</p>
         )}
       </section>
+    </div>
+  )
+}
+
+function MetricCard({ label, value, detail }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <p className="text-[11px] font-sans font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="mt-1 stat-number text-2xl text-forest leading-none">{value}</p>
+      <p className="mt-1 text-xs font-sans text-gray-500">{detail}</p>
     </div>
   )
 }
@@ -3312,6 +3374,128 @@ function TournamentWorkflowTracker({ workflow, actions = {} }) {
           )
         })}
       </ol>
+    </div>
+  )
+}
+
+function FieldPanel({
+  tournament,
+  fieldPlayers,
+  fieldCount,
+  fieldCap,
+  fieldSearch,
+  setFieldSearch,
+  fieldFlightFilter,
+  setFieldFlightFilter,
+  editingMember,
+  setEditingMember,
+  updateMemberFlight,
+  updateMemberPtm,
+  updateMemberTee,
+  saveMembers,
+  membersSaving,
+  membersSaveStatus,
+  flightTagStyles,
+}) {
+  return (
+    <div className="space-y-4">
+      <section className="bg-white border border-gray-200 rounded-lg p-5">
+        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-1">Current Tournament Field</p>
+        <h2 className="text-darktext font-serif text-2xl font-semibold">{tournament?.name ?? 'No tournament selected'}</h2>
+        <p className="text-gray-500 font-sans text-sm mt-1">{fieldCount} / {fieldCap} players entered · {Math.max(fieldCap - fieldCount, 0)} spots remaining</p>
+      </section>
+
+      <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-forest px-4 py-3 flex flex-wrap items-center gap-2">
+          <span className="text-white font-sans text-sm font-semibold">Field</span>
+          <span className="text-white/60 font-mono text-xs">{fieldPlayers.length} shown</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={fieldSearch}
+              onChange={e => setFieldSearch(e.target.value)}
+              placeholder="Search players…"
+              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-gold w-44"
+            />
+            <select
+              value={fieldFlightFilter}
+              onChange={e => setFieldFlightFilter(e.target.value)}
+              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-gold"
+            >
+              <option value="all" className="text-darktext">All flights</option>
+              {FLIGHTS.map(flight => <option key={flight} value={flight} className="text-darktext">{flight}</option>)}
+              <option value="__unassigned__" className="text-darktext">Unassigned</option>
+            </select>
+            <SaveBtn onClick={saveMembers} saving={membersSaving} status={membersSaveStatus} label="Save Field Setup" />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[760px]">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="table-header text-gray-500 text-left">Player</th>
+                <th className="table-header text-gray-500 text-left">Flight</th>
+                <th className="table-header text-gray-500 text-center">Tee</th>
+                <th className="table-header text-gray-500 text-center">PTM</th>
+                <th className="table-header text-gray-500 text-left">Pairing / Group</th>
+                <th className="table-header text-gray-500 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fieldPlayers.map((player, idx) => {
+                const isEditing = editingMember === player.name
+                return (
+                  <tr key={player.name} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                    <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">{formatName(player.name)}</td>
+                    <td className="px-4 py-2.5">
+                      {isEditing ? (
+                        <select value={player.flight ?? ''} onChange={e => updateMemberFlight(player.name, e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest w-full max-w-[180px]">
+                          <option value="">— Unassigned —</option>
+                          {FLIGHTS.map(flight => <option key={flight} value={flight}>{flight}</option>)}
+                        </select>
+                      ) : (
+                        <span className={`text-xs border px-2 py-0.5 rounded-full font-sans ${player.flight ? (flightTagStyles[player.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned}`}>
+                          {player.flight ?? 'Unassigned'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      {isEditing ? (
+                        <select value={player.tee ?? ''} onChange={e => updateMemberTee(player.name, e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest">
+                          <option value="">—</option>
+                          {TEE_OPTIONS.map(tee => <option key={tee} value={tee}>{tee}</option>)}
+                        </select>
+                      ) : (
+                        <TeeTag tee={player.tee} />
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      {isEditing ? (
+                        <input type="number" value={player.ptm ?? ''} onChange={e => updateMemberPtm(player.name, e.target.value)} className="w-16 border border-gray-300 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:ring-2 focus:ring-forest" />
+                      ) : (
+                        <span className="stat-number text-xs text-gray-600">{player.ptm ?? '—'}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-sm font-sans text-gray-600">{player.pairing ?? '—'}</td>
+                    <td className="px-4 py-2 text-center">
+                      {isEditing ? (
+                        <button onClick={() => setEditingMember(null)} className="px-3 py-1 text-xs rounded bg-forest text-white hover:bg-forest/80 font-sans font-semibold transition-colors">Done</button>
+                      ) : (
+                        <button onClick={() => setEditingMember(player.name)} className="px-3 py-1 text-xs rounded border border-gray-200 text-gray-500 hover:text-forest hover:border-forest font-sans transition-colors">Edit</button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+              {fieldPlayers.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">No players in the active tournament field for this filter.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }
@@ -3525,117 +3709,6 @@ function PublishConfirmModal({ preview, publishSaving, publishSaveStatus, onCanc
             {publishSaving ? 'Publishing…' : 'Confirm & Publish Live Results'}
           </button>
         </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Tournament Step Guide ─────────────────────────────────────────────────────
-function TournamentStepGuide({ workflow, pairingsPosted, onGoToPairings, tournament, onOpenPublishPreview, onOpenExport }) {
-  const { counts = {} } = workflow ?? {}
-  const { enteredCount = 0, scoredCount = 0, pairingsCount = 0, resultsPublished = false } = counts
-
-  const guideSteps = [
-    {
-      num: 1,
-      key: 'entries',
-      title: 'Add Players',
-      desc: enteredCount > 0
-        ? `${enteredCount} player${enteredCount !== 1 ? 's' : ''} entered`
-        : 'Select members and add to flights',
-      done: enteredCount > 0,
-      locked: false,
-      action: null,
-      actionLabel: 'Add Players',
-    },
-    {
-      num: 2,
-      key: 'pairings',
-      title: 'Post Pairings',
-      desc: pairingsPosted
-        ? `${pairingsCount} group${pairingsCount !== 1 ? 's' : ''} posted`
-        : 'Generate and publish tee-time groups',
-      done: pairingsPosted,
-      locked: false,
-      action: onGoToPairings,
-      actionLabel: 'Generate Pairings',
-    },
-    {
-      num: 3,
-      key: 'scores',
-      title: 'Enter Scores',
-      desc: !pairingsPosted
-        ? 'Available after pairings are posted'
-        : scoredCount === 0
-          ? 'Enter each player\'s score'
-          : scoredCount >= enteredCount && enteredCount > 0
-            ? `All ${scoredCount} scores entered`
-            : `${scoredCount} / ${enteredCount} scored`,
-      done: pairingsPosted && scoredCount > 0 && enteredCount > 0 && scoredCount >= enteredCount,
-      locked: !pairingsPosted,
-      action: null,
-      actionLabel: 'Enter Scores',
-    },
-    {
-      num: 4,
-      key: 'results',
-      title: 'Publish Results',
-      desc: resultsPublished
-        ? 'Results live on the site'
-        : 'Calculate standings and make results live',
-      done: resultsPublished,
-      locked: !pairingsPosted || scoredCount === 0,
-      action: onOpenPublishPreview,
-      actionLabel: 'Publish Results',
-    },
-    {
-      num: 5,
-      key: 'export',
-      title: 'Export Tournament Reports',
-      desc: 'Download pairings, payments, and credits packets',
-      done: false,
-      locked: false,
-      action: onOpenExport,
-      actionLabel: 'Export Reports',
-    },
-  ]
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg mb-5 overflow-hidden">
-      <div className="bg-forest px-4 py-2.5 flex items-center gap-3">
-        <span className="text-white font-sans text-sm font-semibold">Tournament Workflow</span>
-        {tournament && (
-          <span className="text-white/50 font-sans text-xs">— {tournament.name}</span>
-        )}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
-        {guideSteps.map(step => (
-          <div key={step.key} className={`px-4 py-3 ${step.locked ? 'opacity-50' : ''}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center flex-shrink-0 ${
-                step.done
-                  ? 'bg-green-500 text-white'
-                  : step.locked
-                    ? 'bg-gray-200 text-gray-400'
-                    : 'bg-gold text-forest'
-              }`}>
-                {step.done ? '✓' : step.num}
-              </span>
-              <span className="text-xs font-sans font-semibold text-darktext">{step.title}</span>
-              {step.locked && <span className="text-gray-300 text-xs">🔒</span>}
-            </div>
-            <p className="text-[11px] font-sans text-gray-400 leading-relaxed ml-7">{step.desc}</p>
-            {step.actionLabel && (
-              <button
-                onClick={step.action ?? undefined}
-                className="ml-7 mt-2 px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-forest/30 text-forest hover:bg-forest/5 disabled:opacity-50"
-                disabled={step.locked || !step.action}
-              >
-                {step.actionLabel}
-              </button>
-            )}
-          </div>
-        ))}
       </div>
     </div>
   )
@@ -3916,23 +3989,12 @@ function ScoreEntryPanel({
   fmtPM, fmtPOY, onOpenPublishPreview,
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
-  pairingsPosted, onGoToPairings, workflow,
-  onOpenExport,
+  pairingsPosted, onGoToPairings,
 }) {
   const hasAnyPlayers = allFlights.some(f => (tournamentData[f]?.length ?? 0) > 0)
 
   return (
     <>
-      {/* Step guide */}
-      <TournamentStepGuide
-        workflow={workflow}
-        pairingsPosted={pairingsPosted}
-        onGoToPairings={onGoToPairings}
-        tournament={tournament}
-        onOpenPublishPreview={onOpenPublishPreview}
-        onOpenExport={onOpenExport}
-      />
-
       {/* Two-panel layout */}
       <div className="flex flex-col lg:flex-row gap-4 mb-6">
 
