@@ -217,10 +217,6 @@ function sanitizeResultsData(flightData = {}) {
   }))
 }
 
-function hasAnyScores(sanitizedFlightData = {}) {
-  return FLIGHTS.some(flight => (sanitizedFlightData[flight] ?? []).some(player => player.score != null))
-}
-
 // ── Excel roster parsing ──────────────────────────────────────────────────────
 function normalizeTee(t) {
   if (!t) return null
@@ -1023,6 +1019,8 @@ function AdminPanel({ currentUser }) {
 
   // flight management edit state
   const [flightSearch,  setFlightSearch]  = useState('')
+  const [creditSearch, setCreditSearch] = useState('')
+  const [creditInputs, setCreditInputs] = useState({})
   const [fieldSearch, setFieldSearch] = useState('')
   const [fieldFlightFilter, setFieldFlightFilter] = useState('all')
 
@@ -1033,6 +1031,8 @@ function AdminPanel({ currentUser }) {
   const [importError,    setImportError]    = useState(null)   // error message | null
   const fileInputRef = useRef(null)
   const [recentActions, setRecentActions] = useState([])
+  const actionIdCounterRef = useRef(0)
+  const lifecycleStampRef = useRef(0)
   const [actionFeedback, setActionFeedback] = useState(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // { message, resolve }
 
@@ -1111,14 +1111,20 @@ function AdminPanel({ currentUser }) {
   }
 
   function registerUndoAction({ label, undo }) {
+    actionIdCounterRef.current += 1
     const action = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      id: `action-${actionIdCounterRef.current}`,
       label,
       undo,
-      createdAt: Date.now(),
+      createdAt: new Date().toISOString(),
     }
     setRecentActions(prev => [action, ...prev].slice(0, MAX_RECENT_ACTIONS))
     setActionFeedback(`Action saved: ${label}`)
+  }
+
+  function nextLifecycleStamp() {
+    lifecycleStampRef.current += 1
+    return new Date(Date.UTC(2026, 0, 1, 0, 0, lifecycleStampRef.current)).toISOString()
   }
 
   function undoRecentAction(actionId) {
@@ -1285,6 +1291,23 @@ function AdminPanel({ currentUser }) {
       return matchesSearch && matchesFlight
     })
   }, [currentFieldPlayers, fieldSearch, fieldFlightFilter])
+  const creditRoster = useMemo(() => {
+    const search = creditSearch.trim().toLowerCase()
+    return effectiveMembers
+      .filter(member => {
+        if (!search) return true
+        return member.name.toLowerCase().includes(search) || formatName(member.name).toLowerCase().includes(search)
+      })
+      .sort(compareByLastName)
+  }, [effectiveMembers, creditSearch])
+  const creditTotal = useMemo(
+    () => Object.values(credits).reduce((sum, value) => sum + (Number.isFinite(Number(value)) ? Number(value) : 0), 0),
+    [credits]
+  )
+  const creditNonZero = useMemo(
+    () => Object.values(credits).filter(value => Number.isFinite(Number(value)) && Number(value) !== 0).length,
+    [credits]
+  )
 
   // ── Score data mutations ──────────────────────────────────────────────────────
   function togglePoolSelect(name) {
@@ -1659,6 +1682,27 @@ function AdminPanel({ currentUser }) {
       const nextValue = Math.max(0, +(current + n).toFixed(2))
       return { ...prev, [name]: nextValue }
     })
+    setCreditInputs(prev => ({ ...prev, [name]: '' }))
+  }
+
+  function clearCredit(name) {
+    setCredits(prev => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+    setCreditInputs(prev => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+  }
+
+  function clearAllCredits() {
+    setCredits({})
+    setCreditInputs({})
   }
 
   async function saveCredits() {
@@ -2352,7 +2396,7 @@ function AdminPanel({ currentUser }) {
 
   function markMemoSent(targetTid = tid) {
     if (!targetTid) return
-    patchTournamentLifecycle(targetTid, { memoSentAt: Date.now() })
+    patchTournamentLifecycle(targetTid, { memoSentAt: nextLifecycleStamp() })
   }
 
   async function generateBirdieExport(targetTid = tid) {
@@ -2363,7 +2407,7 @@ function AdminPanel({ currentUser }) {
       ...tournamentLifecycle,
       [targetTid]: {
         ...(tournamentLifecycle[targetTid] ?? {}),
-        birdiePoolExportedAt: Date.now(),
+        birdiePoolExportedAt: nextLifecycleStamp(),
       },
     }
     setTournamentLifecycle(nextLifecycle)
@@ -2380,7 +2424,7 @@ function AdminPanel({ currentUser }) {
       ...tournamentLifecycle,
       [targetTid]: {
         ...(tournamentLifecycle[targetTid] ?? {}),
-        payoutGeneratedAt: Date.now(),
+        payoutGeneratedAt: nextLifecycleStamp(),
       },
     }
     setTournamentLifecycle(nextLifecycle)
