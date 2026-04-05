@@ -1852,7 +1852,7 @@ function AdminPanel({ currentUser }) {
   }), [dashboardTid, dashboardTournament, data, pairingsData, payments, allResults, tournamentLifecycle])
   const workflowActions = useMemo(() => ({
     memo: { label: 'Send Tournament Memo', mode: null },
-    field: { label: 'Open Field', mode: 'field' },
+    field: { label: 'Review Entries', mode: 'payments' },
     pairingsLifecycle: { label: 'Generate / Edit Pairings', mode: 'pairings' },
     birdie: { label: 'Export Birdie Pool', mode: null },
     scoresLifecycle: { label: 'Open Scores / Results', mode: 'scores' },
@@ -1977,13 +1977,12 @@ function AdminPanel({ currentUser }) {
   const primaryActions = [
     { key: 'overview', label: 'Overview', icon: '📊', onClick: () => setAdminMode('dashboard'), active: adminMode === 'dashboard' },
     { key: 'entries', label: 'Entries', icon: '🧾', onClick: () => setAdminMode('payments'), active: adminMode === 'payments' },
-    { key: 'field', label: 'Field', icon: '🏌️', onClick: () => setAdminMode('field'), active: adminMode === 'field' },
     { key: 'pairings', label: 'Pairings', icon: '👥', onClick: () => setAdminMode('pairings'), active: adminMode === 'pairings' },
     { key: 'scores', label: 'Scores', icon: '⛳', onClick: () => setAdminMode('scores'), active: adminMode === 'scores' },
     { key: 'results', label: 'Results', icon: '🏆', onClick: () => setAdminMode('scores'), active: false },
     { key: 'exports', label: 'Exports', icon: '📤', onClick: () => setShowExportPanel(true), active: false },
     { key: 'player-management', label: 'Player Management', icon: '🗂️', onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
-    { key: 'settings', label: 'Settings', icon: '⚙️', onClick: () => setAdminMode('users'), active: adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
+    { key: 'member-management', label: 'Member Management', icon: '👥', onClick: () => setAdminMode('users'), active: adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
   ]
 
   async function saveAllDirtyDrafts() {
@@ -2471,7 +2470,7 @@ function AdminPanel({ currentUser }) {
       <section className="mb-6">
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => setAdminMode('operations')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Player Management</button>
-          <button type="button" onClick={() => setAdminMode('users')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Manage Users</button>
+          <button type="button" onClick={() => setAdminMode('users')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Member Management</button>
           <button type="button" onClick={() => setAdminMode('snapshots')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Snapshots</button>
           <button type="button" onClick={() => setAdminMode('changelog')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Changelog</button>
         </div>
@@ -2527,7 +2526,6 @@ function AdminPanel({ currentUser }) {
           publishSaving={publishSaving}
           onGoToScores={() => setAdminMode('scores')}
           onGoToPayments={() => setAdminMode('payments')}
-          onGoToField={() => setAdminMode('field')}
           onGoToPairings={() => setAdminMode('pairings')}
           onMarkMemoSent={() => markMemoSent(dashboardTid)}
           onExportBirdiePool={() => generateBirdieExport(dashboardTid)}
@@ -3102,11 +3100,11 @@ function AdminPanel({ currentUser }) {
 function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
-  onGoToScores, onGoToPayments, onGoToField, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout, onGoToResults,
+  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout, onGoToResults,
 }) {
   const lifecycleActions = {
     memo: { label: 'Mark Sent', action: onMarkMemoSent },
-    field: { label: 'Open Field', action: onGoToField },
+    field: { label: 'Review Entries', action: onGoToPayments },
     pairingsLifecycle: { label: workflow.counts.pairingsState === 'published' ? 'Edit Pairings' : 'Generate Pairings', action: onGoToPairings },
     birdie: { label: 'Export', action: onExportBirdiePool },
     scoresLifecycle: { label: workflow.counts.resultsPublished ? 'View Results' : 'Enter Scores', action: workflow.counts.resultsPublished ? onGoToResults : onGoToScores },
@@ -3128,7 +3126,6 @@ function DashboardPanel({
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button onClick={onGoToPayments} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Entries</button>
-          <button onClick={onGoToField} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Field</button>
           <button onClick={onGoToPairings} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Pairings</button>
           <button onClick={onGoToScores} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Scores</button>
           <button onClick={onGoToResults} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Results</button>
