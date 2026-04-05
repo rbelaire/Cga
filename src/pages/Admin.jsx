@@ -331,6 +331,55 @@ function cloneForUndo(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value))
 }
 
+function sanitizePairingsForCompare(pairingsByTournament = {}) {
+  const next = {}
+  Object.entries(pairingsByTournament || {}).forEach(([tournamentId, cards]) => {
+    if (!Array.isArray(cards)) return
+    const normalizedCards = cards
+      .map((card, idx) => ({
+        pairing: card?.pairing ?? `Pairing ${idx + 1}`,
+        players: Array.isArray(card?.players)
+          ? card.players
+            .filter(player => player?.name)
+            .map(player => ({ name: player.name, flight: player.flight ?? null }))
+          : [],
+      }))
+      .filter(card => card.players.length > 0)
+    if (normalizedCards.length > 0) next[tournamentId] = normalizedCards
+  })
+  return next
+}
+
+function sanitizeLifecycleForPairings(lifecycleByTournament = {}) {
+  const next = {}
+  Object.entries(lifecycleByTournament || {}).forEach(([tournamentId, state]) => {
+    if (!state || typeof state !== 'object') return
+    const pairingsState = state.pairingsState ?? null
+    const pairingsPublishedAt = state.pairingsPublishedAt ?? null
+    if (!pairingsState && !pairingsPublishedAt) return
+    if (pairingsState === 'none' && !pairingsPublishedAt) return
+    next[tournamentId] = { pairingsState, pairingsPublishedAt }
+  })
+  return next
+}
+
+function sanitizeMembersForCompare(members = [], overrides = {}) {
+  const next = {}
+  members.forEach(member => {
+    const local = overrides?.[member.name] ?? {}
+    next[member.name] = {
+      flight: local.flight ?? member.flight ?? null,
+      ptm: local.ptm ?? member.ptm ?? null,
+      tee: local.tee ?? member.tee ?? null,
+    }
+  })
+  return next
+}
+
+function hasMeaningfulChanges(saved, working) {
+  return stableSerialize(saved) !== stableSerialize(working)
+}
+
 // ── PDF utilities ──────────────────────────────────────────────────────────────
 async function loadAssetBase64(url = `${import.meta.env.BASE_URL}cga-logo.png`) {
   try {
@@ -850,6 +899,8 @@ function AdminPanel({ currentUser }) {
   const [paymentMeta, setPaymentMeta] = useState(() => {
     try { return JSON.parse(localStorage.getItem(PAYMENT_META_KEY)) || {} } catch { return {} }
   })
+  const [pairingsDirtyTouched, setPairingsDirtyTouched] = useState(false)
+  const [membersDirtyTouched, setMembersDirtyTouched] = useState(false)
 
   const currentTournaments = useMemo(() => getCurrentTournaments(schedule), [])
   const pastTournaments = useMemo(() => getPastTournaments(schedule), [])
@@ -1318,6 +1369,7 @@ function AdminPanel({ currentUser }) {
     const newPairings = groups
       .filter(g => g.length > 0)
       .map((ps, i) => ({ pairing: `Pairing ${i + 1}`, players: ps }))
+    setPairingsDirtyTouched(true)
     setPairingsData(prev => ({ ...prev, [tid]: newPairings }))
     patchTournamentLifecycle(tid, { pairingsState: 'draft' })
     setManualPairings(false)
@@ -1329,6 +1381,7 @@ function AdminPanel({ currentUser }) {
     if (!currentPairings.length) {
       const numGroups = Math.max(DEFAULT_PAIRING_ROWS, Math.ceil(totalPlayers / 4) || 1)
       const empty = Array.from({ length: numGroups }, (_, i) => ({ pairing: `Pairing ${i + 1}`, players: [] }))
+      setPairingsDirtyTouched(true)
       setPairingsData(prev => ({ ...prev, [tid]: empty }))
       patchTournamentLifecycle(tid, { pairingsState: 'draft' })
     }
@@ -1338,6 +1391,7 @@ function AdminPanel({ currentUser }) {
 
   function addGroupManual() {
     const idx = currentPairings.length + 1
+    setPairingsDirtyTouched(true)
     setPairingsData(prev => ({
       ...prev,
       [tid]: [...(prev[tid] ?? []), { pairing: `Pairing ${idx}`, players: [] }]
@@ -1354,6 +1408,7 @@ function AdminPanel({ currentUser }) {
     updated.splice(cardIdx, 1)
     // Re-label
     updated.forEach((c, i) => { c.pairing = `Pairing ${i + 1}` })
+    setPairingsDirtyTouched(true)
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
     patchTournamentLifecycle(tid, { pairingsState: 'draft' })
     registerUndoAction({
@@ -1418,6 +1473,7 @@ function AdminPanel({ currentUser }) {
 
     if (targetPlayers.length >= 4) return
     targetPlayers.splice(insertAt, 0, movingPlayer)
+    setPairingsDirtyTouched(true)
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
     patchTournamentLifecycle(tid, { pairingsState: 'draft' })
   }
@@ -1425,6 +1481,7 @@ function AdminPanel({ currentUser }) {
   async function clearPairings() {
     if (!await openConfirm('Clear all pairings for this tournament?')) return
     const snapshot = cloneForUndo(currentPairings)
+    setPairingsDirtyTouched(true)
     setPairingsData(prev => ({ ...prev, [tid]: [] }))
     patchTournamentLifecycle(tid, { pairingsState: 'none' })
     setManualPairings(false)
@@ -1447,6 +1504,7 @@ function AdminPanel({ currentUser }) {
         ? { ...c, players: c.players.filter((_, pi) => pi !== playerIdx) }
         : c
     )
+    setPairingsDirtyTouched(true)
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
     patchTournamentLifecycle(tid, { pairingsState: 'draft' })
     registerUndoAction({
@@ -1489,12 +1547,14 @@ function AdminPanel({ currentUser }) {
       ])
       setTournamentLifecycle(nextLifecycle)
     }, setAdminError)
+    if (ok) setPairingsDirtyTouched(false)
     if (ok) logChange('Pairings saved', tournament?.name ?? tid)
     return ok
   }
 
   // ── Flight management mutations ───────────────────────────────────────────────
   function updateMemberFlight(name, newFlight) {
+    setMembersDirtyTouched(true)
     setMembersOverride(prev => ({
       ...prev,
       [name]: { ...(prev[name] ?? {}), flight: newFlight || null }
@@ -1502,6 +1562,7 @@ function AdminPanel({ currentUser }) {
   }
 
   function updateMemberPtm(name, newPtm) {
+    setMembersDirtyTouched(true)
     setMembersOverride(prev => ({
       ...prev,
       [name]: { ...(prev[name] ?? {}), ptm: newPtm === '' ? null : Number(newPtm) }
@@ -1509,6 +1570,7 @@ function AdminPanel({ currentUser }) {
   }
 
   function updateMemberTee(name, newTee) {
+    setMembersDirtyTouched(true)
     setMembersOverride(prev => ({
       ...prev,
       [name]: { ...(prev[name] ?? {}), tee: newTee || null }
@@ -1528,6 +1590,7 @@ function AdminPanel({ currentUser }) {
       await saveSnapshot('members', membersData, 'Before members save')
       await DB.saveMembers(updated)
     }, setAdminError)
+    if (ok) setMembersDirtyTouched(false)
     if (ok) logChange('Members saved', `${updated.length} members`)
     return ok
   }
@@ -1807,16 +1870,27 @@ function AdminPanel({ currentUser }) {
     return Array.isArray(p) && p.length > 0
   }, [cloudPairings, tid, tournamentLifecycle])
 
+  const pairingsDirty = useMemo(() => {
+    if (!pairingsDirtyTouched) return false
+    return hasMeaningfulChanges(
+      {
+        pairings: sanitizePairingsForCompare(cloudPairings),
+        lifecycle: sanitizeLifecycleForPairings(cloudTournamentLifecycle),
+      },
+      {
+        pairings: sanitizePairingsForCompare(pairingsData),
+        lifecycle: sanitizeLifecycleForPairings(tournamentLifecycle),
+      }
+    )
+  }, [pairingsDirtyTouched, cloudPairings, cloudTournamentLifecycle, pairingsData, tournamentLifecycle])
+
   const membersDirty = useMemo(() => {
-    const cloudLookup = Object.fromEntries(membersData.map(m => [m.name, m]))
-    const overrideNames = Object.keys(membersOverride)
-    return overrideNames.some(name => {
-      const local = membersOverride[name] ?? {}
-      const cloud = cloudLookup[name]
-      if (!cloud) return true
-      return (local.flight ?? null) !== (cloud.flight ?? null) || (local.ptm ?? null) !== (cloud.ptm ?? null)
-    })
-  }, [membersData, membersOverride])
+    if (!membersDirtyTouched) return false
+    return hasMeaningfulChanges(
+      sanitizeMembersForCompare(membersData),
+      sanitizeMembersForCompare(membersData, membersOverride)
+    )
+  }, [membersDirtyTouched, membersData, membersOverride])
 
   const dirtyRegistry = useMemo(() => ([
     {
@@ -1829,7 +1903,7 @@ function AdminPanel({ currentUser }) {
     {
       key: 'pairings',
       label: 'Pairings Builder',
-      dirty: stableSerialize(pairingsData) !== stableSerialize(cloudPairings) || stableSerialize(tournamentLifecycle) !== stableSerialize(cloudTournamentLifecycle),
+      dirty: pairingsDirty,
       saveAction: 'pairings',
       saving: pairingsSaving,
     },
@@ -1870,7 +1944,7 @@ function AdminPanel({ currentUser }) {
     },
   ]), [
     data, cloudScores, scoresSaving,
-    pairingsData, cloudPairings, pairingsSaving, tournamentLifecycle, cloudTournamentLifecycle,
+    pairingsDirty, pairingsSaving,
     membersDirty, membersSaving,
     credits, cloudCredits, creditsSaving,
     payments, cloudPayments, paymentsSaving, paymentMeta, cloudPaymentMeta,
@@ -1927,6 +2001,30 @@ function AdminPanel({ currentUser }) {
     }
     setSaveAllSaving(false)
     setTimeout(() => setSaveAllStatus(null), 3000)
+  }
+
+  async function discardAllDirtyDrafts() {
+    if (!hasUnsavedDrafts || saveAllSaving || anySectionSaving) return
+    if (!await openConfirm('Discard ALL local changes and revert everything to the last saved cloud version?')) return
+    const dirtyKeys = new Set(unsavedDrafts.map(section => section.key))
+    if (dirtyKeys.has('scores')) setData(cloudScores)
+    if (dirtyKeys.has('pairings')) {
+      setPairingsData(cloudPairings)
+      setTournamentLifecycle(cloudTournamentLifecycle)
+      setPairingsDirtyTouched(false)
+    }
+    if (dirtyKeys.has('payments')) {
+      setPayments(cloudPayments)
+      setPaymentMeta(cloudPaymentMeta)
+    }
+    if (dirtyKeys.has('credits')) setCredits(cloudCredits)
+    if (dirtyKeys.has('users')) setUsersDraft(cloudUsers)
+    if (dirtyKeys.has('tournament-info')) setTournamentInfoDrafts({})
+    if (dirtyKeys.has('members')) {
+      const base = Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm, tee: m.tee ?? null }]))
+      setMembersOverride(base)
+      setMembersDirtyTouched(false)
+    }
   }
 
   const paymentRoster = useMemo(() => {
@@ -2291,37 +2389,27 @@ function AdminPanel({ currentUser }) {
 
       <section className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-sans font-semibold ${hasUnsavedDrafts ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-emerald-300 bg-emerald-50 text-emerald-700'}`}>
-              {hasUnsavedDrafts ? 'Unsaved changes' : 'All changes synced'}
-            </span>
-            <button
-              onClick={saveAllDirtyDrafts}
-              disabled={saveAllSaving || anySectionSaving || savableUnsavedDrafts.length === 0}
-              className="px-3 py-2 text-xs font-sans font-semibold rounded-md bg-forest text-white disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {saveAllSaving ? 'Saving…' : 'Save All'}
-            </button>
-            {hasUnsavedDrafts && (
+          {hasUnsavedDrafts ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-sans font-semibold border-amber-300 bg-amber-50 text-amber-800">
+                Unsaved changes
+              </span>
               <button
-                onClick={async () => {
-                  if (!await openConfirm('Discard ALL local changes and revert everything to the last saved cloud version?')) return
-                  setData(cloudScores)
-                  setPairingsData(cloudPairings)
-                  setPayments(cloudPayments)
-                  setCredits(cloudCredits)
-                  setUsersDraft(cloudUsers)
-                  setTournamentInfoDrafts({})
-                  const base = Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm }]))
-                  setMembersOverride(base)
-                }}
+                onClick={saveAllDirtyDrafts}
+                disabled={saveAllSaving || anySectionSaving || savableUnsavedDrafts.length === 0}
+                className="px-3 py-2 text-xs font-sans font-semibold rounded-md bg-forest text-white disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {saveAllSaving ? 'Saving…' : 'Save All'}
+              </button>
+              <button
+                onClick={discardAllDirtyDrafts}
                 disabled={saveAllSaving || anySectionSaving}
                 className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
               >
                 Discard All
               </button>
-            )}
-          </div>
+            </div>
+          ) : <div />}
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
             <button
               type="button"
@@ -2343,9 +2431,8 @@ function AdminPanel({ currentUser }) {
             <span className="text-xs font-sans text-gray-500">{keyWorkflowStats}</span>
           </div>
         </div>
-        {(saveAllStatus || hasUnsavedDrafts) && (
+        {(saveAllStatus === 'err' || hasUnsavedDrafts) && (
           <p className="mt-2 text-[11px] font-sans text-gray-500">
-            {saveAllStatus === 'ok' && 'All savable sections synced to cloud. '}
             {saveAllStatus === 'err' && 'Some sections failed to sync. Review the error banner and retry. '}
             {hasUnsavedDrafts ? `Pending sections: ${unsavedDrafts.map(item => item.label).join(', ')}.` : ''}
           </p>
