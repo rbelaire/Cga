@@ -13,12 +13,20 @@ function getBubbleRounds(row) {
 const TREND_ICONS = {
   up: '↑',
   down: '↓',
-  stable: '–',
 }
 const TREND_COLORS = {
   up: 'text-green-600',
   down: 'text-red-500',
-  stable: 'text-gray-400',
+}
+
+function asFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function formatSignedDelta(value) {
+  const numeric = asFiniteNumber(value)
+  if (numeric == null || numeric === 0) return '—'
+  return numeric > 0 ? `+${numeric}` : `${numeric}`
 }
 
 function CellValue({ col, row, idx, highlightTop, showBubble }) {
@@ -40,35 +48,30 @@ function CellValue({ col, row, idx, highlightTop, showBubble }) {
     </span>
   )
   if (col.key === 'points') return (
-    <span className="stat-number text-darktext font-medium">{row.points}</span>
+    <span className="stat-number text-darktext font-medium">{asFiniteNumber(row.points) ?? '—'}</span>
   )
   if (col.key === 'poy') return (
-    <span className={`stat-number font-semibold ${row.poy > 0 ? 'text-gold' : 'text-gray-400'}`}>
-      {row.poy}
+    <span className="stat-number font-semibold text-darktext">
+      {asFiniteNumber(row.poy) ?? '—'}
     </span>
   )
   if (col.key === 'ptm') return (
-    <span className="stat-number text-gray-600">{row.ptm ?? '—'}</span>
+    <span className="stat-number text-darktext">{asFiniteNumber(row.ptm) ?? '—'}</span>
   )
   if (col.key === 'ptmDelta') {
-    const d = row.ptmDelta
-    if (d == null || d === 0) return <span className="stat-number text-gray-400">—</span>
-    const color = d > 0 ? 'text-red-500' : 'text-green-600'
-    const icon = d > 0 ? '▲' : '▼'
-    const label = d > 0 ? `+${d}` : `${d}`
-    return <span className={`stat-number font-semibold ${color}`}>{icon} {label}</span>
+    return <span className="stat-number text-darktext font-medium">{formatSignedDelta(row.ptmDelta)}</span>
   }
   if (col.key === 'latestScore') return (
-    <span className="stat-number text-darktext font-medium">{row.latestScore ?? '—'}</span>
+    <span className="stat-number text-darktext font-medium">{asFiniteNumber(row.latestScore) ?? '—'}</span>
   )
   if (col.key === 'eventsPlayed') return (
     <span className="stat-number text-gray-500">{row.eventsPlayed ?? row.events}</span>
   )
   if (col.key === 'events') return (
-    <span className="stat-number text-gray-500">{row.events}</span>
+    <span className="stat-number text-darktext">{asFiniteNumber(row.events) ?? '—'}</span>
   )
   if (col.key === 'scratchPts') return (
-    <span className="stat-number font-semibold text-darktext">{row.scratchPts ?? '—'}</span>
+    <span className="stat-number font-semibold text-darktext">{asFiniteNumber(row.scratchPts) ?? '—'}</span>
   )
   if (col.key === 'trend') return row.trend ? (
     <span className={`text-base font-bold ${TREND_COLORS[row.trend]}`}>

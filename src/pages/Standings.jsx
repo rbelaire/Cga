@@ -10,23 +10,23 @@ import { DB } from '../db'
 const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const HISTORY_LABELS = ['New', '2nd', '3rd', '4th', '5th', '6th', '7th']
 
-const hdcpColumns = [
+const sharedStandingsColumns = [
   { key: 'rank',        label: 'Rank',         sortable: false },
   { key: 'name',        label: 'Player',        sortable: true  },
-  { key: 'poy',         label: 'HDCP',          sortable: true,  tooltip: 'Handicap Player of the Year points. Top finishers per flight earn points each tournament (base 350, −25 per position).' },
   { key: 'ptm',         label: 'PTM',           sortable: true,  tooltip: 'Points to Make — your handicap target score calculated from your last 7 rounds.' },
-  { key: 'ptmDelta',    label: 'PTM Δ',         sortable: true,  tooltip: 'Change in PTM from the Koasati tournament to current PTM. ▼ green = improved (lower target). ▲ red = higher target.' },
+  { key: 'ptmDelta',    label: 'PTM Δ',         sortable: true,  tooltip: 'Change in PTM from before vs after the latest completed tournament.' },
   { key: 'latestScore', label: 'Latest Score',  sortable: true,  tooltip: 'Your Stableford score at the most recent tournament.' },
   { key: 'events',      label: 'Events',        sortable: true,  tooltip: 'Number of tournaments played this season.' },
   { key: 'trend',       label: '',              sortable: false  },
 ]
 
-const scratchColumns = [
-  { key: 'rank',       label: 'Rank',        sortable: false },
-  { key: 'name',       label: 'Player',       sortable: true  },
-  { key: 'scratchPts', label: 'Scratch Pts', sortable: true,  tooltip: 'Total Stableford points scored across all completed tournaments.' },
-  { key: 'events',     label: 'Events',       sortable: true,  tooltip: 'Number of tournaments played this season.' },
-]
+const buildStandingsColumns = (mode) => {
+  const pointsCol = mode === 'hdcp'
+    ? { key: 'poy', label: 'HDCP Points', sortable: true, tooltip: 'Handicap Player of the Year points. Top finishers per flight earn points each tournament (base 350, −25 per position).' }
+    : { key: 'scratchPts', label: 'Scratch Pts', sortable: true, tooltip: 'Total Stableford points scored across all completed tournaments.' }
+
+  return [sharedStandingsColumns[0], sharedStandingsColumns[1], pointsCol, ...sharedStandingsColumns.slice(2)]
+}
 
 // ── PTM sub-components ───────────────────────────────────────────────────────
 
@@ -310,12 +310,47 @@ export default function Standings() {
     [flightData, selectedFlight]
   )
 
+  const latestCompletedTournament = useMemo(() => {
+    return Object.values(allResults ?? {})
+      .filter((result) => result?.status === 'completed')
+      .sort((a, b) => String(b?.date ?? '').localeCompare(String(a?.date ?? '')))[0] ?? null
+  }, [allResults])
+
+  const latestScoreLookup = useMemo(() => {
+    const lookup = {}
+    if (!latestCompletedTournament?.leaderboard) return lookup
+    for (const rows of Object.values(latestCompletedTournament.leaderboard)) {
+      for (const player of rows ?? []) {
+        const score = typeof player?.points === 'number' && Number.isFinite(player.points)
+          ? player.points
+          : null
+        if (player?.name && score != null) lookup[player.name] = score
+      }
+    }
+    return lookup
+  }, [latestCompletedTournament])
+
+  const standingsByName = useMemo(() => {
+    const lookup = {}
+    for (const row of flightData) {
+      if (row?.name) lookup[row.name] = row
+    }
+    return lookup
+  }, [flightData])
+
   const scratchData = useMemo(
-    () => computeScratch(allResults ?? {}).map(row => ({
-      ...row,
-      flight: liveMemberFlightLookup[row.name] ?? null,
-    })),
-    [allResults, liveMemberFlightLookup]
+    () => computeScratch(allResults ?? {}).map(row => {
+      const standingRow = standingsByName[row.name] ?? null
+      return {
+        ...row,
+        flight: liveMemberFlightLookup[row.name] ?? null,
+        ptm: standingRow?.ptm ?? null,
+        ptmDelta: standingRow?.ptmDelta ?? null,
+        latestScore: latestScoreLookup[row.name] ?? null,
+        trend: standingRow?.trend ?? null,
+      }
+    }),
+    [allResults, liveMemberFlightLookup, latestScoreLookup, standingsByName]
   )
 
   const filteredScratchData = useMemo(
@@ -399,13 +434,13 @@ export default function Standings() {
 
       {mode === 'hdcp' && (
         <div className="animate-tab-in">
-          <StandingsTable data={filteredFlightData} columns={hdcpColumns} highlightTop={3} />
+          <StandingsTable data={filteredFlightData} columns={buildStandingsColumns('hdcp')} highlightTop={3} />
         </div>
       )}
 
       {mode === 'scratch' && (
         <div className="animate-tab-in">
-          <StandingsTable data={filteredScratchData} columns={scratchColumns} highlightTop={3} showBubble={false} />
+          <StandingsTable data={filteredScratchData} columns={buildStandingsColumns('scratch')} highlightTop={3} showBubble={false} />
         </div>
       )}
 
