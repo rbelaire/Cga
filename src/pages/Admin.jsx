@@ -734,16 +734,91 @@ function exportResultsXLSX(tournament, flightData) {
 
 function exportBirdiePoolXLSX(tournament, flightData) {
   if (!tournament) return
+  const SITE_BLUE = 'FF0B2E6D'
+  const HEADER_NEUTRAL = 'FFEFF3F8'
+  const TEXT_DARK = 'FF1F2937'
+  const WHITE = 'FFFFFFFF'
+  const ROW_GOLD_TINT = 'FFFFF9EC'
+  const BORDER_COLOR = 'FFD1D5DB'
+
+  const splitBirdieName = (name = '') => {
+    const cleaned = String(name).trim()
+    if (!cleaned) return { last: '', first: '' }
+    if (cleaned.includes(',')) {
+      const [last = '', ...firstParts] = cleaned.split(',')
+      return {
+        last: last.trim(),
+        first: firstParts.join(',').trim(),
+      }
+    }
+    const parts = cleaned.split(/\s+/).filter(Boolean)
+    if (parts.length === 1) return { last: parts[0], first: '' }
+    return {
+      last: parts[parts.length - 1],
+      first: parts.slice(0, -1).join(' '),
+    }
+  }
+
   const uniqueNames = [...new Set(
     ALL_SCORE_TABS.flatMap(flight => (flightData?.[flight] ?? []).map(player => player?.name).filter(Boolean))
   )].sort((a, b) => compareByLastName({ name: a }, { name: b }))
-  const headers = ['Player', ...Array.from({ length: 18 }, (_, idx) => String(idx + 1))]
-  const rows = uniqueNames.map(name => {
-    const row = { Player: formatName(name) }
-    for (let hole = 1; hole <= 18; hole += 1) row[String(hole)] = ''
-    return row
-  })
-  const ws = XLSX.utils.json_to_sheet(rows, { header: headers })
+  const headers = ['#', 'Last', 'First', ...Array.from({ length: 18 }, (_, idx) => String(idx + 1))]
+  const wsData = [
+    headers,
+    ...uniqueNames.map((name, index) => {
+      const normalized = formatName(name)
+      const { last, first } = splitBirdieName(normalized)
+      return [index + 1, last, first, ...Array.from({ length: 18 }, () => '')]
+    }),
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(wsData)
+
+  // Subtle structure-preserving layout tweaks.
+  ws['!cols'] = [
+    { wch: 4 },  // #
+    { wch: 18 }, // Last
+    { wch: 16 }, // First
+    ...Array.from({ length: 18 }, () => ({ wch: 4.5 })),
+  ]
+  ws['!freeze'] = { xSplit: 3, ySplit: 1, topLeftCell: 'D2', state: 'frozen', activePane: 'bottomRight' }
+
+  const range = XLSX.utils.decode_range(ws['!ref'] || `A1:${XLSX.utils.encode_cell({ r: wsData.length - 1, c: headers.length - 1 })}`)
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: BORDER_COLOR } },
+    bottom: { style: 'thin', color: { rgb: BORDER_COLOR } },
+    left: { style: 'thin', color: { rgb: BORDER_COLOR } },
+    right: { style: 'thin', color: { rgb: BORDER_COLOR } },
+  }
+
+  for (let row = range.s.r; row <= range.e.r; row += 1) {
+    for (let col = range.s.c; col <= range.e.c; col += 1) {
+      const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
+      if (!ws[cellAddress]) ws[cellAddress] = { t: 's', v: '' }
+      const isHeader = row === 0
+      const isCoreHeader = isHeader && col <= 2
+      const isHoleHeader = isHeader && col >= 3
+      const isNameColumn = col === 1 || col === 2
+      const isHoleCell = col >= 3
+      const isEvenPlayerRow = row > 0 && row % 2 === 0
+      const fillColor = isHeader
+        ? (isCoreHeader ? HEADER_NEUTRAL : SITE_BLUE)
+        : (isEvenPlayerRow ? ROW_GOLD_TINT : WHITE)
+
+      ws[cellAddress].s = {
+        font: {
+          bold: isHeader || isNameColumn,
+          color: { rgb: isHoleHeader ? WHITE : TEXT_DARK },
+        },
+        fill: { patternType: 'solid', fgColor: { rgb: fillColor }, bgColor: { rgb: fillColor } },
+        alignment: {
+          vertical: 'center',
+          horizontal: isHoleCell || isHeader || col === 0 ? 'center' : 'left',
+        },
+        border: thinBorder,
+      }
+    }
+  }
+
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Birdie Pool')
   XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-birdie-pool.xlsx`)
