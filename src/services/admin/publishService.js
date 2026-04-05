@@ -86,12 +86,12 @@ export function buildPublishPayload({
     newStandings.flights[fl] = sorted.map((p, i) => {
       const newPtm = ptmLookup[p.name] ?? (Number(p.ptm) || null)
       const oldPtm = prevPtmLookup[p.name] ?? null
-      const ptmDelta = (newPtm != null && oldPtm != null) ? +(newPtm - oldPtm).toFixed(2) : 0
+      const hasComparablePtm = newPtm != null && oldPtm != null
+      const ptmDelta = hasComparablePtm ? +(newPtm - oldPtm).toFixed(2) : null
       const prev = prevStandingsLookup[p.name]
       const prevEvents = prev?.events ?? 0
-      const prevPoy = prev?.poy ?? 0
       const newPoyVal = p.poy ?? 0
-      const trend = newPoyVal > prevPoy ? 'up' : newPoyVal < prevPoy ? 'down' : 'stable'
+      const trend = ptmDelta == null || ptmDelta === 0 ? null : ptmDelta > 0 ? 'up' : 'down'
 
       return {
         rank: i + 1,

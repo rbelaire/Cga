@@ -29,6 +29,13 @@ import {
   validateTournamentId,
   validateUsers,
 } from '../services/admin/validation'
+import {
+  exportPairingsPDF as exportPairingsPdfV2,
+  exportPaymentsPDF as exportPaymentsPdfV2,
+  exportPtmPDF as exportPtmPdfV2,
+  exportResultsPDF as exportResultsPdfV2,
+  exportTournamentInfoPDF as exportTournamentInfoPdfV2,
+} from '../exports/pdfExports'
 
 const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
 const ALL_SCORE_TABS   = [...FLIGHTS, 'New Players']
@@ -346,62 +353,6 @@ async function loadLogoBase64() {
   return loadAssetBase64()
 }
 
-async function loadVenmoBase64() {
-  return loadAssetBase64(cgaPayVenmo)
-}
-
-function ensurePdfSpace(doc, y, neededHeight, topY = 46) {
-  const ph = doc.internal.pageSize.getHeight()
-  const bottomSafeY = ph - 22
-  if (y + neededHeight <= bottomSafeY) return y
-  doc.addPage()
-  return topY
-}
-
-function drawVenmoPaymentBlock(doc, venmoImage, y) {
-  if (!venmoImage) return y
-  const pw = doc.internal.pageSize.getWidth()
-  const ph = doc.internal.pageSize.getHeight()
-  const x = 14
-  const contentWidth = pw - 28
-  const maxImageHeight = 52
-
-  y = ensurePdfSpace(doc, y, 66)
-
-  doc.setDrawColor(210, 215, 225)
-  doc.setLineWidth(0.3)
-  doc.line(x, y, pw - 14, y)
-  y += 7
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...PDF_NAVY)
-  doc.text('PAYMENT', x, y)
-  y += 5
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(55, 55, 55)
-  doc.text('Scan to pay on Venmo.', x, y)
-  y += 4
-
-  const props = doc.getImageProperties(venmoImage.data)
-  const ratio = props.width / props.height
-  let imageWidth = contentWidth
-  let imageHeight = imageWidth / ratio
-  if (imageHeight > maxImageHeight) {
-    imageHeight = maxImageHeight
-    imageWidth = imageHeight * ratio
-  }
-  if (y + imageHeight > ph - 22) {
-    y = ensurePdfSpace(doc, y, imageHeight + 4)
-  }
-  const imageX = x + (contentWidth - imageWidth) / 2
-  doc.addImage(venmoImage.data, venmoImage.format, imageX, y, imageWidth, imageHeight)
-
-  return y + imageHeight + 6
-}
-
 async function buildPdfHeader(doc, title, subtitle = '') {
   const pw   = doc.internal.pageSize.getWidth()
   const logo = await loadLogoBase64()
@@ -458,317 +409,42 @@ function addPdfFooter(doc, note = '') {
 // ── PDF: Tournament Info ───────────────────────────────────────────────────────
 async function exportTournamentInfoPDF(tournament) {
   if (!tournament) return
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
-  const pw  = doc.internal.pageSize.getWidth()
-  let y = await buildPdfHeader(doc, 'Tournament Information', 'CGA 2026 Season')
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(20)
-  doc.setTextColor(...PDF_NAVY)
-  const nameLines = doc.splitTextToSize(tournament.name, pw - 28)
-  doc.text(nameLines, 14, y + 6)
-  y += 8 + nameLines.length * 9
-
-  doc.setDrawColor(...PDF_GOLD)
-  doc.setLineWidth(0.8)
-  doc.line(14, y, pw - 14, y)
-  y += 10
-
-  const fields = [
-    ['DATE',                  fmtDate(tournament.date)],
-    ['COURSE',                tournament.course || '—'],
-    ['TEE TIME',              tournament.teeTime || '—'],
-    ['FORMAT',                tournament.format || '—'],
-    ['ENTRY FEE',             tournament.entryFee || '—'],
-    ['REGISTRATION DEADLINE', fmtDateShort(tournament.dueDate)],
-  ]
-  fields.forEach(([label, value]) => {
-    doc.setFont('helvetica', 'bold');  doc.setFontSize(8);  doc.setTextColor(...PDF_NAVY)
-    doc.text(label, 14, y)
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(13); doc.setTextColor(25, 25, 25)
-    doc.text(value, 14, y + 6)
-    y += 13
+  await exportTournamentInfoPdfV2({
+    tournament,
+    logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
+    venmoImageUrl: cgaPayVenmo,
   })
-
-  if (tournament.notes) {
-    doc.setDrawColor(210, 215, 225); doc.setLineWidth(0.3); doc.line(14, y, pw - 14, y); y += 8
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...PDF_NAVY)
-    doc.text('NOTES', 14, y); y += 5
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(60, 60, 60)
-    const noteLines = doc.splitTextToSize(tournament.notes, pw - 28)
-    doc.text(noteLines, 14, y)
-    y += noteLines.length * 5 + 6
-  }
-
-  doc.setDrawColor(210, 215, 225); doc.setLineWidth(0.3); doc.line(14, y, pw - 14, y); y += 8
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...PDF_NAVY)
-  doc.text('ADDITIONAL NOTES', 14, y); y += 6
-  for (let i = 0; i < 4; i++) {
-    y = ensurePdfSpace(doc, y, 8)
-    doc.setDrawColor(190, 195, 205); doc.setLineWidth(0.2); doc.line(14, y, pw - 14, y); y += 8
-  }
-
-  const venmoImage = await loadVenmoBase64()
-  y = drawVenmoPaymentBlock(doc, venmoImage, y)
-
-  addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
-  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-tournament-info.pdf`)
 }
 
 // ── PDF: Pairings ──────────────────────────────────────────────────────────────
 async function exportPairingsPDF(tournament, pairings) {
   if (!tournament || !pairings.length) return
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
-  const y = await buildPdfHeader(
-    doc, 'Pairings',
-    `${tournament.name} · ${fmtDate(tournament.date)} · ${tournament.course}`
-  )
-  const maxPlayers = Math.max(...pairings.map(c => c.players.length))
-  const playerCols = Array.from({ length: maxPlayers }, (_, i) => `Player ${i + 1}`)
-  const body = pairings.map((card, i) => {
-    const row = [i + 1]
-    for (let j = 0; j < maxPlayers; j++) {
-      const p = card.players[j]
-      row.push(p ? `${p.name} (${p.flight})` : '')
-    }
-    return row
+  await exportPairingsPdfV2({
+    tournament,
+    pairings,
+    logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
   })
-  autoTable(doc, {
-    head: [['#', ...playerCols]], body, startY: y, theme: 'striped',
-    headStyles:      { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-    alternateRowStyles: { fillColor: [245, 248, 252] },
-    styles:          { fontSize: 9, cellPadding: 3 },
-    columnStyles:    { 0: { halign: 'center', cellWidth: 12, fontStyle: 'bold' } },
-    margin:          { left: 14, right: 14 },
-  })
-  addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
-  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-pairings.pdf`)
 }
 
 // ── PDF: Points to Make ────────────────────────────────────────────────────────
 async function exportPtmPDF(membersList) {
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
-  let y = await buildPdfHeader(doc, 'Points to Make', 'CGA 2026 Season — Full Roster by Flight')
-  const displayPtm = (ptm) => (typeof ptm === 'number' ? Math.round(ptm) : (ptm ?? '—'))
-  const toTwoColumnRows = (members) => {
-    const sorted = members.slice().sort((a, b) => a.name.localeCompare(b.name))
-    const rows = []
-    for (let i = 0; i < sorted.length; i += 2) {
-      const left = sorted[i]
-      const right = sorted[i + 1]
-      rows.push([
-        i + 1,
-        left?.name ?? '',
-        displayPtm(left?.ptm),
-        left?.tee ?? '—',
-        right ? i + 2 : '',
-        right?.name ?? '',
-        right ? displayPtm(right?.ptm) : '',
-        right?.tee ?? '',
-      ])
-    }
-    return rows
-  }
-
-  const grouped = FLIGHTS.reduce((acc, f) => ({ ...acc, [f]: [] }), {})
-  const unassigned = []
-  for (const m of membersList) {
-    if (m.active === false) continue
-    if (m.flight && grouped[m.flight]) grouped[m.flight].push(m)
-    else unassigned.push(m)
-  }
-  const flightColors = {
-    'Championship': [160, 110, 0], '1st Flight': [30, 80, 180],
-    '2nd Flight':   [55, 60, 165], '3rd Flight': [20, 120, 80],
-    '4th Flight':   [100, 40, 150], '5th Flight': [180, 50, 100],
-  }
-  for (const fl of FLIGHTS) {
-    const members = grouped[fl]
-    if (!members.length) continue
-    const color = flightColors[fl] ?? PDF_NAVY
-    y = ensurePdfSpace(doc, y, 24)
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
-    doc.text(fl.toUpperCase(), 14, y + 4)
-    autoTable(doc, {
-      head: [['#', 'Player', 'PTM', 'Tee', '#', 'Player', 'PTM', 'Tee']],
-      body: toTwoColumnRows(members),
-      startY: y + 6, theme: 'striped',
-      headStyles:      { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      alternateRowStyles: { fillColor: [245, 248, 252] },
-      styles: { fontSize: 8, cellPadding: 1.8 },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 8, fontStyle: 'bold' },
-        1: { cellWidth: 52 },
-        2: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
-        3: { halign: 'center', cellWidth: 12 },
-        4: { halign: 'center', cellWidth: 8, fontStyle: 'bold' },
-        5: { cellWidth: 52 },
-        6: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
-        7: { halign: 'center', cellWidth: 12 },
-      },
-      margin: { left: 14, right: 14 },
-    })
-    y = doc.lastAutoTable.finalY + 8
-  }
-  if (unassigned.length) {
-    y = ensurePdfSpace(doc, y, 24)
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(100, 100, 100)
-    doc.text('UNASSIGNED', 14, y + 4)
-    autoTable(doc, {
-      head: [['#', 'Player', 'PTM', 'Tee', '#', 'Player', 'PTM', 'Tee']],
-      body: toTwoColumnRows(unassigned),
-      startY: y + 6, theme: 'striped',
-      headStyles:      { fillColor: [110, 110, 110], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      alternateRowStyles: { fillColor: [248, 248, 248] },
-      styles: { fontSize: 8, cellPadding: 1.8 },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 8, fontStyle: 'bold' },
-        1: { cellWidth: 52 },
-        2: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
-        3: { halign: 'center', cellWidth: 12 },
-        4: { halign: 'center', cellWidth: 8, fontStyle: 'bold' },
-        5: { cellWidth: 52 },
-        6: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
-        7: { halign: 'center', cellWidth: 12 },
-      },
-      margin: { left: 14, right: 14 },
-    })
-  }
-  addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · Carencro Golf Association`)
-  doc.save('cga-2026-points-to-make.pdf')
+  await exportPtmPdfV2({
+    members: membersList,
+    flights: FLIGHTS,
+    logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
+  })
 }
 
 // ── PDF: Tournament Results ────────────────────────────────────────────────────
 async function exportResultsPDF(tournament, flightData) {
-  if (!tournament) {
-    const doc = new jsPDF({ unit: 'mm', format: 'letter' })
-    let y = await buildPdfHeader(doc, 'Tournament Results', 'No tournament selected')
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...PDF_NAVY)
-    doc.setFontSize(13)
-    doc.text('No tournament selected', 14, y)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.setTextColor(90, 90, 90)
-    doc.text('Select a tournament, then export results again.', 14, y + 7)
-    addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · CGA`)
-    doc.save('cga-tournament-results.pdf')
-    return
-  }
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
-  doc.setFont('helvetica')
-  const sanitizedFlightData = sanitizeResultsData(flightData)
-  const resultsPosted = hasAnyScores(sanitizedFlightData)
-  const totalPlayers = FLIGHTS.reduce((sum, fl) => sum + (sanitizedFlightData[fl]?.length ?? 0), 0)
-  let y = await buildPdfHeader(
-    doc, 'Tournament Results',
-    `${tournament.name} · ${fmtDate(tournament.date)} · ${tournament.course}`
-  )
-  const flightColors = {
-    'Championship': [160, 110, 0], '1st Flight': [30, 80, 180],
-    '2nd Flight':   [55, 60, 165], '3rd Flight': [20, 120, 80],
-    '4th Flight':   [100, 40, 150], '5th Flight': [180, 50, 100],
-  }
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(14)
-  doc.setTextColor(...PDF_NAVY)
-  doc.text(tournament.name ?? 'Tournament Results', 14, y)
-  y += 5
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(85, 85, 85)
-  doc.text(`${fmtDate(tournament.date)} · ${tournament.course}`, 14, y)
-  y += 8
-
-  if (totalPlayers === 0) {
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
-    doc.setTextColor(...PDF_NAVY)
-    doc.text('No players registered', 14, y)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.setTextColor(110, 110, 110)
-    doc.text('Add players to flights before exporting tournament results.', 14, y + 7)
-    addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · CGA`)
-    doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.pdf`)
-    return
-  }
-
-  if (!resultsPosted) {
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(13)
-    doc.setTextColor(...PDF_NAVY)
-    doc.text('Tournament Results', 14, y)
-    y += 7
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(11)
-    doc.setTextColor(95, 95, 95)
-    doc.text('Results pending — scores not yet posted', 14, y)
-    y += 8
-
-    autoTable(doc, {
-      head: [['Registered Players', 'Flight', 'Pre-event PTM']],
-      body: FLIGHTS.flatMap(fl => (sanitizedFlightData[fl] ?? []).map((player) => [
-        player.name,
-        fl,
-        player.preEventPtm == null ? '—' : player.preEventPtm,
-      ])),
-      startY: y,
-      theme: 'striped',
-      headStyles: { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      styles: { fontSize: 8, cellPadding: 1.8, textColor: [35, 35, 35], lineColor: [226, 232, 240], lineWidth: 0.15 },
-      columnStyles: { 2: { halign: 'center', cellWidth: 24 } },
-      margin: { left: 14, right: 14 },
-    })
-
-    addPdfFooter(doc, `Generated ${new Date().toLocaleDateString()} · CGA`)
-    doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.pdf`)
-    return
-  }
-
-  for (const fl of FLIGHTS) {
-    const rawPs = sanitizedFlightData[fl] ?? []
-    const ps    = calcFlightPOY(rawPs)
-    const hasPostedScoresInFlight = ps.some(p => p.score != null)
-    if (!ps.length || !hasPostedScoresInFlight) continue
-    const ranked   = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
-    const unranked = ps.filter(p => p.rank == null)
-    const rows     = [...ranked, ...unranked]
-    const color = flightColors[fl] ?? PDF_NAVY
-    y = ensurePdfSpace(doc, y, 26)
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...color)
-    doc.text(`${fl.toUpperCase()} (${rows.length})`, 14, y + 4)
-    autoTable(doc, {
-      head: [['Rank', 'Player', 'PTM', 'Score', 'Net', 'POY Pts']],
-      body: rows.map(p => [
-        p.rank ?? '—', p.name + (p.eligible === false ? ' *' : ''), p.preEventPtm ?? '—', p.score ?? '—',
-        p.plusMinus == null ? '—' : p.plusMinus > 0 ? `+${p.plusMinus}` : String(p.plusMinus),
-        p.poy == null && p.score != null ? 'Pending' : fmtPOY(p),
-      ]),
-      startY: y + 6, theme: 'striped',
-      headStyles:         { fillColor: color, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      styles:             { fontSize: 8, cellPadding: 1.8, textColor: [30, 30, 30], lineColor: [226, 232, 240], lineWidth: 0.15 },
-      columnStyles: { 0: { halign: 'center', cellWidth: 14 }, 2: { halign: 'center', cellWidth: 14 }, 3: { halign: 'center', cellWidth: 14 }, 4: { halign: 'center', cellWidth: 14 }, 5: { halign: 'center', cellWidth: 22 } },
-      margin: { left: 14, right: 14 },
-      didParseCell(data) {
-        if (data.section !== 'body') return
-        const p = rows[data.row.index]
-        if (!p) return
-        if (data.column.index === 0 && p.rank != null && p.rank <= 3) {
-          data.cell.styles.fontStyle = 'bold'
-          data.cell.styles.textColor = p.rank === 1 ? PDF_GOLD : color
-        }
-        if (data.column.index === 4 && p.plusMinus != null) {
-          data.cell.styles.textColor = p.plusMinus > 0 ? [0, 140, 60] : p.plusMinus < 0 ? [180, 30, 30] : [100, 100, 100]
-        }
-      },
-    })
-    y = doc.lastAutoTable.finalY + 8
-  }
-  addPdfFooter(doc, `* = ineligible for POY · Generated ${new Date().toLocaleDateString()} · CGA`)
-  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.pdf`)
+  if (!tournament) return
+  await exportResultsPdfV2({
+    tournament,
+    flightData,
+    flights: FLIGHTS,
+    calcFlightPOY,
+    logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
+  })
 }
 
 // ── PDF: Credit on Books ───────────────────────────────────────────────────────
@@ -1033,78 +709,12 @@ function PdfBtn({ onClick, children, disabled = false }) {
 // ── PDF: Payment Status ───────────────────────────────────────────────────────
 async function exportPaymentsPDF(tournament, paymentMap, membersList) {
   if (!tournament) return
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
-  const pw = doc.internal.pageSize.getWidth()
-  let y = await buildPdfHeader(doc, 'Payment Status', `${tournament.name} · ${fmtDate(tournament.date)}`)
-
-  // Only paid members, sorted by last name
-  const paid = membersList
-    .filter(m => m.active !== false && paymentMap[m.name])
-    .slice()
-    .sort(compareByLastName)
-  const paidCount = paid.length
-
-  // ── Venmo block on page 1, right after header ──
-  const venmoImage = await loadVenmoBase64()
-  if (venmoImage) {
-    const props = doc.getImageProperties(venmoImage.data)
-    const ratio = props.width / props.height
-    const imgH = 36
-    const imgW = imgH * ratio
-    const imgX = pw - 14 - imgW
-    doc.addImage(venmoImage.data, venmoImage.format, imgX, y, imgW, imgH)
-  }
-
-  // ── Count badge ──
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(28)
-  doc.setTextColor(...PDF_NAVY)
-  doc.text(String(paidCount), 14, y + 12)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(100, 100, 100)
-  doc.text(paidCount === 1 ? 'player paid' : 'players paid', 14, y + 19)
-  y += 40
-
-  // ── Multi-column player list ──
-  if (paidCount > 0) {
-    doc.setDrawColor(...PDF_GOLD)
-    doc.setLineWidth(0.4)
-    doc.line(14, y - 2, pw - 14, y - 2)
-
-    const colCount = paidCount <= 40 ? 3 : 4
-    const colWidth = (pw - 28) / colCount
-    const lineH = 5.2
-    const fontSize = paidCount <= 40 ? 8.5 : 7.5
-    const rows = Math.ceil(paidCount / colCount)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(fontSize)
-
-    paid.forEach((m, i) => {
-      const col = Math.floor(i / rows)
-      const row = i % rows
-      const x = 14 + col * colWidth + 1
-      const ly = y + 4 + row * lineH
-
-      // Alternating row shading
-      if (row % 2 === 0) {
-        doc.setFillColor(245, 248, 252)
-        doc.rect(14 + col * colWidth, ly - 3.6, colWidth, lineH, 'F')
-      }
-
-      // Number
-      doc.setTextColor(160, 160, 160)
-      doc.text(`${i + 1}.`, x, ly, { align: 'left' })
-
-      // Name
-      doc.setTextColor(30, 30, 30)
-      doc.text(m.name, x + 8, ly)
-    })
-  }
-
-  addPdfFooter(doc, `${paidCount} paid · Generated ${new Date().toLocaleDateString()} · CGA`)
-  doc.save(`${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-payments.pdf`)
+  await exportPaymentsPdfV2({
+    tournament,
+    paymentMap,
+    members: membersList,
+    logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
+  })
 }
 
 // ── Confirm dialog ────────────────────────────────────────────────────────────
