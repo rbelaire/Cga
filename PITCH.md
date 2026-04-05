@@ -1,13 +1,16 @@
 # CGA — What It Replaces
 
-| What you used to do manually | What the site does |
+| Manual workflow | What the CGA site now does |
 |---|---|
-| Calculate POY points after every tournament | Computed from scores automatically — ties averaged, ineligible players handled correctly |
-| Maintain standings in a spreadsheet | Standings page updates the moment results are entered |
-| Figure out flight assignments by hand | Drag-and-drop admin panel — assign players to flights in minutes |
-| Type up and share pairings | Pairings page is always current and accessible from any phone |
-| Keep track of who's made their points | Per-player +/− shown across every tournament |
-| Answer "what are the rules?" questions | Rules page members can check themselves |
-| Print tournament sheets by hand | One-click PDFs generated from live data: pairings, results, Points to Make, tournament info, payment status, and credit on books |
-| Track who has paid for each tournament | Payment status tracked per member per tournament — exportable as a PDF |
-| Calculate credit on books manually | Credit balances tracked automatically and exportable as a PDF |
+| Calculate POY points after every tournament | Computes POY from published scores automatically (including tie averaging and eligibility handling) |
+| Maintain standings in a spreadsheet | Updates standings immediately after official publish |
+| Figure out flight assignments by hand | Provides admin flight setup tools with drag-and-drop workflows |
+| Type up and share pairings | Keeps pairings live and mobile-accessible |
+| Keep track of points-to-make manually | Shows per-player PTM and plus/minus context in the app |
+| Repeatedly answer rules/eligibility questions | Publishes rules and eligibility info on the Info page |
+| Assemble tournament paperwork by hand | Supports one-click PDF exports from live data (pairings, results, PTM, tournament info, payment status, credits) |
+| Track who has paid using side notes | Tracks payment status per member and tournament, with export support |
+| Calculate credit balances manually | Maintains credit balances with admin save/restore safeguards |
+
+## Bottom line
+CGA shifts tournament operations from disconnected spreadsheets and ad hoc communication into one auditable, publish-driven system.

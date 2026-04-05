@@ -1,42 +1,42 @@
 # CGA System Overview (Board & Stakeholder Summary)
 
 ## What the CGA system does
-The CGA system is the club’s central hub for tournament operations and member-facing updates. It keeps tournament setup, scores, standings, and points in one place so members and leadership are looking at the same current information.
+The CGA system is the club’s central hub for tournament operations and member-facing updates. It keeps tournament setup, scores, standings, and points in one place so members and leadership review the same live data.
 
 ## Why this matters
 A golf association runs best when results are clear, timely, and consistent. This system helps CGA:
 - move faster from event day to published results,
 - reduce confusion from duplicate files and side spreadsheets,
-- provide members with up-to-date standings and tournament information.
+- give members up-to-date standings and tournament information.
 
-## How the admin side and member side work together
-- **Admin side:** authorized admins enter and maintain tournament data (payments, player entry, pairings, scores, and final publish actions).
-- **Member/public side:** members see live information that is pulled directly from the published data source.
+## How admin and member experiences work together
+- **Admin side:** authorized admins manage payments, rosters, pairings, scores, and publishing.
+- **Member/public side:** members view live tournament outcomes, pairings, standings, and schedule data from the published source.
 
-In practice, admins prepare data behind the scenes, then publish official results when ready.
+Admins can work iteratively with draft saves and then publish an official release once verified.
 
 ## What “Publish Results” does
-“Publish Results” is the official release step. It takes saved tournament scores and generates the live outcome for:
-- that tournament’s posted results,
+“Publish Results” is the official release action. It takes saved scores and updates:
+- that tournament’s official posted result,
 - season standings,
-- points-of-the-year tables.
+- season points-of-the-year tables.
 
-Once published, the site reflects those updates immediately.
+Once published, the site reflects changes immediately.
 
 ## Built-in safeguards
-The system includes practical controls designed to reduce risk:
-- validation checks before saves and publish actions,
-- confirmation steps for high-impact actions,
-- audit logging of key admin actions,
+The platform includes practical controls to reduce operational risk:
+- validation before save/publish,
+- confirmation on high-impact actions,
+- changelog-style audit history,
 - automatic snapshots before major writes,
-- restore tools to recover previous versions when needed.
+- restore tools for rollback and recovery.
 
-## Why this is better than spreadsheets/manual workflows
+## Why this is better than spreadsheet/manual workflows
 Compared with manual spreadsheet workflows, the CGA system provides:
-- **one source of truth** instead of multiple file versions,
-- **fewer manual handoffs** and less copy/paste error risk,
+- **one source of truth** instead of conflicting versions,
+- **fewer manual handoffs** and lower copy/paste risk,
 - **faster publication** from event close to member visibility,
-- **clear accountability** through logs and controlled admin actions,
-- **safer recovery options** through snapshots and restore.
+- **clear accountability** through controlled admin actions and logs,
+- **safer recovery paths** via snapshots and restore.
 
-Overall, this gives leadership higher confidence in data quality, timeliness, and operational continuity.
+Overall, this improves data quality, timeliness, and continuity for both leadership and members.
