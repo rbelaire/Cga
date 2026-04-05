@@ -2,14 +2,13 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
-import { signInWithEmailAndPassword } from 'firebase/auth'
 import { Link } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import { formatName, compareByLastName } from '../utils/formatName'
 import { DB } from '../db'
-import { auth } from '../firebase'
 import { useFireData } from '../hooks/useFireData'
+import { useAuth } from '../context/AuthContext'
 import { computeTournamentWorkflowState } from '../utils/tournamentWorkflow'
 import TeeTag from '../components/ui/TeeTag'
 import CountdownTimer from '../components/ui/CountdownTimer'
@@ -58,15 +57,6 @@ const USERS_KEY = 'cga_users_v1'
 const TOURNAMENT_INFO_KEY = 'cga_tournament_info_v1'
 const TOURNAMENT_LIFECYCLE_KEY = 'cga_tournament_lifecycle_v1'
 const PAYMENT_META_KEY = 'cga_payment_meta_v1'
-const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
-// Multi-PIN map: { [pin]: userName }. Env var VITE_ADMIN_PINS is a JSON object e.g. '{"cga2026":"Admin","5678":"Scott"}'
-const PINS = (() => {
-  try {
-    const raw = import.meta.env.VITE_ADMIN_PINS
-    if (raw) return JSON.parse(raw)
-  } catch { /* ignore bad JSON */ }
-  return { [PIN]: 'Admin' }
-})()
 const MAX_RECENT_ACTIONS = 5
 
 const PDF_NAVY = [27,  59,  111]
@@ -879,53 +869,10 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
   )
 }
 
-// ── PIN gate ───────────────────────────────────────────────────────────────────
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@cga.local'
-
+// ── Auth gate ──────────────────────────────────────────────────────────────────
 export default function Admin() {
-  const [pin,        setPin]        = useState('')
-  const [unlocked,   setUnlocked]   = useState(false)
-  const [currentUser, setCurrentUser] = useState(null)
-  const [err,        setErr]        = useState(false)
-  const [loading,    setLoading]    = useState(false)
-  const [authError,  setAuthError]  = useState(null)
-
-  const tryUnlock = async () => {
-    const userName = PINS[pin]
-    if (!userName) { setErr(true); setTimeout(() => setErr(false), 1500); return }
-    setLoading(true)
-    setAuthError(null)
-    try {
-      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, PIN)
-      setCurrentUser(userName)
-      setUnlocked(true)
-    } catch (e) {
-      setAuthError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (!unlocked) return (
-    <PageWrapper>
-      <div className="max-w-xs mx-auto mt-24">
-        <h1 className="section-title text-2xl mb-6">Admin</h1>
-        <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
-          <input
-            type="password" value={pin} onChange={e => setPin(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && tryUnlock()}
-            placeholder="PIN" autoFocus
-            className={`w-full border rounded px-3 py-2 text-base font-sans focus:outline-none focus:ring-2 focus:ring-forest ${err ? 'border-red-400' : 'border-gray-300'}`}
-          />
-          {err && <p className="text-red-500 text-xs font-sans">Incorrect PIN.</p>}
-          {authError && <p className="text-red-500 text-xs font-sans break-all">Firebase: {authError}</p>}
-          <button onClick={tryUnlock} disabled={loading} className="btn-primary w-full text-center disabled:opacity-60">
-            {loading ? 'Signing in…' : 'Unlock'}
-          </button>
-        </div>
-      </div>
-    </PageWrapper>
-  )
+  const { user, profile } = useAuth()
+  const currentUser = profile?.displayName || user?.displayName || user?.email || 'Admin'
 
   return <AdminPanel currentUser={currentUser} />
 }

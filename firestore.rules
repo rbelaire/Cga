@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /savedFilters/{docId} {
+      allow read, write: if isOwner(request.resource.data.uid) || isOwner(resource.data.uid);
+    }
+
+    match /savedViews/{docId} {
+      allow read, write: if isOwner(request.resource.data.uid) || isOwner(resource.data.uid);
+    }
+
+    match /favorites/{docId} {
+      allow read, write: if isOwner(request.resource.data.uid) || isOwner(resource.data.uid);
+    }
+
+    // Existing CGA docs are intentionally broad for now. Tighten as needed.
+    match /cga/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+  }
+}
