@@ -40,6 +40,8 @@ const CREDITS_KEY  = 'cga_credits_v1'
 const PAYMENTS_KEY = 'cga_payments_v1'
 const USERS_KEY = 'cga_users_v1'
 const TOURNAMENT_INFO_KEY = 'cga_tournament_info_v1'
+const TOURNAMENT_LIFECYCLE_KEY = 'cga_tournament_lifecycle_v1'
+const PAYMENT_META_KEY = 'cga_payment_meta_v1'
 const PIN          = import.meta.env.VITE_ADMIN_PIN ?? 'cga2026'
 // Multi-PIN map: { [pin]: userName }. Env var VITE_ADMIN_PINS is a JSON object e.g. '{"cga2026":"Admin","5678":"Scott"}'
 const PINS = (() => {
@@ -257,6 +259,22 @@ function fmtDate(iso) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
+}
+
+function toMoney(value) {
+  return +((Number(value) || 0).toFixed(2))
+}
+
+function createCreditTxn({ name, tournamentId, creditUsed, user }) {
+  return {
+    id: `credit-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    ts: Date.now(),
+    name,
+    tournamentId,
+    type: 'entry_credit_applied',
+    amount: toMoney(creditUsed),
+    user: user || 'Admin',
+  }
 }
 
 function fmtDateShort(iso) {
@@ -722,6 +740,43 @@ function exportResultsXLSX(tournament, flightData) {
   XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.xlsx`)
 }
 
+function exportBirdiePoolXLSX(tournament, flightData) {
+  if (!tournament) return
+  const uniqueNames = [...new Set(
+    ALL_SCORE_TABS.flatMap(flight => (flightData?.[flight] ?? []).map(player => player?.name).filter(Boolean))
+  )].sort((a, b) => compareByLastName({ name: a }, { name: b }))
+  const headers = ['Player', ...Array.from({ length: 18 }, (_, idx) => String(idx + 1))]
+  const rows = uniqueNames.map(name => {
+    const row = { Player: formatName(name) }
+    for (let hole = 1; hole <= 18; hole += 1) row[String(hole)] = ''
+    return row
+  })
+  const ws = XLSX.utils.json_to_sheet(rows, { header: headers })
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Birdie Pool')
+  XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-birdie-pool.xlsx`)
+}
+
+function exportPayoutDocXLSX(tournament, resultDoc) {
+  if (!tournament || !resultDoc?.leaderboard) return false
+  const wb = XLSX.utils.book_new()
+  for (const [flight, rows] of Object.entries(resultDoc.leaderboard)) {
+    const ranked = (Array.isArray(rows) ? rows : [])
+      .filter(row => (row.rank ?? 0) > 0)
+      .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
+    const sheetRows = ranked.map(row => ({
+      Rank: row.rank ?? '',
+      Player: formatName(row.name),
+      '+/-': row.plusMinus ?? '',
+      POY: row.poy ?? '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(sheetRows)
+    XLSX.utils.book_append_sheet(wb, ws, flight.slice(0, 31))
+  }
+  XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-payout.xlsx`)
+  return true
+}
+
 // ── Excel: Payment Status ─────────────────────────────────────────────────────
 function exportPaymentsXLSX(tournament, paymentMap, membersList) {
   if (!tournament) return
@@ -961,6 +1016,8 @@ function AdminPanel({ currentUser }) {
   const { data: cloudCredits = {} } = useFireData(DB.listenCredits, {})
   const { data: cloudUsers = [] } = useFireData(DB.listenUsers, [])
   const { data: allResults = {} } = useFireData(DB.listenResults, {})
+  const { data: cloudTournamentLifecycle = {} } = useFireData(DB.listenTournamentLifecycle, {})
+  const { data: cloudPaymentMeta = {} } = useFireData(DB.listenPaymentMeta, {})
   const { data: changelog = [] } = useFireData(DB.listenChangelog, [])
   const { data: snapshots = [] } = useFireData(DB.listenSnapshots, [])
 
@@ -996,6 +1053,12 @@ function AdminPanel({ currentUser }) {
   const [tournamentInfoDrafts, setTournamentInfoDrafts] = useState(() => {
     try { return JSON.parse(localStorage.getItem(TOURNAMENT_INFO_KEY)) || {} } catch { return {} }
   })
+  const [tournamentLifecycle, setTournamentLifecycle] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(TOURNAMENT_LIFECYCLE_KEY)) || {} } catch { return {} }
+  })
+  const [paymentMeta, setPaymentMeta] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(PAYMENT_META_KEY)) || {} } catch { return {} }
+  })
 
   const currentTournaments = useMemo(() => getCurrentTournaments(schedule), [])
   const pastTournaments = useMemo(() => getPastTournaments(schedule), [])
@@ -1007,6 +1070,7 @@ function AdminPanel({ currentUser }) {
   const [adminMode,    setAdminMode]    = useState('dashboard')
   const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
+  const [paymentCreditInputs, setPaymentCreditInputs] = useState({})
   const [creditInputs, setCreditInputs] = useState({})
   const [userSearch, setUserSearch] = useState('')
   const [showExportPanel, setShowExportPanel] = useState(false)
@@ -1159,6 +1223,8 @@ function AdminPanel({ currentUser }) {
   useEffect(() => { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments))       }, [payments])
   useEffect(() => { localStorage.setItem(USERS_KEY, JSON.stringify(usersDraft))       }, [usersDraft])
   useEffect(() => { localStorage.setItem(TOURNAMENT_INFO_KEY, JSON.stringify(tournamentInfoDrafts)) }, [tournamentInfoDrafts])
+  useEffect(() => { localStorage.setItem(TOURNAMENT_LIFECYCLE_KEY, JSON.stringify(tournamentLifecycle)) }, [tournamentLifecycle])
+  useEffect(() => { localStorage.setItem(PAYMENT_META_KEY, JSON.stringify(paymentMeta)) }, [paymentMeta])
   useEffect(() => {
     if (!actionFeedback) return
     const timer = setTimeout(() => setActionFeedback(null), 3500)
@@ -1213,6 +1279,12 @@ function AdminPanel({ currentUser }) {
   useEffect(() => {
     setUsersDraft(cloudUsers)
   }, [cloudUsers])
+  useEffect(() => {
+    setTournamentLifecycle(cloudTournamentLifecycle)
+  }, [cloudTournamentLifecycle])
+  useEffect(() => {
+    setPaymentMeta(cloudPaymentMeta)
+  }, [cloudPaymentMeta])
 
   const paymentMap = payments[tid] ?? {}
 
@@ -1413,6 +1485,7 @@ function AdminPanel({ currentUser }) {
       .filter(g => g.length > 0)
       .map((ps, i) => ({ pairing: `Pairing ${i + 1}`, players: ps }))
     setPairingsData(prev => ({ ...prev, [tid]: newPairings }))
+    patchTournamentLifecycle(tid, { pairingsState: 'draft' })
     setManualPairings(false)
     setSelectedUnpaired(null)
   }
@@ -1423,6 +1496,7 @@ function AdminPanel({ currentUser }) {
       const numGroups = Math.max(DEFAULT_PAIRING_ROWS, Math.ceil(totalPlayers / 4) || 1)
       const empty = Array.from({ length: numGroups }, (_, i) => ({ pairing: `Pairing ${i + 1}`, players: [] }))
       setPairingsData(prev => ({ ...prev, [tid]: empty }))
+      patchTournamentLifecycle(tid, { pairingsState: 'draft' })
     }
     setManualPairings(true)
     setSelectedUnpaired(null)
@@ -1434,6 +1508,7 @@ function AdminPanel({ currentUser }) {
       ...prev,
       [tid]: [...(prev[tid] ?? []), { pairing: `Pairing ${idx}`, players: [] }]
     }))
+    patchTournamentLifecycle(tid, { pairingsState: 'draft' })
   }
 
   async function removeGroupManual(cardIdx) {
@@ -1446,6 +1521,7 @@ function AdminPanel({ currentUser }) {
     // Re-label
     updated.forEach((c, i) => { c.pairing = `Pairing ${i + 1}` })
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
+    patchTournamentLifecycle(tid, { pairingsState: 'draft' })
     registerUndoAction({
       label: `Removed ${removedGroup.pairing}`,
       undo: () => {
@@ -1509,12 +1585,14 @@ function AdminPanel({ currentUser }) {
     if (targetPlayers.length >= 4) return
     targetPlayers.splice(insertAt, 0, movingPlayer)
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
+    patchTournamentLifecycle(tid, { pairingsState: 'draft' })
   }
 
   async function clearPairings() {
     if (!await openConfirm('Clear all pairings for this tournament?')) return
     const snapshot = cloneForUndo(currentPairings)
     setPairingsData(prev => ({ ...prev, [tid]: [] }))
+    patchTournamentLifecycle(tid, { pairingsState: 'none' })
     setManualPairings(false)
     setSelectedUnpaired(null)
     if (!snapshot?.length) return
@@ -1536,6 +1614,7 @@ function AdminPanel({ currentUser }) {
         : c
     )
     setPairingsData(prev => ({ ...prev, [tid]: updated }))
+    patchTournamentLifecycle(tid, { pairingsState: 'draft' })
     registerUndoAction({
       label: `Removed ${removedPlayer.name} from ${currentPairings[cardIdx]?.pairing ?? 'pairing'}`,
       undo: () => {
@@ -1562,7 +1641,19 @@ function AdminPanel({ currentUser }) {
 
     const ok = await withSaveState(setPairingsSaving, setPairingsSaveStatus, async () => {
       await saveSnapshot('pairings', cloudPairings, `Before pairings save for ${tid}`, tid)
-      await DB.savePairings({ ...pairingsData })
+      const nextLifecycle = {
+        ...tournamentLifecycle,
+        [tid]: {
+          ...(tournamentLifecycle[tid] ?? {}),
+          pairingsState: 'published',
+          pairingsPublishedAt: Date.now(),
+        },
+      }
+      await Promise.all([
+        DB.savePairings({ ...pairingsData }),
+        DB.saveTournamentLifecycle(nextLifecycle),
+      ])
+      setTournamentLifecycle(nextLifecycle)
     }, setAdminError)
     if (ok) logChange('Pairings saved', tournament?.name ?? tid)
     return ok
@@ -1643,26 +1734,41 @@ function AdminPanel({ currentUser }) {
     return ok
   }
 
+  function patchTournamentLifecycle(tournamentId, patch) {
+    if (!tournamentId) return
+    setTournamentLifecycle(prev => ({
+      ...prev,
+      [tournamentId]: {
+        ...(prev[tournamentId] ?? {}),
+        ...patch,
+      },
+    }))
+  }
+
   // ── Payment mutations ─────────────────────────────────────────────────────────
-  function togglePayment(tournamentId, name) {
+  function ensurePlayerIsEntered(tournamentId, name) {
+    const alreadyAdded = ALL_SCORE_TABS.some(fl =>
+      (data[tournamentId]?.[fl] ?? []).some(p => p.name === name)
+    )
+    if (alreadyAdded) return
+    const memberFlight = memberFlightLookup[name]
+    const targetFlight = FLIGHTS.includes(memberFlight) ? memberFlight : 'New Players'
+    const entry = { name, ptm: ptmLookup[name] ?? '', score: '', eligible: true }
+    setData(prev => {
+      const td = { ...(prev[tournamentId] ?? {}) }
+      td[targetFlight] = [...(td[targetFlight] ?? []), entry]
+      return { ...prev, [tournamentId]: td }
+    })
+  }
+
+  function togglePayment(tournamentId, name, options = {}) {
+    const { creditUsed = 0 } = options
     const currentMap = payments[tournamentId] ?? {}
     const isNowPaid = !currentMap[name]
 
     // Auto-add to score table when marking as paid (if not already entered)
     if (isNowPaid) {
-      const alreadyAdded = ALL_SCORE_TABS.some(fl =>
-        (data[tournamentId]?.[fl] ?? []).some(p => p.name === name)
-      )
-      if (!alreadyAdded) {
-        const memberFlight = memberFlightLookup[name]
-        const targetFlight = FLIGHTS.includes(memberFlight) ? memberFlight : 'New Players'
-        const entry = { name, ptm: ptmLookup[name] ?? '', score: '', eligible: true }
-        setData(prev => {
-          const td = { ...(prev[tournamentId] ?? {}) }
-          td[targetFlight] = [...(td[targetFlight] ?? []), entry]
-          return { ...prev, [tournamentId]: td }
-        })
-      }
+      ensurePlayerIsEntered(tournamentId, name)
     }
 
     setPayments(prev => {
@@ -1671,13 +1777,51 @@ function AdminPanel({ currentUser }) {
       else tidMap[name] = true
       return { ...prev, [tournamentId]: tidMap }
     })
+
+    setPaymentMeta(prev => {
+      const currentTidMeta = { ...(prev[tournamentId] ?? {}) }
+      if (!isNowPaid) {
+        delete currentTidMeta[name]
+      } else {
+        currentTidMeta[name] = {
+          creditUsed: toMoney(creditUsed),
+          paidAt: Date.now(),
+        }
+      }
+      return { ...prev, [tournamentId]: currentTidMeta }
+    })
+  }
+
+  function markPaidWithCredit(tournamentId, name, creditAmountInput) {
+    const available = toMoney(credits[name] ?? 0)
+    const requested = toMoney(creditAmountInput)
+    const creditUsed = Math.max(0, Math.min(requested, available))
+    if (creditUsed > 0) {
+      const nextBalance = toMoney(available - creditUsed)
+      setCredits(prev => ({ ...prev, [name]: nextBalance }))
+      const transaction = createCreditTxn({ name, tournamentId, creditUsed, user: currentUser })
+      DB.appendCreditTransaction(transaction).catch(() => {})
+    }
+    togglePayment(tournamentId, name, { creditUsed })
   }
 
   function markAllPaid(tournamentId, names) {
+    names.forEach(name => ensurePlayerIsEntered(tournamentId, name))
     setPayments(prev => {
       const tidMap = { ...(prev[tournamentId] ?? {}) }
       names.forEach(n => { tidMap[n] = true })
       return { ...prev, [tournamentId]: tidMap }
+    })
+    setPaymentMeta(prev => {
+      const tidMeta = { ...(prev[tournamentId] ?? {}) }
+      names.forEach(name => {
+        tidMeta[name] = {
+          ...(tidMeta[name] ?? {}),
+          creditUsed: toMoney(tidMeta[name]?.creditUsed ?? 0),
+          paidAt: tidMeta[name]?.paidAt ?? Date.now(),
+        }
+      })
+      return { ...prev, [tournamentId]: tidMeta }
     })
   }
 
@@ -1710,7 +1854,10 @@ function AdminPanel({ currentUser }) {
 
     const ok = await withSaveState(setPaymentsSaving, setPaymentsSaveStatus, async () => {
       await saveSnapshot('payments', cloudPayments, `Before payments save for ${tid}`, tid)
-      await DB.savePayments(payments)
+      await Promise.all([
+        DB.savePayments(payments),
+        DB.savePaymentMeta(paymentMeta),
+      ])
     }, setAdminError)
     if (ok) logChange('Payments saved', `${Object.keys(paymentMap).length} paid for ${tournament?.name ?? tid}`)
     return ok
@@ -1790,22 +1937,25 @@ function AdminPanel({ currentUser }) {
   const dashboardTournament = schedule.find(t => t.id === dashboardTid) ?? nextTournament ?? null
   const dashboardWorkflow = useMemo(() => computeTournamentWorkflowState({
     tournamentId: dashboardTid,
+    tournament: dashboardTournament,
     scoresByTournament: data,
     pairingsByTournament: pairingsData,
     paymentsByTournament: payments,
     resultsByTournament: allResults,
+    lifecycleByTournament: tournamentLifecycle,
     scoreFlights: ALL_SCORE_TABS,
-  }), [dashboardTid, data, pairingsData, payments, allResults])
+  }), [dashboardTid, dashboardTournament, data, pairingsData, payments, allResults, tournamentLifecycle])
   const workflowActions = useMemo(() => ({
-    payments: { label: 'Record Payments', mode: 'payments' },
-    entries: { label: 'Add Players', mode: 'scores' },
-    pairings: { label: 'Generate Pairings', mode: 'pairings' },
-    scores: { label: 'Enter Scores', mode: 'scores' },
-    results: { label: 'Publish Results', mode: 'scores' },
+    memo: { label: 'Mark Memo Sent', mode: 'dashboard' },
+    field: { label: 'Open Entries', mode: 'payments' },
+    pairingsLifecycle: { label: 'Generate / Edit Pairings', mode: 'pairings' },
+    birdie: { label: 'Export Birdie Pool', mode: 'dashboard' },
+    scoresLifecycle: { label: 'Open Scores / Results', mode: 'scores' },
+    payout: { label: 'Generate Payout', mode: 'dashboard' },
     export: { label: 'Export Reports', mode: 'dashboard' },
   }), [])
   const nextWorkflowStep = useMemo(() => {
-    const firstIncomplete = dashboardWorkflow.steps.find(step => step.status !== 'complete')
+    const firstIncomplete = dashboardWorkflow.lifecycleSteps.find(step => step.status !== 'complete')
     if (firstIncomplete) return firstIncomplete
     return { key: 'export', title: 'Export Reports', label: 'Workflow complete. Export packets and records.' }
   }, [dashboardWorkflow])
@@ -1816,9 +1966,12 @@ function AdminPanel({ currentUser }) {
   ), [allResults])
 
   const pairingsPosted = useMemo(() => {
+    const state = tournamentLifecycle[tid]?.pairingsState
+    if (state === 'published') return true
+    if (state === 'draft' || state === 'none') return false
     const p = cloudPairings[tid]
     return Array.isArray(p) && p.length > 0
-  }, [cloudPairings, tid])
+  }, [cloudPairings, tid, tournamentLifecycle])
 
   const membersDirty = useMemo(() => {
     const cloudLookup = Object.fromEntries(membersData.map(m => [m.name, m]))
@@ -1842,7 +1995,7 @@ function AdminPanel({ currentUser }) {
     {
       key: 'pairings',
       label: 'Pairings Builder',
-      dirty: stableSerialize(pairingsData) !== stableSerialize(cloudPairings),
+      dirty: stableSerialize(pairingsData) !== stableSerialize(cloudPairings) || stableSerialize(tournamentLifecycle) !== stableSerialize(cloudTournamentLifecycle),
       saveAction: 'pairings',
       saving: pairingsSaving,
     },
@@ -1863,7 +2016,7 @@ function AdminPanel({ currentUser }) {
     {
       key: 'payments',
       label: 'Payments',
-      dirty: stableSerialize(payments) !== stableSerialize(cloudPayments),
+      dirty: stableSerialize(payments) !== stableSerialize(cloudPayments) || stableSerialize(paymentMeta) !== stableSerialize(cloudPaymentMeta),
       saveAction: 'payments',
       saving: paymentsSaving,
     },
@@ -1883,10 +2036,10 @@ function AdminPanel({ currentUser }) {
     },
   ]), [
     data, cloudScores, scoresSaving,
-    pairingsData, cloudPairings, pairingsSaving,
+    pairingsData, cloudPairings, pairingsSaving, tournamentLifecycle, cloudTournamentLifecycle,
     membersDirty, membersSaving,
     credits, cloudCredits, creditsSaving,
-    payments, cloudPayments, paymentsSaving,
+    payments, cloudPayments, paymentsSaving, paymentMeta, cloudPaymentMeta,
     usersDraft, cloudUsers, usersSaving,
     tournamentInfoDrafts,
   ])
@@ -2143,6 +2296,43 @@ function AdminPanel({ currentUser }) {
     }
   }
 
+  function markMemoSent(targetTid = tid) {
+    if (!targetTid) return
+    patchTournamentLifecycle(targetTid, { memoSentAt: Date.now() })
+  }
+
+  async function generateBirdieExport(targetTid = tid) {
+    const targetTournament = schedule.find(t => t.id === targetTid)
+    if (!targetTournament) return
+    exportBirdiePoolXLSX(targetTournament, data[targetTid] ?? {})
+    const nextLifecycle = {
+      ...tournamentLifecycle,
+      [targetTid]: {
+        ...(tournamentLifecycle[targetTid] ?? {}),
+        birdiePoolExportedAt: Date.now(),
+      },
+    }
+    setTournamentLifecycle(nextLifecycle)
+    await DB.saveTournamentLifecycle(nextLifecycle).catch(() => {})
+  }
+
+  async function generatePayoutDocument(targetTid = tid) {
+    const targetTournament = schedule.find(t => t.id === targetTid)
+    const resultDoc = allResults?.[targetTid]
+    if (!targetTournament || !resultDoc) return
+    const exported = exportPayoutDocXLSX(targetTournament, resultDoc)
+    if (!exported) return
+    const nextLifecycle = {
+      ...tournamentLifecycle,
+      [targetTid]: {
+        ...(tournamentLifecycle[targetTid] ?? {}),
+        payoutGeneratedAt: Date.now(),
+      },
+    }
+    setTournamentLifecycle(nextLifecycle)
+    await DB.saveTournamentLifecycle(nextLifecycle).catch(() => {})
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <PageWrapper>
@@ -2251,6 +2441,9 @@ function AdminPanel({ currentUser }) {
             onClick={() => {
               const action = workflowActions[nextWorkflowStep.key]
               if (!action) return
+              if (nextWorkflowStep.key === 'memo') markMemoSent(dashboardTid)
+              if (nextWorkflowStep.key === 'birdie') generateBirdieExport(dashboardTid)
+              if (nextWorkflowStep.key === 'payout') generatePayoutDocument(dashboardTid)
               if (nextWorkflowStep.key === 'export') setShowExportPanel(true)
               setAdminMode(action.mode)
             }}
@@ -2427,6 +2620,10 @@ function AdminPanel({ currentUser }) {
           onGoToScores={() => setAdminMode('scores')}
           onGoToPayments={() => setAdminMode('payments')}
           onGoToPairings={() => setAdminMode('pairings')}
+          onMarkMemoSent={() => markMemoSent(dashboardTid)}
+          onExportBirdiePool={() => generateBirdieExport(dashboardTid)}
+          onGeneratePayout={() => generatePayoutDocument(dashboardTid)}
+          onGoToResults={() => setAdminMode('scores')}
           onOpenExport={() => setShowExportPanel(true)}
         />
       )}
@@ -2463,6 +2660,7 @@ function AdminPanel({ currentUser }) {
           savePairings={savePairings}
           pairingsSaving={pairingsSaving}
           pairingsSaveStatus={pairingsSaveStatus}
+          pairingsState={dashboardWorkflow.counts.pairingsState}
           onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}
           tournament={tournament}
           flightTagStyles={flightTagStyles}
@@ -2738,41 +2936,49 @@ function AdminPanel({ currentUser }) {
               <table className="w-full text-sm min-w-[440px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="table-header text-gray-400 w-12 text-center">Paid</th>
+                    <th className="table-header text-gray-400 w-24 text-center">Paid</th>
                     <th className="table-header text-gray-400 text-left">Player</th>
                     <th className="table-header text-gray-400 text-left">Flight</th>
+                    <th className="table-header text-gray-400 text-right">Credit Available</th>
+                    <th className="table-header text-gray-400 text-right">Credit Applied</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paymentRoster.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
+                      <td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
                         No members match your search.
                       </td>
                     </tr>
                   ) : (
                     paymentRoster.map((m, idx) => {
                       const isPaid = !!paymentMap[m.name]
+                      const balance = toMoney(credits[m.name] ?? 0)
+                      const creditApplied = toMoney(paymentMeta?.[tid]?.[m.name]?.creditUsed ?? 0)
+                      const creditInput = paymentCreditInputs[m.name] ?? ''
                       return (
                         <tr
                           key={m.name}
-                          onClick={() => togglePayment(tid, m.name)}
                           className={`border-b border-gray-100 last:border-0 transition-colors cursor-pointer ${
                             isPaid ? 'bg-green-50/60 hover:bg-green-100/60' : 'hover:bg-gray-50'
                           } ${!isPaid && idx % 2 === 0 ? 'bg-white' : ''} ${!isPaid && idx % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
                         >
                           <td className="px-4 py-2.5 text-center">
-                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full border-2 transition-colors ${
-                              isPaid
-                                ? 'bg-green-500 border-green-500 text-white'
-                                : 'border-gray-300 text-transparent hover:border-green-300'
-                            }`}>
-                              {isPaid && (
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isPaid) togglePayment(tid, m.name)
+                                else markPaidWithCredit(tid, m.name, creditInput || 0)
+                                setPaymentCreditInputs(prev => ({ ...prev, [m.name]: '' }))
+                              }}
+                              className={`px-2.5 py-1 rounded text-[11px] font-sans font-semibold ${
+                                isPaid
+                                  ? 'bg-green-600 text-white'
+                                  : 'border border-gray-300 text-gray-700 hover:border-forest hover:text-forest'
+                              }`}
+                            >
+                              {isPaid ? 'Paid' : 'Mark Paid'}
+                            </button>
                           </td>
                           <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
                             {formatName(m.name)}
@@ -2781,6 +2987,25 @@ function AdminPanel({ currentUser }) {
                             <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[m.flight] ?? flightTagStyles.Unassigned}`}>
                               {m.flight ?? 'Unassigned'}
                             </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-600">
+                            ${balance.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            {isPaid ? (
+                              <span className="font-mono text-xs text-green-700">${creditApplied.toFixed(2)}</span>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                max={balance}
+                                value={creditInput}
+                                onChange={e => setPaymentCreditInputs(prev => ({ ...prev, [m.name]: e.target.value }))}
+                                placeholder="$0.00"
+                                className="w-20 border border-gray-200 rounded px-2 py-1 text-xs text-right font-mono"
+                              />
+                            )}
                           </td>
                         </tr>
                       )
@@ -2797,7 +3022,7 @@ function AdminPanel({ currentUser }) {
                           </svg>
                         </span>
                       </td>
-                      <td colSpan={2} className="px-4 py-2.5 font-sans text-xs font-semibold uppercase tracking-widest text-green-700">
+                      <td colSpan={4} className="px-4 py-2.5 font-sans text-xs font-semibold uppercase tracking-widest text-green-700">
                         {paymentPaidCount} member{paymentPaidCount !== 1 ? 's' : ''} paid
                       </td>
                     </tr>
@@ -2954,15 +3179,15 @@ function AdminPanel({ currentUser }) {
 function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
-  onGoToScores, onGoToPayments, onGoToPairings, onOpenExport,
+  onGoToScores, onGoToPayments, onGoToPairings, onOpenExport, onMarkMemoSent, onExportBirdiePool, onGeneratePayout, onGoToResults,
 }) {
-  const stepActions = {
-    payments: { label: 'Record Payments', action: onGoToPayments },
-    entries: { label: 'Add Players', action: onGoToScores },
-    pairings: { label: 'Generate Pairings', action: onGoToPairings },
-    scores: { label: 'Enter Scores', action: onGoToScores },
-    results: { label: 'Publish Results', action: onGoToScores },
-    export: { label: 'Export Reports', action: onOpenExport },
+  const lifecycleActions = {
+    memo: { label: 'Mark Sent', action: onMarkMemoSent },
+    field: { label: 'Open Entries', action: onGoToPayments },
+    pairingsLifecycle: { label: workflow.counts.pairingsState === 'published' ? 'Edit Pairings' : 'Generate Pairings', action: onGoToPairings },
+    birdie: { label: 'Export', action: onExportBirdiePool },
+    scoresLifecycle: { label: workflow.counts.resultsPublished ? 'View Results' : 'Enter Scores', action: workflow.counts.resultsPublished ? onGoToResults : onGoToScores },
+    payout: { label: 'Generate', action: onGeneratePayout },
   }
 
   return (
@@ -2990,29 +3215,32 @@ function DashboardPanel({
       )}
 
       <section className="bg-white border border-gray-200 rounded-lg p-5">
-        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest">Selected Tournament Snapshot</p>
+        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest">Tournament Overview</p>
         <h3 className="text-darktext font-serif text-xl font-semibold">{selectedTournament?.name ?? 'No tournament selected'}</h3>
         {selectedTournament?.date && <p className="text-gray-500 font-sans text-sm mb-4">{fmtDateShort(selectedTournament.date)}</p>}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Players Entered</p>
-            <p className="stat-number text-3xl text-forest">{workflow.counts.enteredCount}</p>
-            <button onClick={onGoToScores} className="mt-2 text-xs font-sans font-semibold text-forest hover:underline">Add Players</button>
+            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Header</p>
+            <p className="font-sans text-sm text-darktext mt-1">Date: {selectedTournament?.date ?? '—'}</p>
+            <p className="stat-number text-2xl text-forest mt-2">{workflow.counts.paidCount} / {workflow.counts.fieldCap}</p>
+            <p className="text-xs text-gray-500 font-sans">Field count</p>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Players Paid</p>
-            <p className="stat-number text-3xl text-forest">{workflow.counts.paidCount}</p>
-            <button onClick={onGoToPayments} className="mt-2 text-xs font-sans font-semibold text-forest hover:underline">Record Payments</button>
+            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Pairings State</p>
+            <p className="font-sans text-sm font-semibold mt-1 text-forest capitalize">{workflow.counts.pairingsState}</p>
+            <button onClick={onGoToPairings} className="mt-2 text-xs font-sans font-semibold text-forest hover:underline">Pairings</button>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Pairings</p>
-            <p className={`font-sans text-sm font-semibold mt-1 ${workflow.counts.pairingsCount > 0 ? 'text-green-700' : 'text-gray-500'}`}>
-              {workflow.counts.pairingsCount > 0 ? 'Posted' : 'Not posted'}
-            </p>
-            <button onClick={onGoToPairings} className="mt-2 text-xs font-sans font-semibold text-forest hover:underline">Generate Pairings</button>
+            <p className="text-xs text-gray-500 font-sans uppercase tracking-wide">Quick Links</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button onClick={onGoToPayments} className="text-xs font-sans font-semibold text-forest hover:underline">Entries</button>
+              <button onClick={onGoToPairings} className="text-xs font-sans font-semibold text-forest hover:underline">Pairings</button>
+              <button onClick={onGoToScores} className="text-xs font-sans font-semibold text-forest hover:underline">Scoring</button>
+              <button onClick={onGoToResults} className="text-xs font-sans font-semibold text-forest hover:underline">Results</button>
+            </div>
           </div>
         </div>
-        <TournamentWorkflowTracker workflow={workflow} actions={stepActions} />
+        <TournamentWorkflowTracker workflow={{ steps: workflow.lifecycleSteps }} actions={lifecycleActions} />
       </section>
 
       <section className="bg-white border border-gray-200 rounded-lg p-5">
@@ -3924,7 +4152,7 @@ function PairingsPanel({
   selectedUnpaired, setSelectedUnpaired,
   generatePairings, startManualPairings, addGroupManual, removeGroupManual,
   assignUnpairedToGroup, movePlayerManual, clearPairings, removePairedPlayer, savePairings,
-  pairingsSaving, pairingsSaveStatus, onExportPairingsPDF, tournament,
+  pairingsSaving, pairingsSaveStatus, pairingsState, onExportPairingsPDF, tournament,
   flightTagStyles,
 }) {
   const [draggedPlayer, setDraggedPlayer] = useState(null)
@@ -4012,7 +4240,7 @@ function PairingsPanel({
           )}
           {currentPairings.length > 0 && (
             <>
-              <SaveBtn onClick={savePairings} saving={pairingsSaving} status={pairingsSaveStatus} label="Save Pairings" />
+              <SaveBtn onClick={savePairings} saving={pairingsSaving} status={pairingsSaveStatus} label={pairingsState === 'published' ? 'Publish Updates' : 'Publish Pairings'} />
               <PdfBtn onClick={onExportPairingsPDF} disabled={!tournament}>
                 Export Pairings PDF
               </PdfBtn>
@@ -4226,7 +4454,7 @@ function PairingsPanel({
       {currentPairings.length > 0 && (
         <div className="mt-4 bg-blue-50 border border-blue-100 rounded-lg p-4">
           <p className="text-blue-700 font-sans text-xs leading-relaxed">
-            Hit <strong>Save Pairings</strong> to publish directly to the site. Members will see pairings live immediately.
+            Pairings state: <strong className="uppercase">{pairingsState ?? 'none'}</strong>. Hit <strong>Save Pairings</strong> to publish the current draft.
           </p>
         </div>
       )}

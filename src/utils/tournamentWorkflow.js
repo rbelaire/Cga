@@ -18,10 +18,12 @@ function hasScore(value) {
 
 export function computeTournamentWorkflowState({
   tournamentId,
+  tournament = null,
   scoresByTournament = {},
   pairingsByTournament = {},
   paymentsByTournament = {},
   resultsByTournament = {},
+  lifecycleByTournament = {},
   scoreFlights = DEFAULT_SCORE_FLIGHTS,
 }) {
   const scoreTid = asObject(scoresByTournament[tournamentId])
@@ -37,6 +39,7 @@ export function computeTournamentWorkflowState({
   const paidCount = Object.keys(paymentMap).length
 
   const pairings = Array.isArray(pairingsByTournament[tournamentId]) ? pairingsByTournament[tournamentId] : []
+  const lifecycle = asObject(lifecycleByTournament[tournamentId])
   const pairedNames = new Set()
   for (const card of pairings) {
     const cardPlayers = Array.isArray(card?.players) ? card.players : []
@@ -45,7 +48,10 @@ export function computeTournamentWorkflowState({
     }
   }
   const pairedCount = pairedNames.size
-  const pairingsPosted = pairings.length > 0
+  const pairingsState = lifecycle.pairingsState === 'published' || lifecycle.pairingsState === 'draft' || lifecycle.pairingsState === 'none'
+    ? lifecycle.pairingsState
+    : pairings.length > 0 ? 'published' : 'none'
+  const pairingsPosted = pairingsState === 'published'
 
   const resultsPublished = Boolean(resultsByTournament[tournamentId])
 
@@ -69,16 +75,22 @@ export function computeTournamentWorkflowState({
       ? `${enteredCount} entered / ${paidCount} paid`
       : `${enteredCount} entered`
 
-  const pairingsStatus = !pairingsPosted
+  const pairingsStatus = pairingsState === 'none'
     ? 'not_started'
-    : (enteredCount > 0 && pairedCount >= enteredCount) ? 'complete' : 'partial'
-  const pairingsLabel = !pairingsPosted
-    ? 'Pairings not posted'
-    : (enteredCount > 0 && pairedCount >= enteredCount)
-      ? `Pairings posted (${pairings.length} groups)`
-      : enteredCount > 0
-        ? `Pairings draft: ${pairedCount}/${enteredCount} grouped`
-        : `Pairings posted (${pairings.length} groups)`
+    : pairingsState === 'draft'
+      ? 'partial'
+      : (enteredCount > 0 && pairedCount >= enteredCount) ? 'complete' : 'partial'
+  const pairingsLabel = pairingsState === 'none'
+    ? 'Pairings not generated'
+    : pairingsState === 'draft'
+      ? enteredCount > 0
+        ? `Draft ready (${pairedCount}/${enteredCount} grouped)`
+        : 'Draft pairings generated'
+      : (enteredCount > 0 && pairedCount >= enteredCount)
+        ? `Pairings published (${pairings.length} groups)`
+        : enteredCount > 0
+          ? `Published (${pairedCount}/${enteredCount} grouped)`
+          : `Pairings published (${pairings.length} groups)`
 
   const scoresStatus = scoredCount === 0
     ? 'not_started'
@@ -98,14 +110,49 @@ export function computeTournamentWorkflowState({
       ? 'Results published'
       : `Results published (scores ${scoredCount}/${enteredCount || scoredCount})`
 
+  const memoSent = Boolean(lifecycle.memoSentAt)
+  const memoStatus = memoSent ? 'complete' : 'not_started'
+  const memoLabel = memoSent ? 'Tournament memo sent' : 'Tournament memo not sent'
+
+  const fieldStatus = paidCount >= 120 ? 'complete' : paidCount > 0 ? 'partial' : 'not_started'
+  const fieldLabel = `${paidCount} / 120 paid and entered`
+
+  const birdiePoolExported = Boolean(lifecycle.birdiePoolExportedAt)
+  const birdieStatus = !pairingsPosted
+    ? 'not_started'
+    : birdiePoolExported ? 'complete' : 'not_started'
+  const birdieLabel = birdiePoolExported ? 'Birdie pool exported' : 'Birdie pool not exported'
+
+  const scoresPublished = Boolean(resultsByTournament[tournamentId])
+  const scoresLifecycleStatus = scoredCount === 0
+    ? 'not_started'
+    : scoresPublished
+      ? (enteredCount > 0 && scoredCount >= enteredCount ? 'complete' : 'partial')
+      : 'partial'
+  const scoresLifecycleLabel = scoresPublished
+    ? `Published (${scoredCount}/${enteredCount || scoredCount} scored)`
+    : scoredCount > 0
+      ? `Entered (${scoredCount}/${enteredCount || scoredCount} scored)`
+      : 'No scores entered'
+
+  const payoutCreated = Boolean(lifecycle.payoutGeneratedAt)
+  const payoutStatus = !scoresPublished
+    ? 'not_started'
+    : payoutCreated ? 'complete' : 'not_started'
+  const payoutLabel = payoutCreated ? 'Payout document created' : 'Payout document not created'
+
   return {
     counts: {
       paidCount,
       enteredCount,
       pairedCount,
       pairingsCount: pairings.length,
+      pairingsState,
       scoredCount,
       resultsPublished,
+      fieldCap: 120,
+      tournamentName: tournament?.name ?? null,
+      tournamentDate: tournament?.date ?? null,
     },
     steps: [
       { key: 'payments', title: 'Payments received', status: paymentStatus, label: paymentLabel },
@@ -114,6 +161,13 @@ export function computeTournamentWorkflowState({
       { key: 'scores', title: 'Scores entered', status: scoresStatus, label: scoresLabel },
       { key: 'results', title: 'Results published', status: resultsStatus, label: resultsLabel },
     ],
+    lifecycleSteps: [
+      { key: 'memo', title: 'Tournament Memo Sent', status: memoStatus, label: memoLabel },
+      { key: 'field', title: 'Field', status: fieldStatus, label: fieldLabel },
+      { key: 'pairingsLifecycle', title: 'Pairings Ready', status: pairingsStatus, label: pairingsLabel },
+      { key: 'birdie', title: 'Birdie Pool Created', status: birdieStatus, label: birdieLabel },
+      { key: 'scoresLifecycle', title: 'Scores Entered / Published', status: scoresLifecycleStatus, label: scoresLifecycleLabel },
+      { key: 'payout', title: 'Payout Document Created', status: payoutStatus, label: payoutLabel },
+    ],
   }
 }
-
