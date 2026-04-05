@@ -93,6 +93,7 @@ export const DB = {
   // Tournament results (map of all tournaments in one doc)
   getResult:    (tid) => fsGet('cga/results').then(d => d?.data?.[tid] ?? null),
   saveResult:   (tid, data) => fsMerge('cga/results', { data: { [tid]: data } }),
+  saveResultsMap: (data) => fsMerge('cga/results', { data }),
   listenResult: (tid, cb) => fsListen('cga/results', d => cb(d?.data?.[tid] ?? null)),
   listenResults: (cb) => fsListen('cga/results', d => cb(d?.data ?? {})),
 
@@ -138,5 +139,15 @@ export const DB = {
       await setDoc(ref, { entries: [entry] })
     }
   },
+  appendCreditTransactions: async (entries = []) => {
+    if (!entries.length) return
+    const ref = REF('cga/creditTransactions')
+    try {
+      await updateDoc(ref, { entries: arrayUnion(...entries) })
+    } catch {
+      await setDoc(ref, { entries })
+    }
+  },
+  saveCreditTransactions: (entries = []) => fsSet('cga/creditTransactions', { entries }),
   listenCreditTransactions: (cb) => fsListen('cga/creditTransactions', d => cb(d?.entries ?? [])),
 }

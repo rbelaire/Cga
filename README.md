@@ -78,6 +78,7 @@ The app currently uses **flat document paths under `cga/*`**.
 - `cga/pairings` → `{ map: { [tournamentId]: [...] } }`
 - `cga/payments` → `{ data: { [tournamentId]: { [member]: true } } }`
 - `cga/credits` → `{ balances: { [member]: number } }`
+- `cga/creditTransactions` → `{ entries: [{ member, amount, date, note?, reference?, source? }] }`
 - `cga/users` → `{ list: [...] }`
 - `cga/scores` → `{ data: { [tournamentId]: { [flight]: [...] } } }`
 - `cga/results` → `{ data: { [tournamentId]: resultDoc } }`
@@ -105,6 +106,26 @@ Before key writes, the app captures rollback snapshots for:
 - publish-sensitive docs: `results` (per tournament), `standings`, `poy`.
 
 From the **Snapshots** admin tab, admins can restore with explicit confirmation. Restore actions are written to changelog history.
+
+## Bulk Import (Admin)
+
+The Admin area now includes a **Bulk Import** tab for safe spreadsheet imports.
+
+- Supported import types: **Credits**, **Tournaments**, **Results**.
+- Accepted file formats: **.xlsx** and **.csv**.
+- Dry run is required before apply and reports:
+  - rows detected,
+  - valid/invalid rows,
+  - rows to add,
+  - duplicates skipped,
+  - conflicts and blocking validation errors.
+- Default mode is **add-only** (no overwrite / no silent replacement).
+- Duplicate matching is conservative:
+  - Credits: `member + date + amount + note + reference`
+  - Tournaments: `tournamentId`
+  - Results: `tournamentId + flight + member`
+- Before apply, the app snapshots affected docs; after apply it logs a changelog entry.
+- Templates are downloadable directly in the Bulk Import panel (`cga-credits-template.csv`, `cga-tournaments-template.csv`, `cga-results-template.csv`).
 
 ## Routing notes
 
