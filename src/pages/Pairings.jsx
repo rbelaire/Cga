@@ -18,8 +18,12 @@ const flightTagStyles = {
 export default function Pairings() {
   const { tournamentId } = useParams()
   const { data: pairingsMap } = useFireData(DB.listenPairings, {})
+  const { data: lifecycle } = useFireData(DB.listenTournamentLifecycle, {})
 
-  const data = pairingsMap?.[tournamentId] ?? null
+  const pairingsState = lifecycle?.[tournamentId]?.pairingsState
+  const hasLegacyPairings = Boolean(pairingsMap?.[tournamentId])
+  const isPublished = pairingsState === 'published' || (!pairingsState && hasLegacyPairings)
+  const data = isPublished ? pairingsMap?.[tournamentId] ?? null : null
 
   useEffect(() => {
     document.title = data ? `Pairings | ${data.tournament}` : 'Pairings | CGA 2026'

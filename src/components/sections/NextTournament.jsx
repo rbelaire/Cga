@@ -37,7 +37,7 @@ export default function NextTournament() {
           <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
             <CountdownTimer targetDate={next.date} />
             <Link
-              to="/tournaments"
+              to={`/tournaments/${next.id}`}
               className="btn-primary w-full sm:w-auto text-center"
             >
               View Tournament

@@ -9,6 +9,7 @@ import Info from './pages/Info'
 import Admin from './pages/Admin'
 import Pairings from './pages/Pairings'
 import Sponsors from './pages/Sponsors'
+import TournamentDetail from './pages/TournamentDetail'
 
 function NotFound() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/tournaments" element={<Tournaments />} />
+          <Route path="/tournaments/:tournamentId" element={<TournamentDetail />} />
           <Route path="/standings" element={<Standings />} />
           <Route path="/members" element={<Members />} />
           <Route path="/info" element={<Info />} />
