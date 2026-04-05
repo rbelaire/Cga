@@ -15,6 +15,15 @@ const flightTagStyles = {
   Unassigned: 'bg-gray-100 text-gray-600 border-gray-200',
 }
 
+function EmptyPairingsIcon() {
+  return (
+    <svg className="w-14 h-14 mb-4 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 21V4m0 0h10l-2.5 3L17 10H7" />
+      <circle cx="7" cy="21" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
 export default function Pairings() {
   const { tournamentId } = useParams()
   const { data: pairingsMap } = useFireData(DB.listenPairings, {})
@@ -33,7 +42,7 @@ export default function Pairings() {
     return (
       <PageWrapper>
         <div className="py-16 text-center max-w-md mx-auto">
-          <div className="text-5xl mb-4">🏌️</div>
+          <EmptyPairingsIcon />
           <h1 className="section-title text-2xl sm:text-3xl mb-2">Pairings Not Posted Yet</h1>
           <p className="text-gray-500 font-sans text-sm mb-2">
             No pairings are available for this tournament yet.

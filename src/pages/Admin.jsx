@@ -63,6 +63,76 @@ const MAX_RECENT_ACTIONS = 5
 const PDF_NAVY = [27,  59,  111]
 const PDF_GOLD = [201, 168, 76]
 
+function AdminActionIcon({ children, className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      {children}
+    </svg>
+  )
+}
+
+const DashboardIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13h7V3H3v10zm11 8h7V11h-7v10zM3 21h7v-4H3v4zm11-10h7V3h-7v8z" />
+  </AdminActionIcon>
+)
+
+const ReceiptIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3h10l2 2v16l-3-2-3 2-3-2-3 2V5l2-2z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9h6M9 13h6" />
+  </AdminActionIcon>
+)
+
+const UsersIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11a4 4 0 100-8 4 4 0 000 8zM8 13a4 4 0 100-8 4 4 0 000 8zM2 21a6 6 0 0112 0M14 21a6 6 0 018 0" />
+  </AdminActionIcon>
+)
+
+const GolfFlagIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 21V3m0 0h10l-2.5 3L18 9H8" />
+  </AdminActionIcon>
+)
+
+const TrophyIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4h8v3a4 4 0 01-8 0V4zm-3 1h3v2a5 5 0 01-3-2zm14 0h-3v2a5 5 0 003-2zM10 14h4m-5 6h6" />
+  </AdminActionIcon>
+)
+
+const ExportIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l4-4m-4 4l-4-4M5 15v3h14v-3" />
+  </AdminActionIcon>
+)
+
+const FolderIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h6l2 2h10v10H3V7z" />
+  </AdminActionIcon>
+)
+
+const LockIcon = ({ className = 'w-10 h-10 text-gray-300' }) => (
+  <AdminActionIcon className={className}>
+    <rect x="6" y="11" width="12" height="9" rx="2" strokeWidth={2} />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11V8a3 3 0 116 0v3" />
+  </AdminActionIcon>
+)
+
+const CheckIcon = ({ className = 'w-3.5 h-3.5' }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </AdminActionIcon>
+)
+
+const ErrorIcon = ({ className = 'w-3.5 h-3.5' }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 6l12 12M18 6L6 18" />
+  </AdminActionIcon>
+)
+
 
 const flightTagStyles = {
   Championship: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -2037,14 +2107,14 @@ function AdminPanel({ currentUser }) {
   )
   const keyWorkflowStats = `${paymentPaidCount} Paid / ${totalPlayers} Entered`
   const primaryActions = [
-    { key: 'overview', label: 'Overview', icon: '📊', onClick: () => setAdminMode('dashboard'), active: adminMode === 'dashboard' },
-    { key: 'entries', label: 'Entries', icon: '🧾', onClick: () => setAdminMode('payments'), active: adminMode === 'payments' },
-    { key: 'pairings', label: 'Pairings', icon: '👥', onClick: () => setAdminMode('pairings'), active: adminMode === 'pairings' },
-    { key: 'scores', label: 'Scores', icon: '⛳', onClick: () => setAdminMode('scores'), active: adminMode === 'scores' },
-    { key: 'results', label: 'Results', icon: '🏆', onClick: () => setAdminMode('scores'), active: false },
-    { key: 'exports', label: 'Exports', icon: '📤', onClick: () => setShowExportPanel(true), active: false },
-    { key: 'player-management', label: 'Player Management', icon: '🗂️', onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
-    { key: 'member-management', label: 'Member Management', icon: '👥', onClick: () => setAdminMode('users'), active: adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
+    { key: 'overview', label: 'Overview', Icon: DashboardIcon, onClick: () => setAdminMode('dashboard'), active: adminMode === 'dashboard' },
+    { key: 'entries', label: 'Entries', Icon: ReceiptIcon, onClick: () => setAdminMode('payments'), active: adminMode === 'payments' },
+    { key: 'pairings', label: 'Pairings', Icon: UsersIcon, onClick: () => setAdminMode('pairings'), active: adminMode === 'pairings' },
+    { key: 'scores', label: 'Scores', Icon: GolfFlagIcon, onClick: () => setAdminMode('scores'), active: adminMode === 'scores' },
+    { key: 'results', label: 'Results', Icon: TrophyIcon, onClick: () => setAdminMode('scores'), active: false },
+    { key: 'exports', label: 'Exports', Icon: ExportIcon, onClick: () => setShowExportPanel(true), active: false },
+    { key: 'player-management', label: 'Player Management', Icon: FolderIcon, onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
+    { key: 'member-management', label: 'Member Management', Icon: UsersIcon, onClick: () => setAdminMode('users'), active: adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
   ]
 
   async function saveAllDirtyDrafts() {
@@ -2522,7 +2592,7 @@ function AdminPanel({ currentUser }) {
                   : 'border-forest/30 bg-white text-forest hover:bg-forest/10'
               }`}
             >
-              <span aria-hidden="true">{action.icon}</span>
+              <action.Icon className="w-4 h-4" />
               <span>{action.label}</span>
             </button>
           ))}
@@ -2780,7 +2850,7 @@ function AdminPanel({ currentUser }) {
                                 title="Apply adjustment"
                                 className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
                               >
-                                ✓
+                                <CheckIcon className="w-4 h-4" />
                               </button>
                             </div>
                           </td>
@@ -3423,7 +3493,17 @@ function SaveBtn({ onClick, saving, status, label = 'Save to Cloud', className =
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
         </svg>
-      ) : status === 'ok' ? '✓ Saved' : status === 'err' ? '✗ Error' : (
+      ) : status === 'ok' ? (
+        <>
+          <CheckIcon />
+          <span>Saved</span>
+        </>
+      ) : status === 'err' ? (
+        <>
+          <ErrorIcon />
+          <span>Error</span>
+        </>
+      ) : (
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
         </svg>
@@ -3936,7 +4016,7 @@ function ScoreEntryPanel({
         <div className="flex-1 min-w-0">
           {!pairingsPosted ? (
             <div className="bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center py-16 text-center px-8">
-              <span className="text-4xl mb-3 opacity-30">🔒</span>
+              <LockIcon className="w-10 h-10 text-gray-300 mb-3 opacity-70" />
               <p className="font-sans font-semibold text-darktext mb-1">Score entry locked</p>
               <p className="text-gray-400 font-sans text-sm mb-4">
                 Post pairings first — Step 2 above.
@@ -3947,7 +4027,7 @@ function ScoreEntryPanel({
             </div>
           ) : !hasAnyPlayers ? (
             <div className="bg-white border border-gray-200 rounded-lg flex flex-col items-center justify-center py-16 text-center px-8">
-              <span className="text-3xl mb-2 text-gray-300">⛳</span>
+              <GolfFlagIcon className="w-8 h-8 text-gray-300 mb-2" />
               <p className="text-gray-400 font-sans text-sm">No players added yet.</p>
               <p className="text-gray-400 font-sans text-xs mt-1">Select players from the pool on the left.</p>
             </div>
