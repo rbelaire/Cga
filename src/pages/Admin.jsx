@@ -57,14 +57,6 @@ const PDF_NAVY = [27,  59,  111]
 const PDF_GOLD = [201, 168, 76]
 
 
-const QUICK_ACTIONS = [
-  { key: 'setup', mode: 'operations', label: 'Setup Tournament', icon: '⚙️' },
-  { key: 'payments', mode: 'payments', label: 'Enter Payments', icon: '💳' },
-  { key: 'pairings', mode: 'pairings', label: 'Generate Pairings', icon: '👥' },
-  { key: 'scores', mode: 'scores', label: 'Enter Scores', icon: '⛳' },
-  { key: 'users', mode: 'users', label: 'Manage Users', icon: '🧑‍💼' },
-]
-
 const flightTagStyles = {
   Championship: 'bg-amber-50 text-amber-700 border-amber-200',
   '1st Flight': 'bg-blue-50 text-blue-700 border-blue-200',
@@ -1067,7 +1059,7 @@ function AdminPanel({ currentUser }) {
   const [tid,          setTid]          = useState(defaultTournamentId)
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
-  const [adminMode,    setAdminMode]    = useState('dashboard')
+  const [adminMode,    setAdminMode]    = useState('payments')
   const [creditSearch, setCreditSearch] = useState('')
   const [paymentSearch, setPaymentSearch] = useState('')
   const [paymentCreditInputs, setPaymentCreditInputs] = useState({})
@@ -1077,9 +1069,6 @@ function AdminPanel({ currentUser }) {
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'member' })
   const [showTournamentInfoEditor, setShowTournamentInfoEditor] = useState(false)
   const [showPastTournaments, setShowPastTournaments] = useState(false)
-  const TOURNAMENT_MODES = ['dashboard', 'scores', 'pairings', 'payments']
-  const showTournamentSelector = TOURNAMENT_MODES.includes(adminMode)
-
   // Global save error banner
   const [adminError, setAdminError] = useState(null)  // string | null
 
@@ -1946,13 +1935,13 @@ function AdminPanel({ currentUser }) {
     scoreFlights: ALL_SCORE_TABS,
   }), [dashboardTid, dashboardTournament, data, pairingsData, payments, allResults, tournamentLifecycle])
   const workflowActions = useMemo(() => ({
-    memo: { label: 'Mark Memo Sent', mode: 'dashboard' },
+    memo: { label: 'Send Tournament Memo', mode: null },
     field: { label: 'Open Entries', mode: 'payments' },
     pairingsLifecycle: { label: 'Generate / Edit Pairings', mode: 'pairings' },
-    birdie: { label: 'Export Birdie Pool', mode: 'dashboard' },
+    birdie: { label: 'Export Birdie Pool', mode: null },
     scoresLifecycle: { label: 'Open Scores / Results', mode: 'scores' },
-    payout: { label: 'Generate Payout', mode: 'dashboard' },
-    export: { label: 'Export Reports', mode: 'dashboard' },
+    payout: { label: 'Generate Payout', mode: null },
+    export: { label: 'Export Reports', mode: null },
   }), [])
   const nextWorkflowStep = useMemo(() => {
     const firstIncomplete = dashboardWorkflow.lifecycleSteps.find(step => step.status !== 'complete')
@@ -2057,6 +2046,21 @@ function AdminPanel({ currentUser }) {
     () => dirtyRegistry.some(section => section.saving),
     [dirtyRegistry]
   )
+  const canShowResultsAction = Boolean(allResults?.[tid]) || dashboardWorkflow.counts.resultsPublished
+  const keyWorkflowStats = `${paymentPaidCount} Paid / ${totalPlayers} Entered`
+  const primaryActions = [
+    { key: 'payments', label: 'Payments', mode: 'payments', icon: '💳' },
+    { key: 'pairings', label: 'Pairings', mode: 'pairings', icon: '👥' },
+    { key: 'scores', label: 'Scores', mode: 'scores', icon: '⛳' },
+    ...(canShowResultsAction ? [{ key: 'results', label: 'Results', mode: 'scores', icon: '🏆' }] : []),
+  ]
+  const secondaryActions = [
+    { key: 'setup', label: 'Setup Tournament', onClick: () => setAdminMode('operations') },
+    { key: 'users', label: 'Manage Users', onClick: () => setAdminMode('users') },
+    { key: 'export', label: 'Export', onClick: () => setShowExportPanel(true) },
+    { key: 'snapshots', label: 'Snapshots', onClick: () => setAdminMode('snapshots') },
+    { key: 'changelog', label: 'Changelog', onClick: () => setAdminMode('changelog') },
+  ]
 
   async function saveAllDirtyDrafts() {
     if (saveAllSaving || anySectionSaving || savableUnsavedDrafts.length === 0) return
@@ -2386,18 +2390,78 @@ function AdminPanel({ currentUser }) {
         )}
       </div>
 
-      {hasUnsavedDrafts && (
-        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-amber-900 font-sans text-sm font-semibold">Unsaved local changes</p>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={saveAllDirtyDrafts}
-                disabled={saveAllSaving || anySectionSaving || savableUnsavedDrafts.length === 0}
-                className="px-3 py-1.5 text-xs font-sans font-semibold rounded-md bg-forest text-white disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {saveAllSaving ? 'Saving…' : 'Save All'}
-              </button>
+      <section className="mb-6 rounded-xl border border-forest/20 bg-gradient-to-br from-forest/[0.06] via-white to-gold/[0.08] p-4 sm:p-5">
+        <p className="text-[11px] font-sans font-semibold uppercase tracking-widest text-forest/80">Tournament Command Center</p>
+        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-serif text-darktext font-semibold">{tournament?.name ?? 'Select Tournament'}</h2>
+            <p className="mt-1 text-sm font-sans text-gray-600">{tournament ? fmtDate(tournament.date) : 'Choose a tournament to begin operations.'}</p>
+            {tournament && (
+              <div className="mt-3 inline-flex rounded-lg border border-forest/20 bg-white px-3 py-2">
+                <CountdownTimer targetDate={tournament.date} />
+              </div>
+            )}
+          </div>
+          <div className="w-full lg:w-auto space-y-2">
+            <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest">Switch Tournament</label>
+            <select
+              value={tid}
+              onChange={e => { setTid(e.target.value); setPoolSearch(''); setSelectedPool(new Set()) }}
+              className="border border-gray-300 rounded-md px-3 py-2.5 text-sm font-sans w-full lg:min-w-[320px] focus:outline-none focus:ring-2 focus:ring-forest"
+            >
+              {currentTournaments.length > 0 && (
+                <optgroup label="Current & Upcoming">
+                  {currentTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
+                </optgroup>
+              )}
+              {!showPastTournaments && pastTournaments.some(t => t.id === tid) && (
+                <optgroup label="Selected Past Tournament">
+                  {pastTournaments.filter(t => t.id === tid).map(t => (
+                    <option key={t.id} value={t.id}>{t.name} — {t.date}</option>
+                  ))}
+                </optgroup>
+              )}
+              {currentTournaments.length === 0 && pastTournaments[0] && (
+                <optgroup label="Most Recent">
+                  <option value={pastTournaments[0].id}>{pastTournaments[0].name} — {pastTournaments[0].date}</option>
+                </optgroup>
+              )}
+              {showPastTournaments && pastTournaments.length > 0 && (
+                <optgroup label="Past Tournaments">
+                  {pastTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
+                </optgroup>
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowPastTournaments(prev => !prev)}
+              className="text-xs font-sans font-semibold px-3 py-2 rounded-md border border-gray-300 text-gray-700 hover:border-forest hover:text-forest"
+            >
+              {showPastTournaments ? 'Hide Past Tournaments' : 'Past Tournaments'}
+            </button>
+          </div>
+        </div>
+        {tournament && (
+          <p className="mt-3 text-xs text-gray-500 font-sans">
+            {tournament.course} · {tournament.format} · {totalPlayers} player{totalPlayers !== 1 ? 's' : ''} entered
+          </p>
+        )}
+      </section>
+
+      <section className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-sans font-semibold ${hasUnsavedDrafts ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-emerald-300 bg-emerald-50 text-emerald-700'}`}>
+              {hasUnsavedDrafts ? 'Unsaved changes' : 'All changes synced'}
+            </span>
+            <button
+              onClick={saveAllDirtyDrafts}
+              disabled={saveAllSaving || anySectionSaving || savableUnsavedDrafts.length === 0}
+              className="px-3 py-2 text-xs font-sans font-semibold rounded-md bg-forest text-white disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {saveAllSaving ? 'Saving…' : 'Save All'}
+            </button>
+            {hasUnsavedDrafts && (
               <button
                 onClick={async () => {
                   if (!await openConfirm('Discard ALL local changes and revert everything to the last saved cloud version?')) return
@@ -2411,99 +2475,53 @@ function AdminPanel({ currentUser }) {
                   setMembersOverride(base)
                 }}
                 disabled={saveAllSaving || anySectionSaving}
-                className="px-3 py-1.5 text-xs font-sans font-semibold rounded-md border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
               >
                 Discard All
               </button>
-            </div>
+            )}
           </div>
-          <p className="px-4 py-2 border-t border-amber-200 text-amber-800 font-sans text-xs">
-            Pending sections: {unsavedDrafts.map(item => item.label).join(', ')}.
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                const action = workflowActions[nextWorkflowStep.key]
+                if (!action) return
+                if (nextWorkflowStep.key === 'memo') markMemoSent(dashboardTid)
+                if (nextWorkflowStep.key === 'birdie') generateBirdieExport(dashboardTid)
+                if (nextWorkflowStep.key === 'payout') generatePayoutDocument(dashboardTid)
+                if (nextWorkflowStep.key === 'export') setShowExportPanel(true)
+                if (action.mode) setAdminMode(action.mode)
+              }}
+              className="inline-flex items-center justify-center rounded-md bg-forest px-3 py-2 text-xs font-sans font-semibold text-white hover:bg-forest/90"
+            >
+              {workflowActions[nextWorkflowStep.key]?.label ?? 'Continue'}
+            </button>
+            <span className="text-xs font-sans text-gray-500">{nextWorkflowStep.title}</span>
+            <span className="hidden sm:inline text-gray-300">•</span>
+            <span className="text-xs font-sans text-gray-500">{keyWorkflowStats}</span>
+          </div>
+        </div>
+        {(saveAllStatus || hasUnsavedDrafts) && (
+          <p className="mt-2 text-[11px] font-sans text-gray-500">
+            {saveAllStatus === 'ok' && 'All savable sections synced to cloud. '}
+            {saveAllStatus === 'err' && 'Some sections failed to sync. Review the error banner and retry. '}
+            {hasUnsavedDrafts ? `Pending sections: ${unsavedDrafts.map(item => item.label).join(', ')}.` : ''}
           </p>
-          {saveAllStatus === 'ok' && (
-            <p className="px-4 py-2 text-green-700 font-sans text-xs border-t border-amber-200">All savable sections synced to cloud.</p>
-          )}
-          {saveAllStatus === 'err' && (
-            <p className="px-4 py-2 text-red-700 font-sans text-xs border-t border-amber-200">Some sections failed to sync. Review the error banner and retry.</p>
-          )}
-        </div>
-      )}
+        )}
+      </section>
 
-      <div className="mb-4 bg-white border border-forest/20 rounded-lg p-3">
-        <p className="text-[11px] font-sans font-semibold uppercase tracking-widest text-forest mb-1.5">Next Step</p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-sans font-semibold text-darktext text-sm">{nextWorkflowStep.title}</p>
-            <p className="text-xs font-sans text-gray-500">{nextWorkflowStep.label}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              const action = workflowActions[nextWorkflowStep.key]
-              if (!action) return
-              if (nextWorkflowStep.key === 'memo') markMemoSent(dashboardTid)
-              if (nextWorkflowStep.key === 'birdie') generateBirdieExport(dashboardTid)
-              if (nextWorkflowStep.key === 'payout') generatePayoutDocument(dashboardTid)
-              if (nextWorkflowStep.key === 'export') setShowExportPanel(true)
-              setAdminMode(action.mode)
-            }}
-            className="px-3 py-2 text-xs font-sans font-semibold rounded-md bg-forest text-white hover:bg-forest/90"
-          >
-            {workflowActions[nextWorkflowStep.key]?.label ?? 'Continue'}
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-5 rounded-lg border border-gray-200 bg-white p-2.5 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="inline-flex rounded-md border border-gray-200 p-0.5 bg-gray-50">
-            {[
-              { mode: 'dashboard', label: 'Dashboard' },
-              { mode: 'operations', label: 'Operations' },
-            ].map(tab => (
-              <button
-                key={tab.mode}
-                onClick={() => setAdminMode(tab.mode)}
-                className={`px-2.5 py-1 text-xs font-sans font-semibold rounded ${adminMode === tab.mode ? 'bg-white text-forest shadow-sm border border-forest/20' : 'text-gray-500'}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setAdminMode('changelog')}
-              className={`px-2 py-1 text-[11px] font-sans font-semibold rounded border ${adminMode === 'changelog' ? 'border-slate-700 bg-slate-700 text-white' : 'border-gray-300 text-gray-600 hover:border-forest hover:text-forest'}`}
-            >
-              Changelog
-            </button>
-            <button
-              type="button"
-              onClick={() => setAdminMode('snapshots')}
-              className={`px-2 py-1 text-[11px] font-sans font-semibold rounded border ${adminMode === 'snapshots' ? 'border-purple-700 bg-purple-700 text-white' : 'border-gray-300 text-gray-600 hover:border-forest hover:text-forest'}`}
-            >
-              Snapshots
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowExportPanel(true)}
-              className="px-2 py-1 text-[11px] font-sans font-semibold rounded border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-            >
-              Export
-            </button>
-          </div>
-        </div>
-
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-          {QUICK_ACTIONS.map(action => (
+      <section className="mb-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {primaryActions.map(action => (
             <button
               key={action.key}
+              type="button"
               onClick={() => setAdminMode(action.mode)}
-              className={`flex-shrink-0 inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-sans font-semibold ${
+              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-sans font-semibold transition-colors ${
                 adminMode === action.mode
-                  ? 'bg-forest text-white border-forest'
-                  : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:border-forest hover:text-forest'
+                  ? 'border-forest bg-forest text-white shadow-sm'
+                  : 'border-forest/30 bg-white text-forest hover:bg-forest/10'
               }`}
             >
               <span aria-hidden="true">{action.icon}</span>
@@ -2511,61 +2529,22 @@ function AdminPanel({ currentUser }) {
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Tournament selector (only where tournament-scoped data is edited) */}
-      {showTournamentSelector && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-            <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest">Tournament</label>
+      <section className="mb-6">
+        <div className="flex flex-wrap gap-2">
+          {secondaryActions.map(action => (
             <button
+              key={action.key}
               type="button"
-              onClick={() => setShowPastTournaments(prev => !prev)}
-              className="text-xs font-sans font-semibold px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:border-forest hover:text-forest"
+              onClick={action.onClick}
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext"
             >
-              {showPastTournaments ? 'Hide Past Tournaments' : 'Past Tournaments'}
+              {action.label}
             </button>
-          </div>
-          <select
-            value={tid}
-            onChange={e => { setTid(e.target.value); setPoolSearch(''); setSelectedPool(new Set()) }}
-            className="border border-gray-300 rounded px-3 py-2 text-sm font-sans w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-forest"
-          >
-            {currentTournaments.length > 0 && (
-              <optgroup label="Current & Upcoming">
-                {currentTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
-              </optgroup>
-            )}
-            {!showPastTournaments && pastTournaments.some(t => t.id === tid) && (
-              <optgroup label="Selected Past Tournament">
-                {pastTournaments.filter(t => t.id === tid).map(t => (
-                  <option key={t.id} value={t.id}>{t.name} — {t.date}</option>
-                ))}
-              </optgroup>
-            )}
-            {currentTournaments.length === 0 && pastTournaments[0] && (
-              <optgroup label="Most Recent">
-                <option value={pastTournaments[0].id}>{pastTournaments[0].name} — {pastTournaments[0].date}</option>
-              </optgroup>
-            )}
-            {showPastTournaments && pastTournaments.length > 0 && (
-              <optgroup label="Past Tournaments">
-                {pastTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
-              </optgroup>
-            )}
-          </select>
-          {tournament && (
-            <p className="text-xs text-gray-400 font-sans mt-1.5">
-              {tournament.course} · {tournament.format} · {totalPlayers} player{totalPlayers !== 1 ? 's' : ''} entered
-            </p>
-          )}
-          {!showPastTournaments && pastTournaments.length > 0 && (
-            <p className="text-[11px] text-gray-500 font-sans mt-2">
-              Viewing current schedule by default. Past tournaments are available via the button above.
-            </p>
-          )}
+          ))}
         </div>
-      )}
+      </section>
 
       {/* ══════════════════════════════════════════════════════════════════════════
           TOURNAMENT SETUP MODE
@@ -2624,7 +2603,6 @@ function AdminPanel({ currentUser }) {
           onExportBirdiePool={() => generateBirdieExport(dashboardTid)}
           onGeneratePayout={() => generatePayoutDocument(dashboardTid)}
           onGoToResults={() => setAdminMode('scores')}
-          onOpenExport={() => setShowExportPanel(true)}
         />
       )}
 
@@ -3179,7 +3157,7 @@ function AdminPanel({ currentUser }) {
 function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
-  onGoToScores, onGoToPayments, onGoToPairings, onOpenExport, onMarkMemoSent, onExportBirdiePool, onGeneratePayout, onGoToResults,
+  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout, onGoToResults,
 }) {
   const lifecycleActions = {
     memo: { label: 'Mark Sent', action: onMarkMemoSent },
