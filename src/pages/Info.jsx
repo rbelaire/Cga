@@ -231,34 +231,32 @@ function RulesTab() {
   ]
 
   return (
-    <div>
-      <div className="space-y-4 mb-8">
+    <div className="space-y-10">
+      <div className="space-y-8">
         {groupedSections.map((group) => (
-          <div key={group.title} className="bg-white border border-gray-200 rounded-lg p-4">
-            <h2 className="text-forest font-sans text-xs font-semibold uppercase tracking-widest mb-2">{group.title}</h2>
-            <div className="space-y-1">
+          <section key={group.title}>
+            <h2 className="text-forest font-sans text-sm font-semibold uppercase tracking-widest mb-3">{group.title}</h2>
+            <div className="space-y-2">
               {group.items.map((item) => (
                 <a
                   key={item.id}
                   href={`#${item.id}`}
-                  className="block text-sm font-sans text-darktext hover:text-gold transition-colors"
+                  className="block text-sm font-sans text-darktext hover:text-gold hover:underline transition-colors"
                 >
                   {item.label}
                 </a>
               ))}
             </div>
-          </div>
+          </section>
         ))}
       </div>
-      <div className="space-y-6 mb-10">
+      <div className="space-y-8">
         {ruleSections.map(section => (
-          <div key={section.id} id={section.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden scroll-mt-20">
-            <div className="bg-forest px-5 py-3">
-              <h2 className="text-white font-serif text-lg font-semibold">{section.title}</h2>
-            </div>
-            <div className="divide-y divide-gray-100">
+          <section key={section.id} id={section.id} className="scroll-mt-20">
+            <h2 className="text-forest font-serif text-xl font-semibold mb-4">{section.title}</h2>
+            <div className="space-y-5">
               {section.items.map((item, idx) => (
-                <div key={idx} className="px-5 py-4">
+                <div key={idx}>
                   {item.heading && (
                     <h3 className="font-serif text-forest text-sm font-semibold mb-2">{item.heading}</h3>
                   )}
@@ -273,7 +271,7 @@ function RulesTab() {
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         ))}
       </div>
       <div className="bg-forest rounded-lg px-6 py-5 text-center">
