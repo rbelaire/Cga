@@ -5,9 +5,9 @@ import TournamentCard from '../components/ui/TournamentCard'
 import StandingsTable from '../components/ui/StandingsTable'
 import schedule from '../data/schedule.json'
 import { formatDateLong } from '../utils/formatDate'
-import { formatName } from '../utils/formatName'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
+import { buildFlightWinnerCards } from '../utils/flightWinners'
 
 function FlightLeaderboards({ leaderboard }) {
   const [flight, setFlight] = useState(Object.keys(leaderboard)[0])
@@ -149,13 +149,28 @@ export default function Tournaments() {
                         Flight Winners
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-                        {result.flightWinners.map((fw) => (
+                        {buildFlightWinnerCards(result, t.format).map((fw) => (
                           <div key={fw.flight} className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5">
                             <p className="text-forest text-xs font-sans font-semibold uppercase tracking-wide mb-0.5">
                               {fw.flight}
                             </p>
-                            <p className="text-darktext font-sans text-sm font-medium">{formatName(fw.winner)}</p>
-                            <p className="stat-number text-gray-500 text-xs">{fw.points} pts</p>
+                            <div className="space-y-1">
+                              {fw.players.map((player) => (
+                                <div key={`${fw.flight}-${player.name}`} className="leading-tight">
+                                  <p className="text-darktext font-sans text-sm">{player.name}</p>
+                                  {player.pending ? (
+                                    <p className="text-gray-500 text-xs font-sans">Results pending</p>
+                                  ) : (
+                                    <>
+                                      <p className="text-darktext font-sans text-lg font-bold">{player.score}</p>
+                                      {player.relative && (
+                                        <p className="text-gray-500 text-xs font-sans">{player.relative}</p>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         ))}
                       </div>
