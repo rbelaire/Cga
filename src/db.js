@@ -10,6 +10,9 @@
  *   cga/users            – users array for admin management
  *   cga/results          – { data: { [tid]: resultDoc, ... } }
  *   cga/scores           – { [tid]: { [flight]: [...players] } }  (admin work-in-progress)
+ *   cga/tournamentLifecycle – { data: { [tid]: {...} } }
+ *   cga/paymentMeta      – { data: { [tid]: { [memberName]: {...} } } }
+ *   cga/creditTransactions – { entries: [...] }
  */
 import { db } from './firebase'
 import {
@@ -93,6 +96,16 @@ export const DB = {
   listenResult: (tid, cb) => fsListen('cga/results', d => cb(d?.data?.[tid] ?? null)),
   listenResults: (cb) => fsListen('cga/results', d => cb(d?.data ?? {})),
 
+  // Tournament lifecycle metadata (memo, pairings state, exports, payout markers)
+  getTournamentLifecycle:    () => fsGet('cga/tournamentLifecycle').then(d => d?.data ?? {}),
+  saveTournamentLifecycle:   (data) => fsSet('cga/tournamentLifecycle', { data }),
+  listenTournamentLifecycle: (cb) => fsListen('cga/tournamentLifecycle', d => cb(d?.data ?? {})),
+
+  // Payment metadata (credit usage + transaction pointer per tournament/player)
+  getPaymentMeta:    () => fsGet('cga/paymentMeta').then(d => d?.data ?? {}),
+  savePaymentMeta:   (data) => fsSet('cga/paymentMeta', { data }),
+  listenPaymentMeta: (cb) => fsListen('cga/paymentMeta', d => cb(d?.data ?? {})),
+
   // Changelog / audit log  { entries: [...] }
   appendChangelog: async (entry) => {
     const ref = REF('cga/changelog')
@@ -115,4 +128,15 @@ export const DB = {
     }
   },
   listenSnapshots: (cb) => fsListen('cga/snapshots', d => cb(d?.entries ?? [])),
+
+  // Lightweight credit transaction log
+  appendCreditTransaction: async (entry) => {
+    const ref = REF('cga/creditTransactions')
+    try {
+      await updateDoc(ref, { entries: arrayUnion(entry) })
+    } catch {
+      await setDoc(ref, { entries: [entry] })
+    }
+  },
+  listenCreditTransactions: (cb) => fsListen('cga/creditTransactions', d => cb(d?.entries ?? [])),
 }
