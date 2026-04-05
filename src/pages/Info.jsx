@@ -204,52 +204,8 @@ const ruleSections = [
 // ── Sub-page components ───────────────────────────────────────────────────────
 
 function RulesTab() {
-  const groupedSections = [
-    {
-      title: 'Scoring',
-      items: [
-        { id: 'scoring', label: 'Scoring System' },
-        { id: 'handicap', label: 'Handicap & Points' },
-        { id: 'poy', label: 'POY Points' },
-      ],
-    },
-    {
-      title: 'Rules',
-      items: [
-        { id: 'on-course', label: 'On-Course Rules' },
-        { id: 'rainout', label: 'Rainout Tournaments' },
-        { id: 'eligibility-champ', label: 'Championship Eligibility' },
-      ],
-    },
-    {
-      title: 'Awards',
-      items: [
-        { id: 'awards', label: 'Annual Awards' },
-        { id: 'most-improved', label: 'Most & Least Improved' },
-      ],
-    },
-  ]
-
   return (
     <div className="space-y-10">
-      <div className="space-y-8">
-        {groupedSections.map((group) => (
-          <section key={group.title}>
-            <h2 className="text-forest font-sans text-sm font-semibold uppercase tracking-widest mb-3">{group.title}</h2>
-            <div className="space-y-2">
-              {group.items.map((item) => (
-                <a
-                  key={item.id}
-                  href={`#${item.id}`}
-                  className="block text-sm font-sans text-darktext hover:text-gold hover:underline transition-colors"
-                >
-                  {item.label}
-                </a>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
       <div className="space-y-8">
         {ruleSections.map(section => (
           <section key={section.id} id={section.id} className="scroll-mt-20">
