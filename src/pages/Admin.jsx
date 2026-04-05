@@ -1666,35 +1666,105 @@ function AdminPanel({ currentUser }) {
     })
   }
 
-  function togglePayment(tournamentId, name, options = {}) {
+  function playerHasScoreInTournament(tournamentId, name) {
+    return ALL_SCORE_TABS.some(flight =>
+      (data[tournamentId]?.[flight] ?? []).some(player => {
+        if (player?.name !== name) return false
+        const rawScore = player?.score
+        if (rawScore == null || rawScore === '') return false
+        const parsed = Number(rawScore)
+        return Number.isFinite(parsed)
+      })
+    )
+  }
+
+  function removePlayerFromTournamentEntry(tournamentId, name) {
+    setData(prev => {
+      const td = { ...(prev[tournamentId] ?? {}) }
+      ALL_SCORE_TABS.forEach(flight => {
+        td[flight] = (td[flight] ?? []).filter(player => player?.name !== name)
+      })
+      return { ...prev, [tournamentId]: td }
+    })
+  }
+
+  function removePlayerFromTournamentPairings(tournamentId, name) {
+    setPairingsDirtyTouched(true)
+    setPairingsData(prev => {
+      const current = prev[tournamentId] ?? []
+      if (!current.length) return prev
+      const nextTournamentPairings = current.map(card => ({
+        ...card,
+        players: (card.players ?? []).filter(player => player?.name !== name),
+      }))
+      return { ...prev, [tournamentId]: nextTournamentPairings }
+    })
+  }
+
+  async function setTournamentPaidStatus(tournamentId, name, isPaid, options = {}) {
     const { creditUsed = 0 } = options
     const currentMap = payments[tournamentId] ?? {}
-    const isNowPaid = !currentMap[name]
+    const currentlyPaid = !!currentMap[name]
+    if (currentlyPaid === isPaid) return true
 
-    // Auto-add to score table when marking as paid (if not already entered)
-    if (isNowPaid) {
+    if (isPaid) {
       ensurePlayerIsEntered(tournamentId, name)
+      setPayments(prev => {
+        const tidMap = { ...(prev[tournamentId] ?? {}) }
+        tidMap[name] = true
+        return { ...prev, [tournamentId]: tidMap }
+      })
+      setPaymentMeta(prev => {
+        const currentTidMeta = { ...(prev[tournamentId] ?? {}) }
+        currentTidMeta[name] = {
+          ...(currentTidMeta[name] ?? {}),
+          creditUsed: toMoney(creditUsed),
+          paidAt: currentTidMeta[name]?.paidAt ?? Date.now(),
+        }
+        return { ...prev, [tournamentId]: currentTidMeta }
+      })
+      return true
     }
+
+    if (playerHasScoreInTournament(tournamentId, name)) {
+      setAdminError(`Cannot remove ${formatName(name)} from this tournament because scores already exist. Remove scores first, then unmark Paid.`)
+      return false
+    }
+
+    const isPaired = (pairingsData[tournamentId] ?? []).some(card =>
+      (card.players ?? []).some(player => player?.name === name)
+    )
+    const pairingsState = tournamentLifecycle[tournamentId]?.pairingsState
+    if (isPaired && pairingsState === 'published') {
+      const continueRemoval = await openConfirm(
+        `${formatName(name)} is in published pairings. Removing Paid will also remove them from pairings and set pairings back to draft. Continue?`
+      )
+      if (!continueRemoval) return false
+      patchTournamentLifecycle(tournamentId, { pairingsState: 'draft' })
+    } else if (isPaired) {
+      patchTournamentLifecycle(tournamentId, { pairingsState: 'draft' })
+    }
+
+    removePlayerFromTournamentPairings(tournamentId, name)
+    removePlayerFromTournamentEntry(tournamentId, name)
 
     setPayments(prev => {
       const tidMap = { ...(prev[tournamentId] ?? {}) }
-      if (tidMap[name]) delete tidMap[name]
-      else tidMap[name] = true
+      delete tidMap[name]
       return { ...prev, [tournamentId]: tidMap }
     })
-
     setPaymentMeta(prev => {
       const currentTidMeta = { ...(prev[tournamentId] ?? {}) }
-      if (!isNowPaid) {
-        delete currentTidMeta[name]
-      } else {
-        currentTidMeta[name] = {
-          creditUsed: toMoney(creditUsed),
-          paidAt: Date.now(),
-        }
-      }
+      delete currentTidMeta[name]
       return { ...prev, [tournamentId]: currentTidMeta }
     })
+    return true
+  }
+
+  async function togglePayment(tournamentId, name, options = {}) {
+    const currentMap = payments[tournamentId] ?? {}
+    const isNowPaid = !currentMap[name]
+    await setTournamentPaidStatus(tournamentId, name, isNowPaid, options)
   }
 
   function markPaidWithCredit(tournamentId, name, creditAmountInput) {
@@ -1707,38 +1777,30 @@ function AdminPanel({ currentUser }) {
       const transaction = createCreditTxn({ name, tournamentId, creditUsed, user: currentUser })
       DB.appendCreditTransaction(transaction).catch(() => {})
     }
-    togglePayment(tournamentId, name, { creditUsed })
+    setTournamentPaidStatus(tournamentId, name, true, { creditUsed })
   }
 
   function markAllPaid(tournamentId, names) {
-    names.forEach(name => ensurePlayerIsEntered(tournamentId, name))
-    setPayments(prev => {
-      const tidMap = { ...(prev[tournamentId] ?? {}) }
-      names.forEach(n => { tidMap[n] = true })
-      return { ...prev, [tournamentId]: tidMap }
-    })
-    setPaymentMeta(prev => {
-      const tidMeta = { ...(prev[tournamentId] ?? {}) }
-      names.forEach(name => {
-        tidMeta[name] = {
-          ...(tidMeta[name] ?? {}),
-          creditUsed: toMoney(tidMeta[name]?.creditUsed ?? 0),
-          paidAt: tidMeta[name]?.paidAt ?? Date.now(),
-        }
+    names.forEach(name => {
+      setTournamentPaidStatus(tournamentId, name, true, {
+        creditUsed: toMoney(paymentMeta?.[tournamentId]?.[name]?.creditUsed ?? 0),
       })
-      return { ...prev, [tournamentId]: tidMeta }
     })
   }
 
   async function clearAllPayments(tournamentId) {
     if (!await openConfirm('Clear all payment records for this tournament?')) return
     const previous = cloneForUndo(payments[tournamentId] ?? {})
-    setPayments(prev => {
-      const next = { ...prev }
-      delete next[tournamentId]
-      return next
-    })
-    if (!Object.keys(previous).length) return
+    const paidNames = Object.keys(previous)
+    if (!paidNames.length) return
+    const blocked = []
+    for (const name of paidNames) {
+      const removed = await setTournamentPaidStatus(tournamentId, name, false)
+      if (!removed) blocked.push(name)
+    }
+    if (blocked.length) {
+      setAdminError(`Could not clear ${blocked.length} payment(s) because those players have scores or removal was canceled.`)
+    }
     registerUndoAction({
       label: `Cleared payments for ${tournamentId}`,
       undo: () => {
@@ -2850,6 +2912,9 @@ function AdminPanel({ currentUser }) {
               </button>
               <span className="text-xs font-sans text-gray-400">
                 {paymentRoster.filter(m => paymentMap[m.name]).length} of {paymentRoster.length} shown are paid
+              </span>
+              <span className="text-xs font-sans text-gray-500">
+                Paid players are considered entered in the field.
               </span>
             </div>
 
