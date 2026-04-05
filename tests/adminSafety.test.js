@@ -99,7 +99,14 @@ test('integration: publish payload computes standings and result docs from score
         ],
       },
     },
-    currentStandings: { flights: { Championship: [] } },
+    currentStandings: {
+      flights: {
+        Championship: [
+          { name: 'Alice A', ptm: 73, events: 3, poy: 250 },
+          { name: 'Bob B', ptm: 72, events: 3, poy: 200 },
+        ],
+      },
+    },
     ptmLookup: { 'Alice A': 72, 'Bob B': 72 },
     calcFlightPOY,
   })
@@ -108,4 +115,8 @@ test('integration: publish payload computes standings and result docs from score
   assert.equal(payload.resultDoc.id, targetTid)
   assert.equal(Array.isArray(payload.resultDoc.leaderboard.Championship), true)
   assert.equal(payload.newStandings.flights.Championship.length, 2)
+  assert.equal(payload.newStandings.flights.Championship[0].ptmDelta, -1)
+  assert.equal(payload.newStandings.flights.Championship[0].trend, 'down')
+  assert.equal(payload.newStandings.flights.Championship[1].ptmDelta, 0)
+  assert.equal(payload.newStandings.flights.Championship[1].trend, null)
 })
