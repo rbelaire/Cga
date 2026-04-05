@@ -106,6 +106,14 @@ function calcFlightPOY(players) {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const fmtPM  = pm => pm == null ? '—' : pm > 0 ? `+${pm}` : `${pm}`
 const fmtPOY = p  => p.poy == null ? '—' : p.eligible === false ? 'X' : p.poy % 1 === 0 ? String(p.poy) : p.poy.toFixed(1)
+const fmtCurrency = value => {
+  const amount = Number.isFinite(Number(value)) ? Number(value) : 0
+  return `$${amount.toFixed(2)}`
+}
+const fmtPtmValue = value => {
+  const ptm = Number(value)
+  return Number.isFinite(ptm) ? ptm : null
+}
 
 function sanitizeResultsData(flightData = {}) {
   const cleanNumber = (value) => {
@@ -1565,7 +1573,7 @@ function AdminPanel({ currentUser }) {
     setMembersDirtyTouched(true)
     setMembersOverride(prev => ({
       ...prev,
-      [name]: { ...(prev[name] ?? {}), ptm: newPtm === '' ? null : Number(newPtm) }
+      [name]: { ...(prev[name] ?? {}), ptm: newPtm === '' ? null : fmtPtmValue(newPtm) }
     }))
   }
 
@@ -1974,7 +1982,8 @@ function AdminPanel({ currentUser }) {
     { key: 'scores', label: 'Scores', icon: '⛳', onClick: () => setAdminMode('scores'), active: adminMode === 'scores' },
     { key: 'results', label: 'Results', icon: '🏆', onClick: () => setAdminMode('scores'), active: false },
     { key: 'exports', label: 'Exports', icon: '📤', onClick: () => setShowExportPanel(true), active: false },
-    { key: 'settings', label: 'Settings', icon: '⚙️', onClick: () => setAdminMode('operations'), active: adminMode === 'operations' || adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
+    { key: 'player-management', label: 'Player Management', icon: '🗂️', onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
+    { key: 'settings', label: 'Settings', icon: '⚙️', onClick: () => setAdminMode('users'), active: adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
   ]
 
   async function saveAllDirtyDrafts() {
@@ -2461,7 +2470,7 @@ function AdminPanel({ currentUser }) {
 
       <section className="mb-6">
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setAdminMode('operations')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Field Setup</button>
+          <button type="button" onClick={() => setAdminMode('operations')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Player Management</button>
           <button type="button" onClick={() => setAdminMode('users')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Manage Users</button>
           <button type="button" onClick={() => setAdminMode('snapshots')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Snapshots</button>
           <button type="button" onClick={() => setAdminMode('changelog')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Changelog</button>
@@ -2537,14 +2546,6 @@ function AdminPanel({ currentUser }) {
           setFieldSearch={setFieldSearch}
           fieldFlightFilter={fieldFlightFilter}
           setFieldFlightFilter={setFieldFlightFilter}
-          editingMember={editingMember}
-          setEditingMember={setEditingMember}
-          updateMemberFlight={updateMemberFlight}
-          updateMemberPtm={updateMemberPtm}
-          updateMemberTee={updateMemberTee}
-          saveMembers={saveMembers}
-          membersSaving={membersSaving}
-          membersSaveStatus={membersSaveStatus}
           flightTagStyles={flightTagStyles}
         />
       )}
@@ -2594,10 +2595,11 @@ function AdminPanel({ currentUser }) {
       {adminMode === 'operations' && (
         <div className="space-y-5">
           <section className="bg-white border border-gray-200 rounded-lg p-4">
-            <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-3">Field Setup</p>
+            <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-3">Player Management</p>
             <FlightManagementPanel
               effectiveMembers={effectiveMembers}
               membersData={membersData}
+              credits={credits}
               flightSearch={flightSearch}
               setFlightSearch={setFlightSearch}
               editingMember={editingMember}
@@ -3273,14 +3275,6 @@ function FieldPanel({
   setFieldSearch,
   fieldFlightFilter,
   setFieldFlightFilter,
-  editingMember,
-  setEditingMember,
-  updateMemberFlight,
-  updateMemberPtm,
-  updateMemberTee,
-  saveMembers,
-  membersSaving,
-  membersSaveStatus,
   flightTagStyles,
 }) {
   return (
@@ -3312,70 +3306,36 @@ function FieldPanel({
               {FLIGHTS.map(flight => <option key={flight} value={flight} className="text-darktext">{flight}</option>)}
               <option value="__unassigned__" className="text-darktext">Unassigned</option>
             </select>
-            <SaveBtn onClick={saveMembers} saving={membersSaving} status={membersSaveStatus} label="Save Field Setup" />
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[760px]">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="table-header text-gray-500 text-left">Player</th>
                 <th className="table-header text-gray-500 text-left">Flight</th>
                 <th className="table-header text-gray-500 text-center">Tee</th>
-                <th className="table-header text-gray-500 text-center">PTM</th>
                 <th className="table-header text-gray-500 text-left">Pairing / Group</th>
-                <th className="table-header text-gray-500 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {fieldPlayers.map((player, idx) => {
-                const isEditing = editingMember === player.name
                 return (
                   <tr key={player.name} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                     <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">{formatName(player.name)}</td>
                     <td className="px-4 py-2.5">
-                      {isEditing ? (
-                        <select value={player.flight ?? ''} onChange={e => updateMemberFlight(player.name, e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest w-full max-w-[180px]">
-                          <option value="">— Unassigned —</option>
-                          {FLIGHTS.map(flight => <option key={flight} value={flight}>{flight}</option>)}
-                        </select>
-                      ) : (
-                        <span className={`text-xs border px-2 py-0.5 rounded-full font-sans ${player.flight ? (flightTagStyles[player.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned}`}>
-                          {player.flight ?? 'Unassigned'}
-                        </span>
-                      )}
+                      <span className={`text-xs border px-2 py-0.5 rounded-full font-sans ${player.flight ? (flightTagStyles[player.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned}`}>
+                        {player.flight ?? 'Unassigned'}
+                      </span>
                     </td>
-                    <td className="px-4 py-2.5 text-center">
-                      {isEditing ? (
-                        <select value={player.tee ?? ''} onChange={e => updateMemberTee(player.name, e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest">
-                          <option value="">—</option>
-                          {TEE_OPTIONS.map(tee => <option key={tee} value={tee}>{tee}</option>)}
-                        </select>
-                      ) : (
-                        <TeeTag tee={player.tee} />
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      {isEditing ? (
-                        <input type="number" value={player.ptm ?? ''} onChange={e => updateMemberPtm(player.name, e.target.value)} className="w-16 border border-gray-300 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:ring-2 focus:ring-forest" />
-                      ) : (
-                        <span className="stat-number text-xs text-gray-600">{player.ptm ?? '—'}</span>
-                      )}
-                    </td>
+                    <td className="px-4 py-2.5 text-center"><TeeTag tee={player.tee} /></td>
                     <td className="px-4 py-2.5 text-sm font-sans text-gray-600">{player.pairing ?? '—'}</td>
-                    <td className="px-4 py-2 text-center">
-                      {isEditing ? (
-                        <button onClick={() => setEditingMember(null)} className="px-3 py-1 text-xs rounded bg-forest text-white hover:bg-forest/80 font-sans font-semibold transition-colors">Done</button>
-                      ) : (
-                        <button onClick={() => setEditingMember(player.name)} className="px-3 py-1 text-xs rounded border border-gray-200 text-gray-500 hover:text-forest hover:border-forest font-sans transition-colors">Edit</button>
-                      )}
-                    </td>
                   </tr>
                 )
               })}
               {fieldPlayers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">No players in the active tournament field for this filter.</td>
+                  <td colSpan={4} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">No players in the active tournament field for this filter.</td>
                 </tr>
               )}
             </tbody>
@@ -4393,7 +4353,7 @@ function PairingsPanel({
 const TEE_OPTIONS = ['Back', 'Senior', 'Front']
 
 function FlightManagementPanel({
-  effectiveMembers, membersData, flightSearch, setFlightSearch,
+  effectiveMembers, membersData, credits, flightSearch, setFlightSearch,
   editingMember, setEditingMember,
   updateMemberFlight, updateMemberPtm, updateMemberTee,
   saveMembers, membersSaving, membersSaveStatus, flightTagStyles,
@@ -4557,6 +4517,7 @@ function FlightManagementPanel({
                 <th className="table-header text-gray-500 text-left">Player</th>
                 <th className="table-header text-gray-500 text-left">Flight</th>
                 <th className="table-header text-gray-500 text-center">PTM</th>
+                <th className="table-header text-gray-500 text-right">Credit on Books</th>
                 <th className="table-header text-gray-500 text-center">Tee</th>
                 <th className="table-header text-gray-500 text-center">Actions</th>
               </tr>
@@ -4564,6 +4525,8 @@ function FlightManagementPanel({
             <tbody>
               {filtered.map((m, idx) => {
                 const isEditing = editingMember === m.name
+                const ptmValue = fmtPtmValue(m.ptm)
+                const creditValue = Number.isFinite(Number(credits?.[m.name])) ? Number(credits[m.name]) : 0
                 return (
                   <tr
                     key={m.name}
@@ -4604,15 +4567,19 @@ function FlightManagementPanel({
                       {isEditing ? (
                         <input
                           type="number"
-                          value={m.ptm ?? ''}
+                          value={ptmValue ?? ''}
                           onChange={e => updateMemberPtm(m.name, e.target.value)}
                           className="w-16 border border-gray-300 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:ring-2 focus:ring-forest"
                         />
                       ) : (
                         <span className="stat-number text-xs text-gray-600">
-                          {m.ptm ?? '—'}
+                          {ptmValue ?? '—'}
                         </span>
                       )}
+                    </td>
+
+                    <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-600">
+                      {fmtCurrency(creditValue)}
                     </td>
 
                     {/* Tee */}
