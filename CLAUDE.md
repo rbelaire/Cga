@@ -1,81 +1,58 @@
-# Carencro Golf Association (CGA) — Project Context
+# Carencro Golf Association (CGA) — Engineering Context
 
-## Stack
-- **React 19 + Vite**, Tailwind CSS 4, React Router v7 (HashRouter)
-- All data is **static JSON** in `src/data/` and `src/data/results/`
-- No backend — deployed as a static site
+## Current architecture
+- **React 19 + Vite**, Tailwind CSS, React Router v7 (HashRouter)
+- **Firebase Firestore + Firebase Auth** back end for live and admin data
+- Static JSON retained for baseline site metadata (e.g., schedule, board, sponsors)
 
 ## Routing
 Uses `HashRouter` (`#/path`). Routes are defined in `src/App.jsx`.
 
 **Main routes:**
 - `/` — Home
-- `/tournaments` — Schedule + Results combined (upcoming cards + completed accordion)
-- `/standings` — HDCP POY / Scratch / Points to Make tabs
-- `/members` — Member directory
-- `/info` — Rules, Eligibility, Board tabs
-- `/admin` — PIN-gated admin panel (PIN: `cga2026`)
+- `/tournaments` — schedule cards + completed results view
+- `/standings` — standings + POY displays
+- `/pairings` — member pairings
+- `/members` — member directory
+- `/info` — rules, eligibility, board tabs
+- `/admin` — PIN-gated admin panel
 
-**Legacy redirects** (→ new route): `/schedule`, `/results` → `/tournaments`; `/points-to-make` → `/standings`; `/rules`, `/board`, `/eligibility` → `/info`
+**Legacy redirects** (→ new route):
+- `/schedule`, `/results` → `/tournaments`
+- `/points-to-make` → `/standings`
+- `/rules`, `/board`, `/eligibility` → `/info`
 
-## Data Files
-| File | Purpose |
-|------|---------|
-| `src/data/schedule.json` | All tournaments for the season |
-| `src/data/members.json` | Member roster with `flight`, `ptm`, `memberSince` |
-| `src/data/standings.json` | Season standings by score |
-| `src/data/poy.json` | Player of the Year points by flight |
-| `src/data/results/2026-koasati-flow-control.json` | Tournament 2026-01 results |
+## Data sources
+### Static data (`src/data/`)
+- `schedule.json` — season tournament metadata
+- `board.json` — board page content
+- `sponsors.json` — sponsor content
 
-## Data Field Conventions
-- `points` = actual Stableford **score made** at the tournament
-- `ptm` = **Points to Make** (handicap target)
-- `plusMinus` = `points − ptm`
-- `poy` = POY points awarded (base 350, −25/position; tied players average their slots; ineligible = 0)
+### Firestore live/admin data (`cga/*`)
+- `members`, `standings`, `poy`, `ptm`, `pairings`, `payments`, `credits`, `users`, `scores`, `results`, `changelog`, `snapshots`
 
-## POY Points Algorithm
-```
-base = 350 - 25 * (zeroIndexedPosition)
-tied players share averaged slots
-ineligible players get poy: 0 but still hold their position in the scale
-```
+Public views subscribe to Firestore using `useFireData` and gracefully fall back when data is unavailable.
 
-## Flights
-`['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']`
+## Admin behavior
+- PIN gate + auth attempt for admin unlock
+- Draft-like save flows for operational data entry
+- Publish computes and writes `results`, `standings`, and `poy`
+- Validation layer in `src/services/admin/validation/` blocks invalid writes
+- Snapshot and restore support for operational recovery
+- Changelog entries written for key actions
 
-## Adding a New Tournament
-1. Add entry to `src/data/schedule.json` with `status: "upcoming"`
-2. Use the admin panel (`/admin`) to enter scores and publish results to Firebase
-3. Set `status: "completed"` on the tournament in `schedule.json` once done
+## Key files
+- `src/db.js` — Firestore read/write wrappers
+- `src/hooks/useFireData.js` — real-time subscription hook
+- `src/pages/Admin.jsx` — admin UI + workflow orchestration
+- `src/services/admin/publishService.js` — publish computations
+- `src/services/admin/auditService.js` — audit/changelog payload helpers
+- `src/services/admin/snapshotService.js` — snapshot/restore helpers
 
-Results are stored in Firebase (`cga/results`) and displayed automatically on `/tournaments`.
-
-## Key Components
-| Component | Notes |
-|-----------|-------|
-| `StandingsTable` | Sortable table; shows empty state when data is empty; `min-w-[540px]` for mobile scroll |
-| `TournamentCard` | Completed cards use `bg-gray-50`; links to `/tournaments` via `state={{ expand: id }}` |
-| `MemberCard` | Dims unassigned members (no `flight`/`ptm`); hides null `memberSince` |
-| `Header` | Sticky, active nav item gets `bg-white/10` highlight |
-
-## Admin Panel
-- PIN gate → `<AdminPanel />`
-- Left panel: searchable member pool (draggable chips)
-- Right panel: flight score table (draggable rows)
-- Drag interactions: pool→flight (insert), flight→flight (reorder), flight→pool (remove)
-- Auto-saves to `localStorage` on every change
-- Export downloads `*-results.json`, `poy.json`, `standings.json`
-
-## Page Titles
-Every page sets `document.title` via `useEffect`:
-```js
-useEffect(() => { document.title = 'Page Name | CGA 2026' }, [])
-```
-
-## Styling Conventions
+## Styling conventions
 - `forest` = dark green (primary)
-- `gold` = accent/highlights/active states
-- `section-title` = serif heading utility class
-- `gold-divider` = gold underline divider utility class
-- `stat-number` = monospace number display class
-- `btn-primary` = primary button utility class
+- `gold` = accent/highlight
+- `section-title` = serif heading utility
+- `gold-divider` = section underline utility
+- `stat-number` = monospace stat display
+- `btn-primary` = primary button styling

@@ -2,13 +2,21 @@
 
 Live site: **https://rbelaire.github.io/Cga/**
 
+## Project snapshot
+
+The CGA site is a React + Firebase web app for tournament operations and member-facing updates.
+
+- Public pages show schedule, pairings, standings, members, and club info.
+- The admin area manages entries, payments, pairings, scores, publish, and rollback workflows.
+- Firestore is the live source of truth for all operational data.
+
 ## Stack
 
 - React 19 + Vite
 - Tailwind CSS
 - React Router (HashRouter)
 - Firebase Firestore + Firebase Auth
-- GitHub Pages (GitHub Actions)
+- GitHub Pages (GitHub Actions deploy)
 
 ## Local development
 
@@ -23,11 +31,17 @@ Run tests:
 npm test
 ```
 
+Build production bundle:
+
+```bash
+npm run build
+```
+
 > App runs at `http://localhost:5173/Cga/` in local Vite dev.
 
 ## Environment variables
 
-Set these in `.env.local` for local development and in GitHub Actions secrets for deploys:
+Set these in `.env.local` for local dev and in GitHub Actions secrets for deployments:
 
 - `VITE_FIREBASE_API_KEY`
 - `VITE_FIREBASE_AUTH_DOMAIN`
@@ -39,7 +53,7 @@ Set these in `.env.local` for local development and in GitHub Actions secrets fo
 - `VITE_ADMIN_PIN` (optional fallback PIN)
 - `VITE_ADMIN_PINS` (optional JSON map for multi-user PIN labels)
 
-## Data flow (actual)
+## Data flow
 
 ```text
 Admin local draft state (localStorage)
@@ -53,18 +67,9 @@ Public pages
   -> render live data when available
 ```
 
-### Draft → publish behavior
-
-- Score entry supports draft saves (`cga/scores`) before publishing.
-- Publishing writes the selected tournament’s result plus recomputed season tables:
-  - `cga/results`
-  - `cga/standings`
-  - `cga/poy`
-- Other admin sections (members, credits, users, pairings, payments) save directly to their respective docs.
-
 ## Firestore structure (current implementation)
 
-The project currently uses **flat document paths under `cga/*`** rather than `current/draft/history` namespaces.
+The app currently uses **flat document paths under `cga/*`**.
 
 - `cga/members` → `{ list: [...] }`
 - `cga/standings` → `{ flights: {...} }`
@@ -76,97 +81,53 @@ The project currently uses **flat document paths under `cga/*`** rather than `cu
 - `cga/users` → `{ list: [...] }`
 - `cga/scores` → `{ data: { [tournamentId]: { [flight]: [...] } } }`
 - `cga/results` → `{ data: { [tournamentId]: resultDoc } }`
-- `cga/changelog` → `{ entries: [...] }` (admin audit history)
-- `cga/snapshots` → `{ entries: [{ id, type, ts, tid?, details, data }] }` (admin rollback snapshots)
+- `cga/changelog` → `{ entries: [...] }`
+- `cga/snapshots` → `{ entries: [{ id, type, ts, tid?, details, data }] }`
 
+## Admin safety model
 
-## Admin validation guardrails
+Admin saves and publish flow through validators in `src/services/admin/validation/`.
 
-Admin saves and publish now run through shared validators in `src/services/admin/validation/` before writing to Firestore.
+Guardrails include:
+- tournament ID validity,
+- duplicate member/user detection,
+- invalid score/PTM values,
+- malformed credits/payments structures,
+- pairing references to unknown players,
+- publish payload completeness/member references.
 
-Guardrails cover:
-- tournament ID validity
-- duplicate members/users
-- invalid score/PTM values
-- invalid credits/payments shape
-- pairing references to non-entered players
-- publish payload completeness and member references
-
-Invalid saves/publishes are blocked and surfaced as concise admin error banners.
+Invalid writes are blocked and surfaced as admin error banners.
 
 ## Snapshots and restore
 
-Before key writes, admin stores snapshots in `cga/snapshots` for:
-- `scores`, `pairings`, `members`, `credits`, `payments`, `users`
-- publish-sensitive docs: `results` (per tournament), `standings`, `poy`
+Before key writes, the app captures rollback snapshots for:
+- `scores`, `pairings`, `members`, `credits`, `payments`, `users`,
+- publish-sensitive docs: `results` (per tournament), `standings`, `poy`.
 
-Use the **Snapshots** admin tab to review recent snapshots and restore with explicit confirmation. Restore actions are recorded in changelog.
+From the **Snapshots** admin tab, admins can restore with explicit confirmation. Restore actions are written to changelog history.
 
-## Results page data source
+## Routing notes
 
-There is no standalone `Results.jsx` route in the app.
-
-- Tournament result display is implemented in `src/pages/Tournaments.jsx`.
-- It reads from Firestore (`DB.listenResults`) through `useFireData`.
-- Fallback is an empty object (`{}`), so completed tournaments show “Results not yet available” until Firestore data exists.
+- Tournament result rendering is in `src/pages/Tournaments.jsx`.
+- There is no standalone `Results.jsx` route.
 - Legacy `/results` URL redirects to `/tournaments`.
 
-## Admin architecture
-
-- UI remains in `src/pages/Admin.jsx`.
-- Publish computation is extracted to `src/services/admin/publishService.js`.
-- Audit-entry construction is extracted to `src/services/admin/auditService.js`.
-- Firestore read/write access remains centralized in `src/db.js`.
-
-## Admin workflow UX
-
-Admin includes an actionable workflow system:
-
-- Quick action buttons (setup, payments, pairings, scores, users)
-- Tournament workflow tracker with step actions
-- “Next step” CTA based on current workflow state
-- Unsaved draft detection + “Save All” orchestration
-
-## Logging / history
-
-Admin actions are recorded in Firestore changelog entries via `DB.appendChangelog`.
-
-Typical entries include:
-
-- Scores saved
-- Pairings saved
-- Members / credits / users / payments saved
-- Results published
-
-## Security model
-
-- **Authentication:** Admin unlock requires PIN and also attempts Firebase Auth email/password sign-in.
-- **Authorization rules:** Firestore security rules are managed in Firebase Console (no `firestore.rules` file is stored in this repo).
-
-Recommended rule baseline for admin writes:
-
-```text
-allow write: if request.auth != null;
-```
-
-Adjust as needed for production-grade role checks.
-
-## Key folders/files
+## Key files
 
 - `src/db.js` — Firestore data-access layer
-- `src/hooks/useFireData.js` — realtime subscription hook with fallback
-- `src/pages/Admin.jsx` — admin UI and workflow
-- `src/services/admin/` — extracted admin services
+- `src/hooks/useFireData.js` — realtime subscription hook
+- `src/pages/Admin.jsx` — admin UI/workflow
+- `src/services/admin/` — publish, audit, validation services
 - `src/pages/Tournaments.jsx` — completed tournament results UI
-- `src/pages/Standings.jsx`, `src/pages/Members.jsx`, `src/pages/Pairings.jsx` — public data pages
 - `src/data/schedule.json` — season schedule metadata
 
 ## Deployment
 
-Push to `main` triggers GitHub Actions deployment to GitHub Pages via the repository workflow.
+Pushes to `main` deploy to GitHub Pages through the repo workflow.
 
-## Additional Documentation
+## Additional documentation
 
-- [`BOARD_OVERVIEW.md`](./BOARD_OVERVIEW.md) — plain-English summary for board members and stakeholders.
-- [`ADMIN_GUIDE.md`](./ADMIN_GUIDE.md) — practical, non-technical guide for tournament admins.
-
+- [`BOARD_OVERVIEW.md`](./BOARD_OVERVIEW.md) — stakeholder summary
+- [`ADMIN_GUIDE.md`](./ADMIN_GUIDE.md) — practical admin operating guide
+- [`PITCH.md`](./PITCH.md) — value proposition / replacement story
+- [`CLAUDE.md`](./CLAUDE.md) — internal engineering context
