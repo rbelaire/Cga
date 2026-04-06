@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
+import ErrorBoundary from './components/ErrorBoundary'
 import Header from './components/layout/Header'
 import Footer from './components/layout/Footer'
 import Home from './pages/Home'
@@ -33,33 +34,35 @@ export default function App() {
     <HashRouter>
       <div className="flex flex-col min-h-screen">
         <Header />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/tournaments" element={<Tournaments />} />
-          <Route path="/tournaments/:tournamentId" element={<TournamentDetail />} />
-          <Route path="/standings" element={<Standings />} />
-          <Route path="/members" element={<Members />} />
-          <Route path="/info" element={<Info />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/admin" element={
-            <ProtectedRoute>
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center py-24"><span className="text-gray-400 font-sans text-sm">Loading admin…</span></div>}>
-                <Admin />
-              </Suspense>
-            </ProtectedRoute>
-          } />
-          <Route path="/pairings/:tournamentId" element={<Pairings />} />
-          <Route path="/sponsors" element={<Sponsors />} />
-          {/* Legacy redirects */}
-          <Route path="/schedule" element={<Navigate to="/tournaments" replace />} />
-          <Route path="/results" element={<Navigate to="/tournaments" replace />} />
-          <Route path="/points-to-make" element={<Navigate to="/standings" replace />} />
-          <Route path="/poy" element={<Navigate to="/standings" replace />} />
-          <Route path="/rules" element={<Navigate to="/info" replace />} />
-          <Route path="/board" element={<Navigate to="/info" replace />} />
-          <Route path="/eligibility" element={<Navigate to="/info" replace />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/tournaments" element={<Tournaments />} />
+            <Route path="/tournaments/:tournamentId" element={<TournamentDetail />} />
+            <Route path="/standings" element={<Standings />} />
+            <Route path="/members" element={<Members />} />
+            <Route path="/info" element={<Info />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center py-24"><span className="text-gray-400 font-sans text-sm">Loading admin…</span></div>}>
+                  <Admin />
+                </Suspense>
+              </ProtectedRoute>
+            } />
+            <Route path="/pairings/:tournamentId" element={<Pairings />} />
+            <Route path="/sponsors" element={<Sponsors />} />
+            {/* Legacy redirects */}
+            <Route path="/schedule" element={<Navigate to="/tournaments" replace />} />
+            <Route path="/results" element={<Navigate to="/tournaments" replace />} />
+            <Route path="/points-to-make" element={<Navigate to="/standings" replace />} />
+            <Route path="/poy" element={<Navigate to="/standings" replace />} />
+            <Route path="/rules" element={<Navigate to="/info" replace />} />
+            <Route path="/board" element={<Navigate to="/info" replace />} />
+            <Route path="/eligibility" element={<Navigate to="/info" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </ErrorBoundary>
         <Footer />
       </div>
     </HashRouter>

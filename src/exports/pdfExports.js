@@ -35,10 +35,13 @@ function normalizeResultsHeader(text) {
   return formatText(text).replace(/[+\u2212/-]+/g, '+/-')
 }
 
-export async function exportTournamentInfoPDF({ tournament, venmoImageUrl, logoUrl }) {
+export async function exportTournamentInfoPDF({ tournament, venmoImageUrl, logoUrl, onAssetWarning }) {
   const clean = sanitizeTournamentData(tournament)
   const logo = await loadAssetBase64(logoUrl)
   const venmo = await loadAssetBase64(venmoImageUrl)
+  if ((!logo && logoUrl) || (!venmo && venmoImageUrl)) {
+    onAssetWarning?.('One or more images could not be loaded and will be omitted from the PDF.')
+  }
   const { doc, cursorY, withFooter } = createExportPage({
     title: 'Tournament Information',
     subtitle: 'Official Tournament Brief',

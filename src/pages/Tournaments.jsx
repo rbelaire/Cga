@@ -178,6 +178,7 @@ export default function Tournaments() {
                     className="w-full text-left p-5 flex items-start justify-between gap-4 hover:bg-gray-50 transition-colors"
                     onClick={() => onToggleExpanded(t.id, isOpen)}
                     aria-expanded={isOpen}
+                    aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${t.name} results`}
                   >
                     <div>
                       <h3 className="text-darktext font-serif text-xl font-semibold mb-1">{t.name}</h3>
@@ -187,7 +188,7 @@ export default function Tournaments() {
                       <span className="text-xs bg-gray-100 text-gray-600 border border-gray-200 px-2.5 py-1 rounded-full font-sans hidden sm:block">
                         {t.format}
                       </span>
-                      <svg className={`w-5 h-5 text-gold transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className={`w-5 h-5 text-gold transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>

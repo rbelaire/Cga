@@ -1,6 +1,7 @@
 import { SCORE_FLIGHTS } from './flightOrder.js'
 
 const DEFAULT_SCORE_FLIGHTS = SCORE_FLIGHTS
+const FIELD_CAP = 120  // maximum number of paid-and-entered players per tournament
 
 function asObject(value) {
   return value && typeof value === 'object' ? value : {}
@@ -116,8 +117,8 @@ export function computeTournamentWorkflowState({
   const memoStatus = memoSent ? 'complete' : 'not_started'
   const memoLabel = memoSent ? 'Tournament memo sent' : 'Tournament memo not sent'
 
-  const fieldStatus = paidCount >= 120 ? 'complete' : paidCount > 0 ? 'partial' : 'not_started'
-  const fieldLabel = `${paidCount} / 120 paid and entered`
+  const fieldStatus = paidCount >= FIELD_CAP ? 'complete' : paidCount > 0 ? 'partial' : 'not_started'
+  const fieldLabel = `${paidCount} / ${FIELD_CAP} paid and entered`
 
   const birdiePoolExported = Boolean(lifecycle.birdiePoolExportedAt)
   const birdieStatus = !pairingsPosted
@@ -152,7 +153,7 @@ export function computeTournamentWorkflowState({
       pairingsState,
       scoredCount,
       resultsPublished,
-      fieldCap: 120,
+      fieldCap: FIELD_CAP,
       tournamentName: tournament?.name ?? null,
       tournamentDate: tournament?.date ?? null,
     },

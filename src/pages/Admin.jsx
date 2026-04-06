@@ -146,10 +146,13 @@ const flightTagStyles = {
 }
 
 // ── POY calculation ────────────────────────────────────────────────────────────
+const POY_BASE_POINTS    = 350  // points awarded to the flight winner
+const POY_POINTS_PER_RANK = 25  // points deducted per rank position below first
+
 function calcFlightPOY(players) {
   if (!players.length) return players
   const n     = players.length
-  const scale = Array.from({ length: n }, (_, i) => 350 - 25 * i)
+  const scale = Array.from({ length: n }, (_, i) => POY_BASE_POINTS - POY_POINTS_PER_RANK * i)
 
   const withPM = players.map((p, i) => {
     const hasData = p.ptm !== '' && p.score !== '' && p.ptm != null && p.score != null
@@ -375,7 +378,8 @@ function fmtDate(iso) {
 }
 
 function toMoney(value) {
-  return +((Number(value) || 0).toFixed(2))
+  // Round via integer arithmetic to avoid floating-point accumulation
+  return Math.round((Number(value) || 0) * 100) / 100
 }
 
 function createCreditTxn({ name, tournamentId, creditUsed, user }) {
@@ -534,12 +538,13 @@ function addPdfFooter(doc, note = '') {
 }
 
 // ── PDF: Tournament Info ───────────────────────────────────────────────────────
-async function exportTournamentInfoPDF(tournament) {
+async function exportTournamentInfoPDF(tournament, { onAssetWarning } = {}) {
   if (!tournament) return
   await exportTournamentInfoPdfV2({
     tournament,
     logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
     venmoImageUrl: cgaPayVenmo,
+    onAssetWarning,
   })
 }
 
@@ -1049,6 +1054,23 @@ function AdminPanel({ currentUser }) {
     if (!entry?.type) return
     const label = getSnapshotLabel(entry)
     if (!await openConfirm(`Restore ${label}? Current live data for ${entry.type} will be overwritten.`)) return
+
+    // Validate snapshot data before writing to prevent propagating corrupted snapshots
+    const memberNames = (membersData ?? []).map(m => m.name)
+    const preRestoreValidators = {
+      members:  (data) => validateMembers(Array.isArray(data) ? data : []),
+      users:    (data) => validateUsers(Array.isArray(data) ? data : []),
+      credits:  (data) => validateCredits(data && typeof data === 'object' ? data : {}, memberNames),
+      payments: (data) => validatePayments(data && typeof data === 'object' ? data : {}, schedule, memberNames),
+    }
+    const preValidator = preRestoreValidators[entry.type]
+    if (preValidator) {
+      const validationErrors = preValidator(entry.data)
+      if (validationErrors.length) {
+        setAdminError(`Snapshot validation failed — ${formatValidationErrors(validationErrors)}`)
+        return
+      }
+    }
 
     const restoreMap = {
       scores: () => DB.saveScores(entry.data),
@@ -2322,7 +2344,8 @@ function AdminPanel({ currentUser }) {
       })
       setBulkImportPlan(plan)
     } catch (error) {
-      setBulkImportError(error?.message || String(error))
+      console.warn('[CGA] Bulk import plan failed:', error)
+      setBulkImportError('Failed to plan import. Check that the file is a valid template and try again.')
       setBulkImportStatus('err')
     } finally {
       setBulkImportPlanning(false)
@@ -2375,8 +2398,9 @@ function AdminPanel({ currentUser }) {
       logChange('Bulk import applied', `${bulkImportType} · ${bulkImportMode} · added ${summary.toAdd}, duplicates ${summary.duplicates}, invalid ${summary.invalidRows}`)
       setBulkImportStatus('ok')
     } catch (error) {
+      console.warn('[CGA] Bulk import apply failed:', error)
       setBulkImportStatus('err')
-      setBulkImportError(error?.message || String(error))
+      setBulkImportError('Failed to apply import. The data may be invalid or a save error occurred.')
     } finally {
       setBulkImportApplying(false)
     }
@@ -3317,10 +3341,10 @@ function AdminPanel({ currentUser }) {
               </label>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <PdfBtn onClick={() => exportTournamentInfoPDF(tournamentInfo)}>
+              <PdfBtn onClick={() => exportTournamentInfoPDF(tournamentInfo, { onAssetWarning: setAdminError })}>
                 Export Selected Tournament Info
               </PdfBtn>
-              <PdfBtn onClick={() => exportTournamentInfoPDF(nextTournamentInfo)} disabled={!nextTournamentInfo}>
+              <PdfBtn onClick={() => exportTournamentInfoPDF(nextTournamentInfo, { onAssetWarning: setAdminError })} disabled={!nextTournamentInfo}>
                 Export Next Tournament Info
               </PdfBtn>
             </div>
