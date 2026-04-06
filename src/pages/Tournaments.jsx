@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import TournamentCard from '../components/ui/TournamentCard'
@@ -8,6 +8,8 @@ import { formatDateLong } from '../utils/formatDate'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 import { buildFlightWinnerCards } from '../utils/flightWinners'
+import FlightWinnerCards from '../components/ui/FlightWinnerCards'
+import { sortFlights } from '../utils/flightOrder'
 import { useAuth } from '../context/AuthContext'
 import {
   listenSavedFilter,
@@ -17,8 +19,12 @@ import {
 } from '../lib/firebase/firestore'
 
 function FlightLeaderboards({ leaderboard }) {
-  const [flight, setFlight] = useState(Object.keys(leaderboard)[0])
-  const flights = Object.keys(leaderboard)
+  const flights = useMemo(
+    () => sortFlights(Object.keys(leaderboard || {}), { includeNewPlayers: true }),
+    [leaderboard],
+  )
+  const [flight, setFlight] = useState(null)
+  const activeFlight = flights.includes(flight) ? flight : flights[0]
 
   const scoreColumns = [
     { key: 'rank', label: 'Rank', sortable: false },
@@ -34,26 +40,26 @@ function FlightLeaderboards({ leaderboard }) {
       <h4 className="text-gold text-xs font-sans font-semibold uppercase tracking-widest mb-3">
         Full Leaderboard
       </h4>
-      <div className="mb-4 -mx-1 px-1 overflow-x-auto">
-        <div className="flex gap-2 w-max min-w-full whitespace-nowrap">
+      <div className="mb-3 -mx-1 px-1 overflow-x-auto">
+        <div className="flex gap-1.5 w-max min-w-full whitespace-nowrap">
           {flights.map((f) => (
             <button
               key={f}
               onClick={() => setFlight(f)}
-              className={`px-3 py-1.5 text-xs font-sans font-medium rounded transition-colors ${
-                flight === f
-                  ? 'bg-gold text-forest'
-                  : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
+              className={`px-2.5 py-1 text-xs font-sans font-semibold rounded-md transition-colors border ${
+                activeFlight === f
+                  ? 'bg-forest text-white border-forest shadow-sm'
+                  : 'bg-white text-gray-700 border-gray-200 hover:text-forest hover:border-gold'
               }`}
             >
               {f}
-              <span className="ml-1 opacity-60">({(leaderboard[f] || []).length})</span>
+              <span className={`ml-1 ${activeFlight === f ? 'text-white/80' : 'text-gray-500'}`}>({(leaderboard[f] || []).length})</span>
             </button>
           ))}
         </div>
       </div>
-      <div key={flight} className="animate-tab-in">
-        <StandingsTable data={leaderboard[flight]} columns={scoreColumns} highlightTop={3} />
+      <div key={activeFlight} className="animate-tab-in">
+        <StandingsTable data={leaderboard[activeFlight]} columns={scoreColumns} highlightTop={3} />
       </div>
     </div>
   )
@@ -195,29 +201,8 @@ export default function Tournaments() {
 
                   {isOpen && result && (
                     <div className="border-t border-gray-100 p-5">
-                      <h4 className="text-forest text-xs font-sans font-semibold uppercase tracking-widest mb-3">Flight Winners</h4>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-                        {buildFlightWinnerCards(result, t.format).map((fw) => (
-                          <div key={fw.flight} className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5">
-                            <p className="text-forest text-xs font-sans font-semibold uppercase tracking-wide mb-0.5">{fw.flight}</p>
-                            <div className="space-y-1">
-                              {fw.players.map((player) => (
-                                <div key={`${fw.flight}-${player.name}`} className="leading-tight">
-                                  <p className="text-darktext font-sans text-sm">{player.name}</p>
-                                  {player.pending ? (
-                                    <p className="text-gray-500 text-xs font-sans">Results pending</p>
-                                  ) : (
-                                    <>
-                                      <p className="text-darktext font-sans text-lg font-bold">{player.score}</p>
-                                      {player.relative && <p className="text-gray-500 text-xs font-sans">{player.relative}</p>}
-                                    </>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      <h4 className="text-forest text-xs font-sans font-semibold uppercase tracking-widest mb-2.5">Flight Winners</h4>
+                      <FlightWinnerCards winners={buildFlightWinnerCards(result, t.format)} className="mb-4" />
                       <FlightLeaderboards leaderboard={result.leaderboard} />
                     </div>
                   )}

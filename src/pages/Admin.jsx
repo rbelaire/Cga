@@ -44,9 +44,10 @@ import {
   exportResultsPDF as exportResultsPdfV2,
   exportTournamentInfoPDF as exportTournamentInfoPdfV2,
 } from '../exports/pdfExports'
+import { compareFlights, FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
 
-const FLIGHTS          = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
-const ALL_SCORE_TABS   = [...FLIGHTS, 'New Players']
+const FLIGHTS          = FLIGHT_ORDER
+const ALL_SCORE_TABS   = [...FLIGHTS, NEW_PLAYERS_FLIGHT]
 const DEFAULT_PAIRING_ROWS = 15
 const STORAGE_KEY  = 'cga_admin_v1'
 const PAIRINGS_KEY = 'cga_pairings_v1'
@@ -743,7 +744,8 @@ function exportBirdiePoolXLSX(tournament, flightData) {
 function exportPayoutDocXLSX(tournament, resultDoc) {
   if (!tournament || !resultDoc?.leaderboard) return false
   const wb = XLSX.utils.book_new()
-  for (const [flight, rows] of Object.entries(resultDoc.leaderboard)) {
+  for (const [flight, rows] of Object.entries(resultDoc.leaderboard)
+    .sort(([flightA], [flightB]) => compareFlights(flightA, flightB, { includeNewPlayers: true }))) {
     const ranked = (Array.isArray(rows) ? rows : [])
       .filter(row => (row.rank ?? 0) > 0)
       .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
@@ -4607,7 +4609,7 @@ function FlightManagementPanel({
   fileInputRef, handleXlsxFile, importPreview, setImportPreview,
   confirmImport, importSaving, importStatus, importError, setImportError,
 }) {
-  const FLIGHT_OPTIONS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+  const FLIGHT_OPTIONS = FLIGHT_ORDER
   const SORTABLE_COLUMNS = ['name', 'flight', 'ptm', 'creditOnBooks', 'tee']
   const [sortBy, setSortBy] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
@@ -4656,6 +4658,7 @@ function FlightManagementPanel({
         if (sortBy === 'name') return compareByLastName(a, b) * direction
         if (sortBy === 'ptm') return ((a.ptm ?? Number.NEGATIVE_INFINITY) - (b.ptm ?? Number.NEGATIVE_INFINITY)) * direction
         if (sortBy === 'creditOnBooks') return (a.creditOnBooks - b.creditOnBooks) * direction
+        if (sortBy === 'flight') return compareFlights(a.flight, b.flight, { includeNewPlayers: false }) * direction
         return String(a[sortBy] ?? '').localeCompare(String(b[sortBy] ?? '')) * direction
       })
   }, [credits, effectiveMembers, filterFlight, filterTee, flightSearch, onlyCredits, sortBy, sortDir])

@@ -6,8 +6,9 @@ import { computeScratch } from '../utils/computeScratch'
 import { formatName } from '../utils/formatName'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
+import { FLIGHT_ORDER } from '../utils/flightOrder'
 
-const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+const FLIGHTS = FLIGHT_ORDER
 const HISTORY_LABELS = ['New', '2nd', '3rd', '4th', '5th', '6th', '7th']
 
 const sharedStandingsColumns = [

@@ -1,4 +1,6 @@
-const DEFAULT_SCORE_FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight', 'New Players']
+import { SCORE_FLIGHTS } from './flightOrder.js'
+
+const DEFAULT_SCORE_FLIGHTS = SCORE_FLIGHTS
 
 function asObject(value) {
   return value && typeof value === 'object' ? value : {}

@@ -1,4 +1,5 @@
 import { formatName } from './formatName'
+import { compareFlights, NEW_PLAYERS_FLIGHT, normalizeFlight } from './flightOrder'
 
 function isNetFormat(format) {
   return /net|handicap/i.test(format || '')
@@ -26,7 +27,9 @@ export function buildFlightWinnerCards(result, tournamentFormat) {
   const net = isNetFormat(tournamentFormat || result?.format)
 
   return Object.entries(leaderboard)
-    .filter(([flight]) => flight !== 'New Players')
+    .map(([flight, rows]) => [normalizeFlight(flight) || flight, rows])
+    .filter(([flight]) => flight !== NEW_PLAYERS_FLIGHT)
+    .sort(([flightA], [flightB]) => compareFlights(flightA, flightB, { includeNewPlayers: false }))
     .map(([flight, rows]) => {
       const winnerRows = (Array.isArray(rows) ? rows : []).filter((row) => row?.rank === 1 && row?.name)
 

@@ -7,6 +7,7 @@ import { formatDate, formatDateLong } from '../utils/formatDate'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 import { buildFlightWinnerCards } from '../utils/flightWinners'
+import FlightWinnerCards from '../components/ui/FlightWinnerCards'
 
 function DetailItem({ label, value }) {
   if (!value) return null
@@ -113,37 +114,12 @@ export default function TournamentDetail() {
       )}
 
       {result && (
-        <section className="bg-white border border-gray-200 rounded-lg p-5">
-          <h2 className="text-forest text-xs font-sans font-semibold uppercase tracking-widest mb-3">
+        <section className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5">
+          <h2 className="text-forest text-xs font-sans font-semibold uppercase tracking-widest mb-2.5">
             Published Results
           </h2>
           {buildFlightWinnerCards(result, tournament.format).length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-              {buildFlightWinnerCards(result, tournament.format).map((winner) => (
-                <div key={winner.flight} className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5">
-                  <p className="text-forest text-xs font-sans font-semibold uppercase tracking-wide mb-0.5">
-                    {winner.flight}
-                  </p>
-                  <div className="space-y-1">
-                    {winner.players.map((player) => (
-                      <div key={`${winner.flight}-${player.name}`} className="leading-tight">
-                        <p className="text-darktext font-sans text-sm">{player.name}</p>
-                        {player.pending ? (
-                          <p className="text-gray-500 text-xs font-sans">Results pending</p>
-                        ) : (
-                          <>
-                            <p className="text-darktext font-sans text-lg font-bold">{player.score}</p>
-                            {player.relative && (
-                              <p className="text-gray-500 text-xs font-sans">{player.relative}</p>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <FlightWinnerCards winners={buildFlightWinnerCards(result, tournament.format)} className="mb-4" />
           )}
           <Link
             to="/tournaments"

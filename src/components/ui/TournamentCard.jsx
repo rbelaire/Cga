@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { formatDate } from '../../utils/formatDate'
+import { sortFlights } from '../../utils/flightOrder'
 
 const statusStyles = {
   upcoming: 'bg-green-100 text-green-700',
@@ -10,6 +11,7 @@ const statusStyles = {
 export default function TournamentCard({ tournament, compact = false }) {
   const { id, name, date, course, format, entryFee, flights, status, notes } = tournament
   const isPast = status === 'completed'
+  const orderedFlights = sortFlights(flights ?? [], { includeNewPlayers: true })
 
   return (
     <div
@@ -49,9 +51,9 @@ export default function TournamentCard({ tournament, compact = false }) {
           </div>
         )}
 
-        {!compact && flights && flights.length > 0 && (
+        {!compact && orderedFlights.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2.5">
-            {flights.map((flight) => (
+            {orderedFlights.map((flight) => (
               <span key={flight} className="text-xs border border-gray-200 text-gray-500 px-2 py-0.5 rounded font-sans">
                 {flight}
               </span>
