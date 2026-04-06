@@ -22,7 +22,6 @@ import {
   buildImportContext,
   BULK_IMPORT_DEFINITIONS,
   collectRowsForImportType,
-  getBulkImportTemplateDownload,
   parseBulkImportFile,
   planBulkImport,
 } from '../services/admin/import'
@@ -45,6 +44,9 @@ import {
   exportTournamentInfoPDF as exportTournamentInfoPdfV2,
 } from '../exports/pdfExports'
 import { compareFlights, FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
+import { AdminPaymentsPanel } from './admin/AdminPaymentsPanel'
+import { AdminCreditsPanel } from './admin/AdminCreditsPanel'
+import { AdminBulkImportPanel } from './admin/AdminBulkImportPanel'
 
 const FLIGHTS          = FLIGHT_ORDER
 const ALL_SCORE_TABS   = [...FLIGHTS, NEW_PLAYERS_FLIGHT]
@@ -2861,146 +2863,27 @@ function AdminPanel({ currentUser }) {
             />
           </section>
 
-          <section>
-          <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4">
-            <div className="flex flex-wrap gap-2">
-              <input
-                type="text"
-                value={creditSearch}
-                onChange={e => setCreditSearch(e.target.value)}
-                placeholder="Search members…"
-                className="flex-1 min-w-[140px] border border-gray-200 rounded px-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-sans text-gray-500 whitespace-nowrap">
-                  <span className="font-semibold text-forest">{creditNonZero}</span> with balance ·{' '}
-                  <span className={`font-semibold stat-number ${creditTotal > 0 ? 'text-green-600' : creditTotal < 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                    {creditTotal < 0 ? '−' : ''}${Math.abs(creditTotal).toFixed(2)}
-                  </span>{' total'}
-                </span>
-                <SaveBtn onClick={saveCredits} saving={creditsSaving} status={creditsSaveStatus} />
-                <PdfBtn onClick={() => exportCreditsPDF(credits, membersData)}>
-                  Credits PDF
-                </PdfBtn>
-                {Object.keys(credits).length > 0 && (
-                  <button
-                    onClick={clearAllCredits}
-                    className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors whitespace-nowrap"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
-              <span className="text-white font-sans text-sm font-semibold">Member Credit Balances</span>
-              <span className="text-white/50 font-sans text-xs">{creditRoster.length} members</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[540px]">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="table-header text-gray-400 text-left">Player</th>
-                    <th className="table-header text-gray-400 text-left">Flight</th>
-                    <th className="table-header text-gray-400 text-right">Balance</th>
-                    <th className="table-header text-gray-400 text-center">Add / Subtract</th>
-                    <th className="table-header text-gray-400 w-8"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {creditRoster.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
-                        No members match your search.
-                      </td>
-                    </tr>
-                  ) : (
-                    creditRoster.map((m, idx) => {
-                      const balance = credits[m.name] ?? 0
-                      const input   = creditInputs[m.name] ?? ''
-                      return (
-                        <tr
-                          key={m.name}
-                          className={`border-b border-gray-100 last:border-0 transition-colors ${
-                            balance !== 0 ? 'hover:bg-amber-50/30' : 'hover:bg-gray-50'
-                          } ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
-                        >
-                          <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
-                            {formatName(m.name)}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[m.flight] ?? flightTagStyles.Unassigned}`}>
-                              {m.flight ?? 'Unassigned'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right">
-                            <span className={`stat-number text-sm font-bold ${
-                              balance > 0 ? 'text-green-600' : balance < 0 ? 'text-red-500' : 'text-gray-300'
-                            }`}>
-                              {balance < 0 ? '−' : ''}${Math.abs(balance).toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={input}
-                                onChange={e => setCreditInputs(prev => ({ ...prev, [m.name]: e.target.value }))}
-                                onKeyDown={e => e.key === 'Enter' && applyCredit(m.name, input)}
-                                placeholder="+/− $"
-                                className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                              />
-                              <button
-                                onClick={() => applyCredit(m.name, input)}
-                                disabled={!input}
-                                title="Apply adjustment"
-                                className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
-                              >
-                                <CheckIcon className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            {balance !== 0 && (
-                              <button
-                                onClick={() => clearCredit(m.name)}
-                                title="Clear balance"
-                                className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors"
-                              >
-                                ×
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-                {creditNonZero > 0 && (
-                  <tfoot>
-                    <tr className="bg-forest/5 border-t-2 border-forest/20">
-                      <td colSpan={2} className="px-4 py-2.5 font-sans text-xs font-semibold uppercase tracking-widest text-forest">
-                        Total on Books
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <span className={`stat-number text-sm font-bold ${
-                          creditTotal > 0 ? 'text-green-600' : creditTotal < 0 ? 'text-red-500' : 'text-gray-400'
-                        }`}>
-                          {creditTotal < 0 ? '−' : ''}${Math.abs(creditTotal).toFixed(2)}
-                        </span>
-                      </td>
-                      <td colSpan={2} />
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </div>
-          </section>
+          <AdminCreditsPanel
+            creditSearch={creditSearch}
+            setCreditSearch={setCreditSearch}
+            creditNonZero={creditNonZero}
+            creditTotal={creditTotal}
+            saveCredits={saveCredits}
+            creditsSaving={creditsSaving}
+            creditsSaveStatus={creditsSaveStatus}
+            onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
+            onClearAllCredits={clearAllCredits}
+            credits={credits}
+            creditRoster={creditRoster}
+            creditInputs={creditInputs}
+            setCreditInputs={setCreditInputs}
+            applyCredit={applyCredit}
+            clearCredit={clearCredit}
+            flightTagStyles={flightTagStyles}
+            SaveBtn={SaveBtn}
+            PdfBtn={PdfBtn}
+            CheckIcon={CheckIcon}
+          />
         </div>
       )}
 
@@ -3021,7 +2904,7 @@ function AdminPanel({ currentUser }) {
       )}
 
       {adminMode === 'bulk-import' && (
-        <BulkImportPanel
+        <AdminBulkImportPanel
           importType={bulkImportType}
           setImportType={(type) => {
             setBulkImportType(type)
@@ -3058,167 +2941,33 @@ function AdminPanel({ currentUser }) {
           PAYMENTS MODE
       ════════════════════════════════════════════════════════════════════════ */}
       {adminMode === 'payments' && (
-        <div>
-          <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4">
-            <div className="flex flex-wrap gap-2">
-              <input
-                type="text"
-                value={paymentSearch}
-                onChange={e => setPaymentSearch(e.target.value)}
-                placeholder="Search members…"
-                className="flex-1 min-w-[140px] border border-gray-200 rounded px-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-sans text-gray-500 whitespace-nowrap">
-                  <span className="font-semibold text-green-600">{paymentPaidCount}</span>
-                  {' / '}
-                  <span className="font-semibold text-forest">{membersData.filter(m => m.active !== false).length}</span>
-                  {' paid'}
-                </span>
-                <SaveBtn onClick={savePayments} saving={paymentsSaving} status={paymentsSaveStatus} />
-                <PdfBtn onClick={() => exportPaymentsPDF(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>
-                  PDF
-                </PdfBtn>
-                <XlsxBtn onClick={() => exportPaymentsXLSX(tournament, paymentMap, membersData)} disabled={!tournament || paymentPaidCount === 0}>
-                  Excel
-                </XlsxBtn>
-                {paymentPaidCount > 0 && (
-                  <button
-                    onClick={() => clearAllPayments(tid)}
-                    className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors whitespace-nowrap"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-forest px-4 py-2.5 flex items-center justify-between">
-              <span className="text-white font-sans text-sm font-semibold">
-                Payment Status — {tournament?.name ?? 'Select Tournament'}
-              </span>
-              <span className="text-white/50 font-sans text-xs">{paymentRoster.length} members</span>
-            </div>
-
-            {/* Bulk actions */}
-            <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => markAllPaid(tid, paymentRoster.filter(m => !paymentMap[m.name]).map(m => m.name))}
-                disabled={paymentRoster.every(m => paymentMap[m.name])}
-                className="px-3 py-1 text-xs font-sans font-medium rounded border border-green-200 text-green-600 bg-green-50 hover:bg-green-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Mark All Shown as Paid
-              </button>
-              <span className="text-xs font-sans text-gray-400">
-                {paymentRoster.filter(m => paymentMap[m.name]).length} of {paymentRoster.length} shown are paid
-              </span>
-              <span className="text-xs font-sans text-gray-500">
-                Paid players are considered entered in the field.
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[440px]">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="table-header text-gray-400 w-24 text-center">Paid</th>
-                    <th className="table-header text-gray-400 text-left">Player</th>
-                    <th className="table-header text-gray-400 text-left">Flight</th>
-                    <th className="table-header text-gray-400 text-right">Credit Available</th>
-                    <th className="table-header text-gray-400 text-right">Credit Applied</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paymentRoster.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
-                        No members match your search.
-                      </td>
-                    </tr>
-                  ) : (
-                    paymentRoster.map((m, idx) => {
-                      const isPaid = !!paymentMap[m.name]
-                      const balance = toMoney(credits[m.name] ?? 0)
-                      const creditApplied = toMoney(paymentMeta?.[tid]?.[m.name]?.creditUsed ?? 0)
-                      const creditInput = paymentCreditInputs[m.name] ?? ''
-                      return (
-                        <tr
-                          key={m.name}
-                          className={`border-b border-gray-100 last:border-0 transition-colors cursor-pointer ${
-                            isPaid ? 'bg-green-50/60 hover:bg-green-100/60' : 'hover:bg-gray-50'
-                          } ${!isPaid && idx % 2 === 0 ? 'bg-white' : ''} ${!isPaid && idx % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
-                        >
-                          <td className="px-4 py-2.5 text-center">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (isPaid) togglePayment(tid, m.name)
-                                else markPaidWithCredit(tid, m.name, creditInput || 0)
-                                setPaymentCreditInputs(prev => ({ ...prev, [m.name]: '' }))
-                              }}
-                              className={`px-2.5 py-1 rounded text-[11px] font-sans font-semibold ${
-                                isPaid
-                                  ? 'bg-green-600 text-white'
-                                  : 'border border-gray-300 text-gray-700 hover:border-forest hover:text-forest'
-                              }`}
-                            >
-                              {isPaid ? 'Paid' : 'Mark Paid'}
-                            </button>
-                          </td>
-                          <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
-                            {formatName(m.name)}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[m.flight] ?? flightTagStyles.Unassigned}`}>
-                              {m.flight ?? 'Unassigned'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-600">
-                            ${balance.toFixed(2)}
-                          </td>
-                          <td className="px-4 py-2.5 text-right">
-                            {isPaid ? (
-                              <span className="font-mono text-xs text-green-700">${creditApplied.toFixed(2)}</span>
-                            ) : (
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                max={balance}
-                                value={creditInput}
-                                onChange={e => setPaymentCreditInputs(prev => ({ ...prev, [m.name]: e.target.value }))}
-                                placeholder="$0.00"
-                                className="w-20 border border-gray-200 rounded px-2 py-1 text-xs text-right font-mono"
-                              />
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-                {paymentPaidCount > 0 && (
-                  <tfoot>
-                    <tr className="bg-green-50/80 border-t-2 border-green-200">
-                      <td className="px-4 py-2.5 text-center">
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </span>
-                      </td>
-                      <td colSpan={4} className="px-4 py-2.5 font-sans text-xs font-semibold uppercase tracking-widest text-green-700">
-                        {paymentPaidCount} member{paymentPaidCount !== 1 ? 's' : ''} paid
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </div>
-        </div>
+        <AdminPaymentsPanel
+          paymentSearch={paymentSearch}
+          setPaymentSearch={setPaymentSearch}
+          paymentPaidCount={paymentPaidCount}
+          activeMemberCount={membersData.filter(m => m.active !== false).length}
+          savePayments={savePayments}
+          paymentsSaving={paymentsSaving}
+          paymentsSaveStatus={paymentsSaveStatus}
+          onExportPaymentsPDF={() => exportPaymentsPDF(tournament, paymentMap, membersData)}
+          onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData)}
+          onClearAllPayments={() => clearAllPayments(tid)}
+          tournament={tournament}
+          paymentRoster={paymentRoster}
+          paymentMap={paymentMap}
+          credits={credits}
+          paymentMeta={paymentMeta}
+          tid={tid}
+          paymentCreditInputs={paymentCreditInputs}
+          setPaymentCreditInputs={setPaymentCreditInputs}
+          onMarkAllPaid={(names) => markAllPaid(tid, names)}
+          onTogglePayment={(name) => togglePayment(tid, name)}
+          onMarkPaidWithCredit={(name, creditInput) => markPaidWithCredit(tid, name, creditInput)}
+          flightTagStyles={flightTagStyles}
+          SaveBtn={SaveBtn}
+          PdfBtn={PdfBtn}
+          XlsxBtn={XlsxBtn}
+        />
       )}
 
       {showExportPanel && (
@@ -5140,146 +4889,3 @@ function FlightManagementPanel({
   )
 }
 
-function BulkImportPanel({
-  importType,
-  setImportType,
-  importMode,
-  importDefinitions,
-  importPlan,
-  importError,
-  importStatus,
-  planning,
-  applying,
-  fileName,
-  onFileSelected,
-  onApply,
-  currentUser,
-}) {
-  const template = getBulkImportTemplateDownload(importType)
-  const definition = importDefinitions[importType]
-
-  return (
-    <div className="space-y-5">
-      <section className="bg-white border border-gray-200 rounded-lg p-4">
-        <h3 className="text-lg font-serif text-darktext">Bulk Import</h3>
-        <p className="text-sm font-sans text-gray-600 mt-1">
-          Admin-only dry run importer for historical CGA data. Current user: <span className="font-semibold">{currentUser || 'Admin'}</span>.
-        </p>
-
-        <div className="grid gap-4 md:grid-cols-2 mt-4">
-          <label className="text-sm font-sans">
-            <span className="text-xs uppercase tracking-widest text-gray-500">Import Type</span>
-            <select
-              value={importType}
-              onChange={e => setImportType(e.target.value)}
-              className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-            >
-              {Object.entries(importDefinitions).map(([key, value]) => (
-                <option key={key} value={key}>{value.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="text-sm font-sans">
-            <span className="text-xs uppercase tracking-widest text-gray-500">Mode</span>
-            <input
-              value={importMode}
-              readOnly
-              className="mt-1 w-full border border-gray-200 bg-gray-50 rounded-md px-3 py-2 text-sm text-gray-700"
-            />
-          </label>
-        </div>
-
-        <div className="mt-4 p-3 rounded-md border border-gray-200 bg-gray-50">
-          <p className="text-xs font-semibold uppercase tracking-widest text-forest">Template & Rules</p>
-          <p className="text-sm font-sans text-gray-700 mt-1">{definition.description}</p>
-          <p className="text-xs font-sans text-gray-500 mt-2">
-            Required columns: {definition.requiredColumns.join(', ')}
-            {definition.optionalColumns.length > 0 ? ` · Optional: ${definition.optionalColumns.join(', ')}` : ''}
-          </p>
-          <ul className="mt-2 list-disc list-inside text-xs font-sans text-gray-600 space-y-1">
-            {definition.usageNotes.map(note => <li key={note}>{note}</li>)}
-          </ul>
-          {template && (
-            <a
-              className="inline-flex mt-3 px-3 py-1.5 text-xs rounded border border-forest/30 text-forest hover:bg-forest/10"
-              href={template.href}
-              download={template.fileName}
-            >
-              Download {definition.label} CSV Template
-            </a>
-          )}
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-3 items-center">
-          <label className="inline-flex items-center px-3 py-2 text-xs font-sans rounded-md bg-forest text-white cursor-pointer hover:bg-forest/90">
-            {planning ? 'Reading file…' : 'Upload .xlsx or .csv'}
-            <input type="file" className="hidden" accept=".xlsx,.csv" onChange={onFileSelected} disabled={planning || applying} />
-          </label>
-          <span className="text-xs font-sans text-gray-500">{fileName || 'No file selected'}</span>
-        </div>
-      </section>
-
-      {importError && (
-        <section className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm font-sans text-red-700">
-          {importError}
-        </section>
-      )}
-
-      {importPlan && (
-        <section className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-widest text-forest">Dry Run Preview</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-sans">
-            <Stat label="Rows" value={importPlan.summary.rowsDetected} />
-            <Stat label="Valid" value={importPlan.summary.validRows} />
-            <Stat label="Invalid" value={importPlan.summary.invalidRows} />
-            <Stat label="New Adds" value={importPlan.summary.toAdd} />
-            <Stat label="Duplicates" value={importPlan.summary.duplicates} />
-            <Stat label="Conflicts" value={importPlan.summary.conflicts} />
-            <Stat label="Updates" value={importPlan.summary.updates} />
-            <Stat label="Blocking Errors" value={importPlan.summary.blockingErrors} />
-          </div>
-
-          {importPlan.issues.length > 0 && (
-            <div className="rounded border border-red-200 bg-red-50 p-3">
-              <p className="text-xs font-semibold text-red-700 uppercase tracking-widest">Validation Issues</p>
-              <ul className="mt-2 space-y-1 text-xs text-red-700 font-sans max-h-48 overflow-auto">
-                {importPlan.issues.map((issue, idx) => (
-                  <li key={`${issue.rowNumber}-${idx}`}>
-                    Row {issue.rowNumber}: {issue.issue}{issue.suggestion ? ` — ${issue.suggestion}` : ''}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {importPlan.duplicates.length > 0 && (
-            <p className="text-xs font-sans text-amber-700">{importPlan.duplicates.length} duplicate row(s) will be skipped automatically in add-only mode.</p>
-          )}
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onApply}
-              disabled={applying || planning || importPlan.issues.length > 0 || importPlan.toAdd.length === 0}
-              className="px-4 py-2 text-xs font-sans font-semibold rounded-md bg-forest text-white disabled:opacity-50"
-            >
-              {applying ? 'Applying…' : `Apply Import (${importPlan.toAdd.length} add)`}
-            </button>
-            {importStatus === 'ok' && <span className="text-xs font-sans text-green-700">Import completed and logged.</span>}
-            {importStatus === 'err' && <span className="text-xs font-sans text-red-700">Import failed. See error details above.</span>}
-          </div>
-        </section>
-      )}
-    </div>
-  )
-}
-
-function Stat({ label, value }) {
-  return (
-    <div className="rounded border border-gray-200 bg-gray-50 px-2 py-2">
-      <p className="text-[10px] uppercase tracking-widest text-gray-500">{label}</p>
-      <p className="text-sm font-semibold text-darktext">{value}</p>
-    </div>
-  )
-}
