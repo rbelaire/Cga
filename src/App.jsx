@@ -6,6 +6,7 @@ import Footer from './components/layout/Footer'
 import Home from './pages/Home'
 import Tournaments from './pages/Tournaments'
 import Standings from './pages/Standings'
+import MostImproved from './pages/MostImproved'
 import Members from './pages/Members'
 import Info from './pages/Info'
 import Pairings from './pages/Pairings'
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/tournaments" element={<Tournaments />} />
             <Route path="/tournaments/:tournamentId" element={<TournamentDetail />} />
             <Route path="/standings" element={<Standings />} />
+            <Route path="/most-improved" element={<MostImproved />} />
             <Route path="/members" element={<Members />} />
             <Route path="/info" element={<Info />} />
             <Route path="/login" element={<Login />} />
