@@ -9,10 +9,10 @@
 
 const TEE_CONFIG = {
   Back:   { label: 'Back',   short: 'B', classes: 'bg-gray-800   text-white' },
-  Senior: { label: 'Senior', short: 'S', classes: 'bg-amber-500  text-white' },
-  Front:  { label: 'Front',  short: 'F', classes: 'bg-sky-600    text-white' },
+  Senior: { label: 'Senior', short: 'S', classes: 'bg-blue-700   text-white' },
+  Front:  { label: 'Front',  short: 'F', classes: 'bg-slate-400  text-white' },
   // legacy alias
-  Sr:     { label: 'Senior', short: 'S', classes: 'bg-amber-500  text-white' },
+  Sr:     { label: 'Senior', short: 'S', classes: 'bg-blue-700   text-white' },
 }
 
 export default function TeeTag({ tee, className = '' }) {

@@ -198,7 +198,12 @@ function PtmTab({ ptmList, liveMembers, ptmDeltaLookup }) {
               <SortHeader label="Player" colKey="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
               <SortHeader label="PTM" colKey="ptm" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} tooltip="Points to Make — your handicap target score, calculated from your last 7 rounds." />
               {HISTORY_LABELS.map(lbl => (
-                <th key={lbl} className="table-header text-white/70 font-normal">{lbl}</th>
+                <th
+                  key={lbl}
+                  className={`table-header ${lbl === 'New' ? 'text-gold font-bold' : 'text-white/70 font-normal'}`}
+                >
+                  {lbl}
+                </th>
               ))}
               <th className="table-header text-white/70 font-normal">Rounds</th>
             </tr>
