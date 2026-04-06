@@ -23,6 +23,11 @@ function asFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+function asRoundedWhole(value) {
+  const numeric = asFiniteNumber(value)
+  return numeric == null ? null : Math.round(numeric)
+}
+
 function formatSignedDelta(value) {
   const numeric = asFiniteNumber(value)
   if (numeric == null || numeric === 0) return '—'
@@ -56,7 +61,7 @@ function CellValue({ col, row, idx, highlightTop, showBubble }) {
     </span>
   )
   if (col.key === 'ptm') return (
-    <span className="stat-number text-darktext">{asFiniteNumber(row.ptm) ?? '—'}</span>
+    <span className="stat-number text-darktext">{asRoundedWhole(row.ptm) ?? '—'}</span>
   )
   if (col.key === 'ptmDelta') {
     return <span className="stat-number text-darktext font-medium">{formatSignedDelta(row.ptmDelta)}</span>
