@@ -880,8 +880,23 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
 
 // ── Auth gate ──────────────────────────────────────────────────────────────────
 export default function Admin() {
-  const { user, profile } = useAuth()
+  const { user, profile, isAdmin, loading } = useAuth()
   const currentUser = profile?.displayName || user?.displayName || user?.email || 'Admin'
+
+  if (loading) {
+    return <div className="flex-1 flex items-center justify-center py-24 text-sm text-gray-500">Loading…</div>
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-24">
+        <LockIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+        <h1 className="font-serif text-xl font-bold text-darktext mb-2">Admin Access Required</h1>
+        <p className="text-sm text-gray-500 mb-1">Your account (<span className="font-mono">{user?.email}</span>) does not have admin privileges.</p>
+        <p className="text-xs text-gray-400">Contact the site administrator to request access.</p>
+      </div>
+    )
+  }
 
   return <AdminPanel currentUser={currentUser} />
 }
@@ -2118,15 +2133,15 @@ function AdminPanel({ currentUser }) {
   )
   const keyWorkflowStats = `${paymentPaidCount} Paid / ${totalPlayers} Entered`
   const primaryActions = [
-    { key: 'overview', label: 'Overview', icon: '📊', onClick: () => setAdminMode('dashboard'), active: adminMode === 'dashboard' },
-    { key: 'entries', label: 'Entries', icon: '🧾', onClick: () => setAdminMode('payments'), active: adminMode === 'payments' },
-    { key: 'pairings', label: 'Pairings', icon: '👥', onClick: () => setAdminMode('pairings'), active: adminMode === 'pairings' },
-    { key: 'scores', label: 'Scores', icon: '⛳', onClick: () => setAdminMode('scores'), active: adminMode === 'scores' },
-    { key: 'results', label: 'Results', icon: '🏆', onClick: () => setAdminMode('scores'), active: false },
-    { key: 'exports', label: 'Exports', icon: '📤', onClick: () => setShowExportPanel(true), active: false },
-    { key: 'player-management', label: 'Player Management', icon: '🗂️', onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
-    { key: 'bulk-import', label: 'Bulk Import', icon: '📥', onClick: () => setAdminMode('bulk-import'), active: adminMode === 'bulk-import' },
-    { key: 'member-management', label: 'Member Management', icon: '👥', onClick: () => setAdminMode('users'), active: adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
+    { key: 'overview',           label: 'Overview',           Icon: DashboardIcon, onClick: () => setAdminMode('dashboard'),  active: adminMode === 'dashboard' },
+    { key: 'entries',            label: 'Entries',            Icon: ReceiptIcon,   onClick: () => setAdminMode('payments'),   active: adminMode === 'payments' },
+    { key: 'pairings',           label: 'Pairings',           Icon: UsersIcon,     onClick: () => setAdminMode('pairings'),   active: adminMode === 'pairings' },
+    { key: 'scores',             label: 'Scores',             Icon: GolfFlagIcon,  onClick: () => setAdminMode('scores'),     active: adminMode === 'scores' },
+    { key: 'results',            label: 'Results',            Icon: TrophyIcon,    onClick: () => setAdminMode('scores'),     active: false },
+    { key: 'exports',            label: 'Exports',            Icon: ExportIcon,    onClick: () => setShowExportPanel(true),   active: false },
+    { key: 'player-management',  label: 'Player Management',  Icon: FolderIcon,    onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
+    { key: 'bulk-import',        label: 'Bulk Import',        Icon: FolderIcon,    onClick: () => setAdminMode('bulk-import'),active: adminMode === 'bulk-import' },
+    { key: 'member-management',  label: 'Member Management',  Icon: UsersIcon,     onClick: () => setAdminMode('users'),      active: adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
   ]
 
   async function saveAllDirtyDrafts() {
