@@ -6,16 +6,16 @@ Live site: **https://rbelaire.github.io/Cga/**
 
 The CGA site is a React + Firebase web app for tournament operations and member-facing updates.
 
-- Public pages show schedule, pairings, standings, members, and club info.
+- Public pages show schedule, pairings, standings, most/least improved, members, and club info.
 - The admin area manages entries, payments, pairings, scores, publish, and rollback workflows.
 - Firestore remains the live source of truth for operational CGA tournament data under `cga/*`.
-- New user-scoped Firebase collections support login profiles and lightweight preferences.
+- Firebase Auth secures the admin panel.
 
 ## Stack
 
 - React 19 + Vite
 - Tailwind CSS
-- React Router (HashRouter)
+- React Router v7 (HashRouter)
 - Firebase Auth + Firestore + Storage utilities
 - GitHub Pages (GitHub Actions deploy)
 
@@ -81,11 +81,9 @@ Copy `.env.example` to `.env.local` and fill all values.
 - `src/lib/firebase/client.js` initializes Firebase once and exports `auth`, `db`, and `storage`.
 - `src/firebase.js` re-exports these for backward compatibility.
 
-### Auth and role-ready profiles
+### Auth
 
-- `/login` route supports:
-  - Email/password sign-in
-  - Google sign-in popup
+- `/login` route supports email/password and Google sign-in.
 - Protected route wrapper enforces auth for `/admin`.
 - User profile docs are created/merged in Firestore `users/{uid}` with `roles` array for future role expansion.
 
@@ -114,7 +112,7 @@ Current user-facing usage:
 ## Data flow
 
 ```text
-Admin local draft state (localStorage)
+Admin local draft state
   ├─ Save Draft / Save Pairings / Save Users / Save Payments ...
   │    -> Firestore draft-like docs (cga/scores, cga/pairings, cga/users, ...)
   └─ Publish Results
@@ -123,19 +121,17 @@ Admin local draft state (localStorage)
 Public pages
   -> subscribe to Firestore in real-time via useFireData()
   -> render live data when available
-
-User personalization (signed in)
-  -> save lightweight preferences to savedFilters / savedViews / favorites
 ```
 
 ## Firestore structure
 
-### Existing operational docs (unchanged)
+### Operational docs (`cga/*`)
 
 - `cga/members` → `{ list: [...] }`
 - `cga/standings` → `{ flights: {...} }`
 - `cga/poy` → `{ flights: {...} }`
 - `cga/ptm` → `{ list: [...] }`
+- `cga/beginningOfYearPtm` → `{ list: [...] }` — season-start PTM snapshot for Most Improved
 - `cga/pairings` → `{ map: { [tournamentId]: [...] } }`
 - `cga/payments` → `{ data: { [tournamentId]: { [member]: true } } }`
 - `cga/credits` → `{ balances: { [member]: number } }`
@@ -146,7 +142,7 @@ User personalization (signed in)
 - `cga/changelog` → `{ entries: [...] }`
 - `cga/snapshots` → `{ entries: [...] }`
 
-### New lightweight docs
+### Lightweight user docs
 
 - `users/{uid}` → profile + role-ready auth claims mirror
 - `savedFilters/{uid_page}` → user filters per page
@@ -171,7 +167,7 @@ Pushes to `main` deploy to GitHub Pages through the repo workflow.
 
 ### Firebase App Hosting readiness
 
-This repository now includes Firebase config/rules and environment naming parity (`NEXT_PUBLIC_*`) so the project can be adapted for Firebase App Hosting later without reworking app-level Firebase modules.
+This repository includes Firebase config/rules and environment naming parity (`NEXT_PUBLIC_*`) so the project can be adapted for Firebase App Hosting later without reworking app-level Firebase modules.
 
 General flow when moving to App Hosting:
 

@@ -1,27 +1,35 @@
 # CGA System Overview (Board & Stakeholder Summary)
 
 ## What the CGA system does
-The CGA system is the club’s central hub for tournament operations and member-facing updates. It keeps tournament setup, scores, standings, and points in one place so members and leadership review the same live data.
+The CGA system is the club's central hub for tournament operations and member-facing updates. It keeps tournament setup, scores, standings, improvement tracking, and points in one place so members and leadership review the same live data.
 
 ## Why this matters
 A golf association runs best when results are clear, timely, and consistent. This system helps CGA:
 - move faster from event day to published results,
 - reduce confusion from duplicate files and side spreadsheets,
-- give members up-to-date standings and tournament information.
+- give members up-to-date standings, improvement rankings, and tournament information.
 
 ## How admin and member experiences work together
 - **Admin side:** authorized admins manage payments, rosters, pairings, scores, and publishing.
-- **Member/public side:** members view live tournament outcomes, pairings, standings, and schedule data from the published source.
+- **Member/public side:** members view live tournament outcomes, pairings, standings, season improvement rankings, and schedule data from the published source.
 
 Admins can work iteratively with draft saves and then publish an official release once verified.
 
-## What “Publish Results” does
-“Publish Results” is the official release action. It takes saved scores and updates:
-- that tournament’s official posted result,
+## What "Publish Results" does
+"Publish Results" is the official release action. It takes saved scores and updates:
+- that tournament's official posted result,
 - season standings,
 - season points-of-the-year tables.
 
 Once published, the site reflects changes immediately.
+
+## Member-facing pages
+- **Tournaments** — schedule, upcoming events, completed results by flight
+- **Standings** — per-flight PTM standings and Player of the Year points tables (handicap and scratch)
+- **Most / Least Improved** — ranks members by PTM change from the start of the season, with qualification requirements (7+ total rounds, 3+ current-year rounds)
+- **Members** — active member directory with flight assignments
+- **Pairings** — live group assignments for each tournament
+- **Info** — rules, eligibility details, and board information
 
 ## Built-in safeguards
 The platform includes practical controls to reduce operational risk:

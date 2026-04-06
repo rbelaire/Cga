@@ -4,22 +4,27 @@ This guide is for day-to-day CGA admins who run tournament operations.
 
 ## Main admin areas
 The admin experience is organized around core tournament tasks:
-- **Operations / setup** for tournament context and event prep
-- **Payments** to track who has paid
-- **Pairings** to build and publish groups
-- **Scores** to enter results by flight
-- **Users / supporting admin data** (as needed)
-- **Snapshots / Restore** for recovery and rollback support
+- **Dashboard** — workflow tracker and lifecycle overview for the active tournament
+- **Flight Management** — roster and flight assignments, credit balances per player
+- **Payments** — track who has paid per tournament
+- **Pairings** — build and publish player groups
+- **Scores / Results** — enter scores by flight, publish final results
+- **Credits** — adjust member credit balances
+- **Exports** — generate PDFs and spreadsheets from live data
+- **Snapshots / Restore** — review and restore previous data states
+- **Changelog** — audit log of key admin actions
+- **Users / Member Management** — manage member list and admin access
+- **Beginning PTM** — snapshot PTM at the start of the season for Most Improved tracking
 
-Use the workflow tracker and quick actions to move through the sequence efficiently.
+Use the workflow tracker and quick actions on the Dashboard to move through the sequence efficiently.
 
 ## Typical tournament workflow
 A practical flow most admins can follow:
-1. **Set the tournament context** and confirm the correct event.
+1. **Confirm the active tournament** from the tournament selector.
 2. **Record payments** for participating members.
-3. **Enter players into flights** (tournament roster).
+3. **Assign players to flights** in Flight Management.
 4. **Generate/post pairings** so members can view groups.
-5. **Enter scores** as they become available.
+5. **Enter scores** by flight once the event is complete.
 6. **Save Draft** while work is still in progress.
 7. **Publish Results** once scores are final and verified.
 
@@ -27,7 +32,7 @@ A practical flow most admins can follow:
 ### Save Draft
 Use this during active work.
 - Saves in-progress score entry for later.
-- Does **not** update official standings/POY tables.
+- Does **not** update official standings or POY tables.
 - Best for partial entry, corrections, and mid-process updates.
 
 ### Publish Results
@@ -42,6 +47,27 @@ When you confirm publish:
 - season standings are recalculated and updated,
 - season POY tables are recalculated and updated,
 - public/member views update immediately.
+
+## Most Improved tracking — Beginning PTM
+The **Most Improved / Least Improved** page compares each player's current PTM against their PTM at the start of the season.
+
+To set the season baseline:
+1. Go to **Beginning PTM** in the admin nav.
+2. Confirm the action — this snapshots the current PTM list as the season-start reference.
+3. Save once at the beginning of the season. Overwriting mid-season will reset all comparisons.
+
+Qualification for the Most Improved page requires a player to have 7 or more total rounds on record and at least 3 rounds in the current calendar year.
+
+## Exports
+The **Exports** panel generates downloadable files from live data:
+- Pairings PDF
+- Tournament results PDF
+- PTM list PDF
+- Credit balances PDF
+- Payments spreadsheet (XLSX)
+- Tournament info summary
+
+All exports reflect the data as it stands at the moment of generation.
 
 ## Safeguards, snapshots, and restore
 ### Safeguards
@@ -62,14 +88,15 @@ From **Snapshots / Restore**, admins can:
 Restore actions are logged for traceability.
 
 ## Best practices
-- Confirm the correct tournament before entering/editing data.
+- Confirm the correct tournament before entering or editing data.
 - Save draft frequently during score entry.
 - Cross-check names, score/PTM completeness, and obvious outliers before publish.
 - Treat publish as the final official step, not a routine save.
-- If a mistake is discovered, restore quickly and note what was corrected.
+- If a mistake is discovered after publish, restore quickly and note what was corrected in the changelog.
+- Snapshot the Beginning PTM once at the very start of the season and do not overwrite it mid-season.
 
 ## Quick reference
 - **Working in progress?** → **Save Draft**
 - **Final and verified?** → **Publish Results**
 - **Need to undo a major issue?** → **Snapshots / Restore**
-- **Not sure what’s next?** → Follow workflow tracker and quick action prompts
+- **Not sure what's next?** → Follow workflow tracker and quick action prompts on the Dashboard

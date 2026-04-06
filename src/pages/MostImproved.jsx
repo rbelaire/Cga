@@ -5,6 +5,7 @@ import { formatName } from '../utils/formatName'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 import { FLIGHT_ORDER } from '../utils/flightOrder'
+import { roundPtm } from '../utils/roundPtm'
 
 // ── Computation ──────────────────────────────────────────────────────────────
 
@@ -59,10 +60,6 @@ function buildRows(ptmList, beginningPtmList, allResults, memberFlightLookup) {
 }
 
 // ── Sub-components ───────────────────────────────────────────────────────────
-
-function roundPtm(v) {
-  return v == null ? null : Math.round(v)
-}
 
 function formatDelta(delta) {
   if (delta == null) return '—'
@@ -173,7 +170,7 @@ export default function MostImproved() {
     if (selectedFlight !== 'All') rows = rows.filter(r => r.flight === selectedFlight)
     if (search.trim()) {
       const q = search.toLowerCase()
-      rows = rows.filter(r => r.name.toLowerCase().includes(q))
+      rows = rows.filter(r => r.name?.toLowerCase().includes(q))
     }
     return rows
   }, [sortedWithRank, selectedFlight, search])
