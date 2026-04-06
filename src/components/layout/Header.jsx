@@ -6,6 +6,7 @@ const navLinks = [
   { to: '/', label: 'Home' },
   { to: '/tournaments', label: 'Tournaments' },
   { to: '/standings', label: 'Standings' },
+  { to: '/most-improved', label: 'Most Improved' },
   { to: '/members', label: 'Members' },
   { to: '/info', label: 'Info' },
   { to: '/admin', label: 'Admin', highlight: true },

@@ -151,6 +151,11 @@ export const DB = {
   saveCreditTransactions: (entries = []) => fsSet('cga/creditTransactions', { entries }),
   listenCreditTransactions: (cb) => fsListen('cga/creditTransactions', d => cb(d?.entries ?? [])),
 
+  // Beginning-of-year PTM snapshot (for Most/Least Improved)
+  getBeginningPtm:    () => fsGet('cga/beginningOfYearPtm').then(d => d?.list ?? null),
+  saveBeginningPtm:   (list) => fsSet('cga/beginningOfYearPtm', { list }),
+  listenBeginningPtm: (cb) => fsListen('cga/beginningOfYearPtm', d => cb(d?.list ?? null)),
+
   // Atomically write result, poy, and standings in a single batch
   batchPublish: async (tid, { resultDoc, newPoy, newStandings }) => {
     const batch = writeBatch(db)

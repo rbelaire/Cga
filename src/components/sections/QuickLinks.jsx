@@ -18,6 +18,16 @@ const links = [
     ),
   },
   {
+    to: '/most-improved',
+    label: 'Most Improved',
+    summary: 'Season improvement',
+    icon: (
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+      </svg>
+    ),
+  },
+  {
     to: '/standings',
     label: 'Standings',
     summary: 'Latest rankings',
@@ -71,13 +81,14 @@ export default function QuickLinks() {
     Tournaments: nextEventText,
     Standings: leaderText,
     Members: memberText,
+    'Most Improved': 'Season improvement',
     Info: 'Rules & Policies',
   }
 
   return (
     <section className="py-5 sm:py-7 bg-gray-50 border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           {links.map(({ to, label, summary, icon }) => (
             <Link
               key={label}
