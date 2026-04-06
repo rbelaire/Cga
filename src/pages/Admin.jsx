@@ -45,7 +45,6 @@ import {
 } from '../exports/pdfExports'
 import { compareFlights, FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
 import { AdminPaymentsPanel } from './admin/AdminPaymentsPanel'
-import { AdminCreditsPanel } from './admin/AdminCreditsPanel'
 import { AdminBulkImportPanel } from './admin/AdminBulkImportPanel'
 
 const FLIGHTS          = FLIGHT_ORDER
@@ -1004,11 +1003,6 @@ function AdminPanel({ currentUser }) {
 
   // flight management edit state
   const [flightSearch,  setFlightSearch]  = useState('')
-  const [creditSearch, setCreditSearch] = useState('')
-  const [creditInputs, setCreditInputs] = useState({})
-  const [fieldSearch, setFieldSearch] = useState('')
-  const [fieldFlightFilter, setFieldFlightFilter] = useState('all')
-
   // Excel import state
   const [importPreview,  setImportPreview]  = useState(null)   // { matched, unmatched } | null
   const [importSaving,   setImportSaving]   = useState(false)
@@ -1271,55 +1265,6 @@ function AdminPanel({ currentUser }) {
     })
     return lookup
   }, [currentPairings])
-  const currentFieldPlayers = useMemo(() => {
-    const membersLookup = Object.fromEntries(effectiveMembers.map(member => [member.name, member]))
-    const byName = {}
-    ALL_SCORE_TABS.forEach(flight => {
-      ;(data[tid]?.[flight] ?? []).forEach(player => {
-        const name = player?.name
-        if (!name) return
-        const rosterRecord = membersLookup[name] ?? {}
-        byName[name] = {
-          name,
-          flight: player.flight ?? rosterRecord.flight ?? (flight === 'New Players' ? null : flight),
-          tee: player.tee ?? rosterRecord.tee ?? null,
-          ptm: player.ptm ?? rosterRecord.ptm ?? null,
-          pairing: fieldPairingLookup[name] ?? null,
-        }
-      })
-    })
-    return Object.values(byName).sort(compareByLastName)
-  }, [data, tid, effectiveMembers, fieldPairingLookup])
-  const filteredFieldPlayers = useMemo(() => {
-    const search = fieldSearch.trim().toLowerCase()
-    return currentFieldPlayers.filter(player => {
-      const matchesSearch = !search || player.name.toLowerCase().includes(search) || formatName(player.name).toLowerCase().includes(search)
-      const matchesFlight = fieldFlightFilter === 'all'
-        ? true
-        : fieldFlightFilter === '__unassigned__'
-          ? !player.flight
-          : player.flight === fieldFlightFilter
-      return matchesSearch && matchesFlight
-    })
-  }, [currentFieldPlayers, fieldSearch, fieldFlightFilter])
-  const creditRoster = useMemo(() => {
-    const search = creditSearch.trim().toLowerCase()
-    return effectiveMembers
-      .filter(member => {
-        if (!search) return true
-        return member.name.toLowerCase().includes(search) || formatName(member.name).toLowerCase().includes(search)
-      })
-      .sort(compareByLastName)
-  }, [effectiveMembers, creditSearch])
-  const creditTotal = useMemo(
-    () => Object.values(credits).reduce((sum, value) => sum + (Number.isFinite(Number(value)) ? Number(value) : 0), 0),
-    [credits]
-  )
-  const creditNonZero = useMemo(
-    () => Object.values(credits).filter(value => Number.isFinite(Number(value)) && Number(value) !== 0).length,
-    [credits]
-  )
-
   // ── Score data mutations ──────────────────────────────────────────────────────
   function togglePoolSelect(name) {
     setSelectedPool(prev => {
@@ -1693,27 +1638,6 @@ function AdminPanel({ currentUser }) {
       const nextValue = Math.max(0, +(current + n).toFixed(2))
       return { ...prev, [name]: nextValue }
     })
-    setCreditInputs(prev => ({ ...prev, [name]: '' }))
-  }
-
-  function clearCredit(name) {
-    setCredits(prev => {
-      if (!(name in prev)) return prev
-      const next = { ...prev }
-      delete next[name]
-      return next
-    })
-    setCreditInputs(prev => {
-      if (!(name in prev)) return prev
-      const next = { ...prev }
-      delete next[name]
-      return next
-    })
-  }
-
-  function clearAllCredits() {
-    setCredits({})
-    setCreditInputs({})
   }
 
   async function saveCredits() {
@@ -2137,7 +2061,6 @@ function AdminPanel({ currentUser }) {
     { key: 'entries',            label: 'Entries',            Icon: ReceiptIcon,   onClick: () => setAdminMode('payments'),   active: adminMode === 'payments' },
     { key: 'pairings',           label: 'Pairings',           Icon: UsersIcon,     onClick: () => setAdminMode('pairings'),   active: adminMode === 'pairings' },
     { key: 'scores',             label: 'Scores',             Icon: GolfFlagIcon,  onClick: () => setAdminMode('scores'),     active: adminMode === 'scores' },
-    { key: 'results',            label: 'Results',            Icon: TrophyIcon,    onClick: () => setAdminMode('scores'),     active: false },
     { key: 'exports',            label: 'Exports',            Icon: ExportIcon,    onClick: () => setShowExportPanel(true),   active: false },
     { key: 'player-management',  label: 'Player Management',  Icon: FolderIcon,    onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
     { key: 'bulk-import',        label: 'Bulk Import',        Icon: FolderIcon,    onClick: () => setAdminMode('bulk-import'),active: adminMode === 'bulk-import' },
@@ -2790,20 +2713,6 @@ function AdminPanel({ currentUser }) {
         />
       )}
 
-      {adminMode === 'field' && (
-        <FieldPanel
-          tournament={tournament}
-          fieldPlayers={filteredFieldPlayers}
-          fieldCount={currentFieldPlayers.length}
-          fieldCap={dashboardWorkflow.counts.fieldCap}
-          fieldSearch={fieldSearch}
-          setFieldSearch={setFieldSearch}
-          fieldFlightFilter={fieldFlightFilter}
-          setFieldFlightFilter={setFieldFlightFilter}
-          flightTagStyles={flightTagStyles}
-        />
-      )}
-
       {publishPreview && (
         <PublishConfirmModal
           preview={publishPreview}
@@ -2877,28 +2786,6 @@ function AdminPanel({ currentUser }) {
               setImportError={setImportError}
             />
           </section>
-
-          <AdminCreditsPanel
-            creditSearch={creditSearch}
-            setCreditSearch={setCreditSearch}
-            creditNonZero={creditNonZero}
-            creditTotal={creditTotal}
-            saveCredits={saveCredits}
-            creditsSaving={creditsSaving}
-            creditsSaveStatus={creditsSaveStatus}
-            onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
-            onClearAllCredits={clearAllCredits}
-            credits={credits}
-            creditRoster={creditRoster}
-            creditInputs={creditInputs}
-            setCreditInputs={setCreditInputs}
-            applyCredit={applyCredit}
-            clearCredit={clearCredit}
-            flightTagStyles={flightTagStyles}
-            SaveBtn={SaveBtn}
-            PdfBtn={PdfBtn}
-            CheckIcon={CheckIcon}
-          />
 
           <BeginningPtmPanel livePtmData={livePtmData} logChange={logChange} openConfirm={openConfirm} />
         </div>
@@ -3291,86 +3178,6 @@ function TournamentWorkflowTracker({ workflow, actions = {} }) {
           )
         })}
       </ol>
-    </div>
-  )
-}
-
-function FieldPanel({
-  tournament,
-  fieldPlayers,
-  fieldCount,
-  fieldCap,
-  fieldSearch,
-  setFieldSearch,
-  fieldFlightFilter,
-  setFieldFlightFilter,
-  flightTagStyles,
-}) {
-  return (
-    <div className="space-y-4">
-      <section className="bg-white border border-gray-200 rounded-lg p-5">
-        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-1">Current Tournament Field</p>
-        <h2 className="text-darktext font-serif text-2xl font-semibold">{tournament?.name ?? 'No tournament selected'}</h2>
-        <p className="text-gray-500 font-sans text-sm mt-1">{fieldCount} / {fieldCap} players entered · {Math.max(fieldCap - fieldCount, 0)} spots remaining</p>
-      </section>
-
-      <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-forest px-4 py-3 flex flex-wrap items-center gap-2">
-          <span className="text-white font-sans text-sm font-semibold">Field</span>
-          <span className="text-white/60 font-mono text-xs">{fieldPlayers.length} shown</span>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              value={fieldSearch}
-              onChange={e => setFieldSearch(e.target.value)}
-              placeholder="Search players…"
-              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-gold w-44"
-            />
-            <select
-              value={fieldFlightFilter}
-              onChange={e => setFieldFlightFilter(e.target.value)}
-              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-gold"
-            >
-              <option value="all" className="text-darktext">All flights</option>
-              {FLIGHTS.map(flight => <option key={flight} value={flight} className="text-darktext">{flight}</option>)}
-              <option value="__unassigned__" className="text-darktext">Unassigned</option>
-            </select>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="table-header text-gray-500 text-left">Player</th>
-                <th className="table-header text-gray-500 text-left">Flight</th>
-                <th className="table-header text-gray-500 text-center">Tee</th>
-                <th className="table-header text-gray-500 text-left">Pairing / Group</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fieldPlayers.map((player, idx) => {
-                return (
-                  <tr key={player.name} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                    <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">{formatName(player.name)}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-xs border px-2 py-0.5 rounded-full font-sans ${player.flight ? (flightTagStyles[player.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned}`}>
-                        {player.flight ?? 'Unassigned'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center"><TeeTag tee={player.tee} /></td>
-                    <td className="px-4 py-2.5 text-sm font-sans text-gray-600">{player.pairing ?? '—'}</td>
-                  </tr>
-                )
-              })}
-              {fieldPlayers.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">No players in the active tournament field for this filter.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   )
 }
