@@ -12,8 +12,14 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let unsubProfile = null
+    let cancelled = false
+
+    const failOpenTimer = setTimeout(() => {
+      if (!cancelled) setLoading(false)
+    }, 4000)
 
     const unsubAuth = listenForAuthChanges((nextUser) => {
+      clearTimeout(failOpenTimer)
       setUser(nextUser)
       setLoading(false)
 
@@ -27,9 +33,17 @@ export function AuthProvider({ children }) {
       } else {
         setProfile(null)
       }
+    }, () => {
+      clearTimeout(failOpenTimer)
+      if (cancelled) return
+      setUser(null)
+      setProfile(null)
+      setLoading(false)
     })
 
     return () => {
+      cancelled = true
+      clearTimeout(failOpenTimer)
       unsubAuth()
       if (unsubProfile) unsubProfile()
     }
