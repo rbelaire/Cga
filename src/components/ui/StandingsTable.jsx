@@ -60,11 +60,31 @@ function CellValue({ col, row, idx, highlightTop, showBubble }) {
       {asFiniteNumber(row.poy) ?? '—'}
     </span>
   )
-  if (col.key === 'ptm') return (
-    <span className="stat-number text-darktext">{asRoundedWhole(row.ptm) ?? '—'}</span>
-  )
-  if (col.key === 'ptmDelta') {
-    return <span className="stat-number text-darktext font-medium">{formatSignedDelta(row.ptmDelta)}</span>
+  if (col.key === 'ptm') {
+    const ptm = asRoundedWhole(row.ptm)
+    const delta = typeof row.ptmDelta === 'number' ? Math.round(row.ptmDelta) : null
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span className="stat-number text-darktext">{ptm ?? '—'}</span>
+        {ptm != null && delta != null && delta !== 0 && (
+          delta > 0 ? (
+            <span className="inline-flex items-center gap-0.5 text-red-500 flex-shrink-0" title={`PTM +${delta} after last tournament`}>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+              </svg>
+              <span className="stat-number text-xs font-semibold leading-none">{delta}</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5 text-green-600 flex-shrink-0" title={`PTM −${Math.abs(delta)} after last tournament`}>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+              <span className="stat-number text-xs font-semibold leading-none">{Math.abs(delta)}</span>
+            </span>
+          )
+        )}
+      </span>
+    )
   }
   if (col.key === 'latestScore') return (
     <span className="stat-number text-darktext font-medium">{asFiniteNumber(row.latestScore) ?? '—'}</span>

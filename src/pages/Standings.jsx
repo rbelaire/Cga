@@ -7,6 +7,7 @@ import { formatName } from '../utils/formatName'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 import { FLIGHT_ORDER } from '../utils/flightOrder'
+import { roundPtm } from '../utils/roundPtm'
 
 const FLIGHTS = FLIGHT_ORDER
 const HISTORY_LABELS = ['New', '2nd', '3rd', '4th', '5th', '6th', '7th']
@@ -14,8 +15,7 @@ const HISTORY_LABELS = ['New', '2nd', '3rd', '4th', '5th', '6th', '7th']
 const sharedStandingsColumns = [
   { key: 'rank',        label: 'Rank',         sortable: false },
   { key: 'name',        label: 'Player',        sortable: true  },
-  { key: 'ptm',         label: 'PTM',           sortable: true,  tooltip: 'Points to Make — your handicap target score calculated from your last 7 rounds.' },
-  { key: 'ptmDelta',    label: 'PTM Δ',         sortable: true,  tooltip: 'Change in PTM from before vs after the latest completed tournament.' },
+  { key: 'ptm',         label: 'PTM',           sortable: true,  tooltip: 'Points to Make — your handicap target score calculated from your last 7 rounds. Arrow shows change after the latest tournament.' },
   { key: 'latestScore', label: 'Latest Score',  sortable: true,  tooltip: 'Your Stableford score at the most recent tournament.' },
   { key: 'events',      label: 'Events',        sortable: true,  tooltip: 'Number of tournaments played this season.' },
   { key: 'trend',       label: '',              sortable: false  },
@@ -31,11 +31,6 @@ const buildStandingsColumns = (mode) => {
 
 // ── PTM sub-components ───────────────────────────────────────────────────────
 
-function roundPtm(val) {
-  if (val == null) return null
-  return Math.round(val)
-}
-
 function ScoreCell({ value }) {
   if (value == null) return <span className="text-gray-300 stat-number">—</span>
   return <span className="stat-number text-darktext font-medium">{value}</span>
@@ -43,22 +38,26 @@ function ScoreCell({ value }) {
 
 function TrendArrow({ ptmDelta }) {
   if (typeof ptmDelta !== 'number') return null
-  if (Math.abs(ptmDelta) < Number.EPSILON) return null
-  if (ptmDelta > 0) {
+  const rounded = Math.round(ptmDelta)
+  if (rounded === 0) return null
+  if (rounded > 0) {
     return (
-      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="PTM increased">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-      </svg>
+      <span className="inline-flex items-center gap-0.5 text-red-500 flex-shrink-0" aria-label={`PTM increased by ${rounded}`}>
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+        </svg>
+        <span className="stat-number text-xs font-semibold leading-none">{rounded}</span>
+      </span>
     )
   }
-  if (ptmDelta < 0) {
-    return (
-      <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="PTM decreased">
+  return (
+    <span className="inline-flex items-center gap-0.5 text-green-600 flex-shrink-0" aria-label={`PTM decreased by ${Math.abs(rounded)}`}>
+      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
       </svg>
-    )
-  }
-  return null
+      <span className="stat-number text-xs font-semibold leading-none">{Math.abs(rounded)}</span>
+    </span>
+  )
 }
 
 function SortHeader({ label, colKey, sortKey, sortDir, onSort, className = '', tooltip }) {
