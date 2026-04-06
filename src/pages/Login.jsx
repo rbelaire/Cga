@@ -1,17 +1,43 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
+import { useAuth } from '../context/AuthContext'
 import { loginWithEmailPassword, loginWithGoogle } from '../lib/firebase/auth'
+
+function formatAuthError(error) {
+  const code = error?.code ?? ''
+
+  if (code === 'auth/unauthorized-domain') {
+    return 'This domain is not authorized for Google sign-in in Firebase Auth settings.'
+  }
+
+  if (code === 'auth/popup-closed-by-user') {
+    return 'Google sign-in popup was closed before completing sign-in.'
+  }
+
+  if (code === 'firestore/permission-denied') {
+    return 'Signed in, but your account does not have the required Firestore permissions yet.'
+  }
+
+  return error?.message ?? 'Sign-in failed. Please try again.'
+}
 
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { isAuthenticated } = useAuth()
   const redirectTo = location.state?.from?.pathname ?? '/admin'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(redirectTo, { replace: true })
+    }
+  }, [isAuthenticated, navigate, redirectTo])
 
   const onEmailLogin = async (event) => {
     event.preventDefault()
@@ -21,7 +47,7 @@ export default function Login() {
       await loginWithEmailPassword(email, password)
       navigate(redirectTo, { replace: true })
     } catch (err) {
-      setError(err.message)
+      setError(formatAuthError(err))
     } finally {
       setLoading(false)
     }
@@ -31,10 +57,12 @@ export default function Login() {
     setLoading(true)
     setError('')
     try {
-      await loginWithGoogle()
-      navigate(redirectTo, { replace: true })
+      const user = await loginWithGoogle()
+      if (user) {
+        navigate(redirectTo, { replace: true })
+      }
     } catch (err) {
-      setError(err.message)
+      setError(formatAuthError(err))
     } finally {
       setLoading(false)
     }
