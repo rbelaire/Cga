@@ -55,15 +55,18 @@ import { db } from './client'
  * @property {unknown=} createdAt
  */
 
-export async function upsertUserProfile(user, roles = ['member']) {
+export async function upsertUserProfile(user, roles) {
   const userRef = doc(db, 'users', user.uid)
   const existing = await getDoc(userRef)
+  const existingData = existing.exists() ? existing.data() : null
+  const nextRoles = Array.isArray(roles) ? roles : (existingData?.roles ?? ['member'])
+
   const base = {
     uid: user.uid,
     email: user.email ?? null,
     displayName: user.displayName ?? null,
     photoURL: user.photoURL ?? null,
-    roles,
+    roles: nextRoles,
     updatedAt: serverTimestamp(),
   }
 
