@@ -115,6 +115,18 @@ const FolderIcon = ({ className }) => (
   </AdminActionIcon>
 )
 
+const ArchiveIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 4h14a1 1 0 011 1v2H4V5a1 1 0 011-1zm0 4h14v12a1 1 0 01-1 1H6a1 1 0 01-1-1V8zm5 4h4" />
+  </AdminActionIcon>
+)
+
+const ClockListIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </AdminActionIcon>
+)
+
 const LockIcon = ({ className = 'w-10 h-10 text-gray-300' }) => (
   <AdminActionIcon className={className}>
     <rect x="6" y="11" width="12" height="9" rx="2" strokeWidth={2} />
@@ -971,7 +983,6 @@ function AdminPanel({ currentUser }) {
   const [paymentSearch, setPaymentSearch] = useState('')
   const [paymentCreditInputs, setPaymentCreditInputs] = useState({})
   const [userSearch, setUserSearch] = useState('')
-  const [showExportPanel, setShowExportPanel] = useState(false)
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'member' })
   const [showTournamentInfoEditor, setShowTournamentInfoEditor] = useState(false)
   const [showPastTournaments, setShowPastTournaments] = useState(false)
@@ -1010,7 +1021,7 @@ function AdminPanel({ currentUser }) {
   const [importError,    setImportError]    = useState(null)   // error message | null
   const fileInputRef = useRef(null)
   const [bulkImportType, setBulkImportType] = useState('credits')
-  const [bulkImportMode] = useState('add-only')
+  const bulkImportMode = 'add-only'
   const [bulkImportFileName, setBulkImportFileName] = useState('')
   const [bulkImportPlan, setBulkImportPlan] = useState(null)
   const [bulkImportStatus, setBulkImportStatus] = useState(null)
@@ -1129,7 +1140,7 @@ function AdminPanel({ currentUser }) {
 
   function nextLifecycleStamp() {
     lifecycleStampRef.current += 1
-    return new Date(Date.UTC(2026, 0, 1, 0, 0, lifecycleStampRef.current)).toISOString()
+    return new Date(Date.UTC(new Date().getFullYear(), 0, 1, 0, 0, lifecycleStampRef.current)).toISOString()
   }
 
   function undoRecentAction(actionId) {
@@ -1255,16 +1266,6 @@ function AdminPanel({ currentUser }) {
     ).sort((a, b) => compareByLastName(a, b)),
     [data, tid, pairedNames]
   )
-  const fieldPairingLookup = useMemo(() => {
-    const lookup = {}
-    currentPairings.forEach((card, idx) => {
-      const label = card?.pairing || `Group ${idx + 1}`
-      ;(card.players ?? []).forEach(player => {
-        if (player?.name) lookup[player.name] = label
-      })
-    })
-    return lookup
-  }, [currentPairings])
   // ── Score data mutations ──────────────────────────────────────────────────────
   function togglePoolSelect(name) {
     setSelectedPool(prev => {
@@ -2025,13 +2026,6 @@ function AdminPanel({ currentUser }) {
       saveAction: 'users',
       saving: usersSaving,
     },
-    {
-      key: 'tournament-info',
-      label: 'Tournament Info Drafts',
-      dirty: Object.values(tournamentInfoDrafts).some(d => d && Object.keys(d).length > 0),
-      saveAction: null,
-      saving: false,
-    },
   ]), [
     data, cloudScores, scoresSaving,
     pairingsDirty, pairingsSaving,
@@ -2061,10 +2055,12 @@ function AdminPanel({ currentUser }) {
     { key: 'entries',            label: 'Entries',            Icon: ReceiptIcon,   onClick: () => setAdminMode('payments'),   active: adminMode === 'payments' },
     { key: 'pairings',           label: 'Pairings',           Icon: UsersIcon,     onClick: () => setAdminMode('pairings'),   active: adminMode === 'pairings' },
     { key: 'scores',             label: 'Scores',             Icon: GolfFlagIcon,  onClick: () => setAdminMode('scores'),     active: adminMode === 'scores' },
-    { key: 'exports',            label: 'Exports',            Icon: ExportIcon,    onClick: () => setShowExportPanel(true),   active: false },
+    { key: 'exports',            label: 'Exports',            Icon: ExportIcon,    onClick: () => setAdminMode('exports'),    active: adminMode === 'exports' },
     { key: 'player-management',  label: 'Player Management',  Icon: FolderIcon,    onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
     { key: 'bulk-import',        label: 'Bulk Import',        Icon: FolderIcon,    onClick: () => setAdminMode('bulk-import'),active: adminMode === 'bulk-import' },
-    { key: 'member-management',  label: 'Member Management',  Icon: UsersIcon,     onClick: () => setAdminMode('users'),      active: adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
+    { key: 'member-management',  label: 'Member Management',  Icon: UsersIcon,     onClick: () => setAdminMode('users'),      active: adminMode === 'users' },
+    { key: 'snapshots',          label: 'Snapshots',          Icon: ArchiveIcon,   onClick: () => setAdminMode('snapshots'),  active: adminMode === 'snapshots' },
+    { key: 'changelog',          label: 'Changelog',          Icon: ClockListIcon, onClick: () => setAdminMode('changelog'),  active: adminMode === 'changelog' },
   ]
 
   async function saveAllDirtyDrafts() {
@@ -2109,7 +2105,7 @@ function AdminPanel({ currentUser }) {
     }
     if (dirtyKeys.has('credits')) setCredits(cloudCredits)
     if (dirtyKeys.has('users')) setUsersDraft(cloudUsers)
-    if (dirtyKeys.has('tournament-info')) setTournamentInfoDrafts({})
+    setTournamentInfoDrafts({})
     if (dirtyKeys.has('members')) {
       const base = Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm, tee: m.tee ?? null }]))
       setMembersOverride(base)
@@ -2608,7 +2604,7 @@ function AdminPanel({ currentUser }) {
                 if (nextWorkflowStep.key === 'memo') markMemoSent(dashboardTid)
                 if (nextWorkflowStep.key === 'birdie') generateBirdieExport(dashboardTid)
                 if (nextWorkflowStep.key === 'payout') generatePayoutDocument(dashboardTid)
-                if (nextWorkflowStep.key === 'export') setShowExportPanel(true)
+                if (nextWorkflowStep.key === 'export') setAdminMode('exports')
                 if (action.mode) setAdminMode(action.mode)
               }}
               className="inline-flex items-center justify-center rounded-md bg-forest px-3 py-2 text-xs font-sans font-semibold text-white hover:bg-forest/90"
@@ -2629,7 +2625,7 @@ function AdminPanel({ currentUser }) {
       </section>
 
       <section className="mb-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11">
           {primaryActions.map(action => (
             <button
               key={action.key}
@@ -2645,13 +2641,6 @@ function AdminPanel({ currentUser }) {
               <span>{action.label}</span>
             </button>
           ))}
-        </div>
-      </section>
-
-      <section className="mb-6">
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setAdminMode('snapshots')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Snapshots</button>
-          <button type="button" onClick={() => setAdminMode('changelog')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Changelog</button>
         </div>
       </section>
 
@@ -2709,7 +2698,6 @@ function AdminPanel({ currentUser }) {
           onMarkMemoSent={() => markMemoSent(dashboardTid)}
           onExportBirdiePool={() => generateBirdieExport(dashboardTid)}
           onGeneratePayout={() => generatePayoutDocument(dashboardTid)}
-          onGoToResults={() => setAdminMode('scores')}
         />
       )}
 
@@ -2874,18 +2862,14 @@ function AdminPanel({ currentUser }) {
         />
       )}
 
-      {showExportPanel && (
+      {adminMode === 'exports' && (
         <ExportPanel
           tournament={tournament}
           tournamentInfo={tournamentInfo}
-          membersData={membersData}
           totalPlayers={totalPlayers}
-          tournamentData={data[tid] ?? {}}
           currentPairings={currentPairings}
-          paymentMap={paymentMap}
           paymentPaidCount={paymentPaidCount}
           credits={credits}
-          onClose={() => setShowExportPanel(false)}
           onOpenTournamentInfoEditor={() => setShowTournamentInfoEditor(true)}
           onExportPtmPDF={() => exportPtmPDF(membersData)}
           onExportPtmXLSX={() => exportPtmXLSX(membersData)}
@@ -3019,14 +3003,14 @@ function AdminPanel({ currentUser }) {
 function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
-  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout, onGoToResults,
+  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout,
 }) {
   const lifecycleActions = {
     memo: { label: 'Mark Sent', action: onMarkMemoSent },
     field: { label: 'Review Entries', action: onGoToPayments },
     pairingsLifecycle: { label: workflow.counts.pairingsState === 'published' ? 'Edit Pairings' : 'Generate Pairings', action: onGoToPairings },
     birdie: { label: 'Export', action: onExportBirdiePool },
-    scoresLifecycle: { label: workflow.counts.resultsPublished ? 'View Results' : 'Enter Scores', action: workflow.counts.resultsPublished ? onGoToResults : onGoToScores },
+    scoresLifecycle: { label: workflow.counts.resultsPublished ? 'View Results' : 'Enter Scores', action: onGoToScores },
     payout: { label: 'Generate', action: onGeneratePayout },
   }
 
@@ -3046,8 +3030,7 @@ function DashboardPanel({
         <div className="mt-4 flex flex-wrap gap-2">
           <button onClick={onGoToPayments} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Entries</button>
           <button onClick={onGoToPairings} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Pairings</button>
-          <button onClick={onGoToScores} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Scores</button>
-          <button onClick={onGoToResults} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Results</button>
+          <button onClick={onGoToScores} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Scores / Results</button>
         </div>
       </section>
 
@@ -3690,25 +3673,22 @@ function UsersPanel({
 }
 
 function ExportPanel({
-  tournament, tournamentInfo, totalPlayers, currentPairings, paymentPaidCount, credits, onClose,
+  tournament, tournamentInfo, totalPlayers, currentPairings, paymentPaidCount, credits,
   onOpenTournamentInfoEditor, onExportPtmPDF, onExportPtmXLSX, onExportResultsPDF, onExportResultsXLSX,
   onExportPairingsPDF, onExportPaymentsPDF, onExportPaymentsXLSX, onExportCreditsPDF,
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 p-4 flex items-end sm:items-center sm:justify-center">
-      <div className="w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-xl">
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold font-sans text-forest">Export</h3>
-          <button onClick={onClose} className="px-2.5 py-1.5 text-xs rounded-md border border-gray-300">Close</button>
-        </div>
-        <div className="divide-y divide-gray-100">
-          <ExportRow title="Tournament Info" description="Registration sheet with date, course, entry fee, and Venmo QR"><PdfBtn onClick={onOpenTournamentInfoEditor} disabled={!tournamentInfo}>PDF</PdfBtn></ExportRow>
-          <ExportRow title="Points to Make — Full Roster" description="All members grouped by flight with their PTM targets"><PdfBtn onClick={onExportPtmPDF}>PDF</PdfBtn><XlsxBtn onClick={onExportPtmXLSX}>Excel</XlsxBtn></ExportRow>
-          <ExportRow title="Tournament Results" description="Per-flight leaderboard with rank, score, +/−, and POY points"><PdfBtn onClick={onExportResultsPDF} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportResultsXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
-          <ExportRow title="Pairings" description="Tee-time groupings for the round"><PdfBtn onClick={onExportPairingsPDF} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn></ExportRow>
-          <ExportRow title="Payment Status" description="List of paid players with Venmo QR code"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
-          <ExportRow title="Credit on Books" description="Member credit balances with totals"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn></ExportRow>
-        </div>
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-forest px-4 py-2.5">
+        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-white/70">Exports</p>
+      </div>
+      <div className="divide-y divide-gray-100">
+        <ExportRow title="Tournament Info" description="Registration sheet with date, course, entry fee, and Venmo QR"><PdfBtn onClick={onOpenTournamentInfoEditor} disabled={!tournamentInfo}>PDF</PdfBtn></ExportRow>
+        <ExportRow title="Points to Make — Full Roster" description="All members grouped by flight with their PTM targets"><PdfBtn onClick={onExportPtmPDF}>PDF</PdfBtn><XlsxBtn onClick={onExportPtmXLSX}>Excel</XlsxBtn></ExportRow>
+        <ExportRow title="Tournament Results" description="Per-flight leaderboard with rank, score, +/−, and POY points"><PdfBtn onClick={onExportResultsPDF} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportResultsXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
+        <ExportRow title="Pairings" description="Tee-time groupings for the round"><PdfBtn onClick={onExportPairingsPDF} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn></ExportRow>
+        <ExportRow title="Payment Status" description="List of paid players with Venmo QR code"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
+        <ExportRow title="Credit on Books" description="Member credit balances with totals"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn></ExportRow>
       </div>
     </div>
   )
@@ -3779,7 +3759,7 @@ function ScoreEntryPanel({
               <LockIcon className="w-10 h-10 text-gray-300 mb-3 opacity-70" />
               <p className="font-sans font-semibold text-darktext mb-1">Score entry locked</p>
               <p className="text-gray-400 font-sans text-sm mb-4">
-                Post pairings first — Step 2 above.
+                Pairings must be published before scores can be entered.
               </p>
               <button onClick={onGoToPairings} className="btn-primary text-sm">
                 Go to Pairings →
@@ -4267,6 +4247,7 @@ function FlightManagementPanel({
   const [editingRows, setEditingRows] = useState({})
   const [rowDrafts, setRowDrafts] = useState({})
   const [creditAdjustments, setCreditAdjustments] = useState({})
+  const [creditAppliedFlash, setCreditAppliedFlash] = useState({})
   const [selectedRows, setSelectedRows] = useState(new Set())
   const [bulkFlight, setBulkFlight] = useState('')
   const [bulkTee, setBulkTee] = useState('')
@@ -4383,6 +4364,8 @@ function FlightManagementPanel({
     if (!Number.isFinite(parsed) || parsed === 0) return
     applyCredit(name, parsed)
     setCreditAdjustments(prev => ({ ...prev, [name]: '' }))
+    setCreditAppliedFlash(prev => ({ ...prev, [name]: true }))
+    setTimeout(() => setCreditAppliedFlash(prev => ({ ...prev, [name]: false })), 1500)
   }
 
   function toggleSelect(name) {
@@ -4697,7 +4680,7 @@ function FlightManagementPanel({
                           onClick={() => applyRowCredit(row.name)}
                           disabled={!creditAdjustments[row.name]}
                           title="Apply adjustment"
-                          className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
+                          className={`w-7 h-7 flex items-center justify-center rounded text-sm font-bold disabled:opacity-30 transition-colors ${creditAppliedFlash[row.name] ? 'bg-green-600 text-white' : 'bg-forest text-white hover:bg-forest/80'}`}
                         >
                           ✓
                         </button>
