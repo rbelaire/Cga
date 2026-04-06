@@ -1023,7 +1023,7 @@ function AdminPanel({ currentUser }) {
       tournamentId: tid || null,
       user: currentUser || 'Admin',
     })
-    DB.appendChangelog(entry).catch(() => {}) // fire-and-forget, non-critical
+    DB.appendChangelog(entry).catch(err => console.warn('[CGA] Failed to write changelog entry:', err))
   }
 
   function blockOnValidation(errors) {
@@ -1832,7 +1832,7 @@ function AdminPanel({ currentUser }) {
       const nextBalance = toMoney(available - creditUsed)
       setCredits(prev => ({ ...prev, [name]: nextBalance }))
       const transaction = createCreditTxn({ name, tournamentId, creditUsed, user: currentUser })
-      DB.appendCreditTransaction(transaction).catch(() => {})
+      DB.appendCreditTransaction(transaction).catch(err => console.warn('[CGA] Failed to log credit transaction:', err))
     }
     setTournamentPaidStatus(tournamentId, name, true, { creditUsed })
   }
@@ -2430,11 +2430,11 @@ function AdminPanel({ currentUser }) {
         saveSnapshot('standings', currentStandings, `Before publish ${payload.targetTid}`, payload.targetTid),
         saveSnapshot('poy', currentPoy, `Before publish ${payload.targetTid}`, payload.targetTid),
       ])
-      await Promise.all([
-        DB.saveResult(payload.targetTid, payload.resultDoc),
-        DB.savePoy(payload.newPoy),
-        DB.saveStandings(payload.newStandings),
-      ])
+      await DB.batchPublish(payload.targetTid, {
+        resultDoc: payload.resultDoc,
+        newPoy: payload.newPoy,
+        newStandings: payload.newStandings,
+      })
     }, setAdminError)
     if (ok) {
       const t = schedule.find(s => s.id === payload.targetTid)
@@ -2481,7 +2481,7 @@ function AdminPanel({ currentUser }) {
       },
     }
     setTournamentLifecycle(nextLifecycle)
-    await DB.saveTournamentLifecycle(nextLifecycle).catch(() => {})
+    await DB.saveTournamentLifecycle(nextLifecycle).catch(err => console.warn('[CGA] Failed to save tournament lifecycle:', err))
   }
 
   async function generatePayoutDocument(targetTid = tid) {
@@ -2498,7 +2498,7 @@ function AdminPanel({ currentUser }) {
       },
     }
     setTournamentLifecycle(nextLifecycle)
-    await DB.saveTournamentLifecycle(nextLifecycle).catch(() => {})
+    await DB.saveTournamentLifecycle(nextLifecycle).catch(err => console.warn('[CGA] Failed to save tournament lifecycle:', err))
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────

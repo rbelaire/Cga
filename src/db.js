@@ -16,7 +16,7 @@
  */
 import { db } from './firebase'
 import {
-  doc, getDoc, setDoc, onSnapshot, updateDoc, arrayUnion,
+  doc, getDoc, setDoc, onSnapshot, updateDoc, arrayUnion, writeBatch,
 } from 'firebase/firestore'
 
 const REF = (path) => doc(db, path)
@@ -150,4 +150,14 @@ export const DB = {
   },
   saveCreditTransactions: (entries = []) => fsSet('cga/creditTransactions', { entries }),
   listenCreditTransactions: (cb) => fsListen('cga/creditTransactions', d => cb(d?.entries ?? [])),
+
+  // Atomically write result, poy, and standings in a single batch
+  batchPublish: async (tid, { resultDoc, newPoy, newStandings }) => {
+    const batch = writeBatch(db)
+    // results uses merge to preserve other tournament entries in the map
+    batch.set(REF('cga/results'), { data: { [tid]: resultDoc } }, { merge: true })
+    batch.set(REF('cga/poy'), newPoy)
+    batch.set(REF('cga/standings'), newStandings)
+    await batch.commit()
+  },
 }

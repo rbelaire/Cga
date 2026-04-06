@@ -9,6 +9,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
@@ -25,10 +30,9 @@ service cloud.firestore {
       allow read, write: if isOwner(request.resource.data.uid) || isOwner(resource.data.uid);
     }
 
-    // Existing CGA docs are intentionally broad for now. Tighten as needed.
     match /cga/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }

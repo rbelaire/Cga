@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
 import Header from './components/layout/Header'
 import Footer from './components/layout/Footer'
@@ -6,12 +7,15 @@ import Tournaments from './pages/Tournaments'
 import Standings from './pages/Standings'
 import Members from './pages/Members'
 import Info from './pages/Info'
-import Admin from './pages/Admin'
 import Pairings from './pages/Pairings'
 import Sponsors from './pages/Sponsors'
 import TournamentDetail from './pages/TournamentDetail'
 import Login from './pages/Login'
 import ProtectedRoute from './components/auth/ProtectedRoute'
+
+// Admin is lazy-loaded so its heavy dependencies (jsPDF, XLSX) are excluded
+// from the main bundle and only fetched when a user navigates to /admin.
+const Admin = lazy(() => import('./pages/Admin'))
 
 function NotFound() {
   return (
@@ -37,7 +41,13 @@ export default function App() {
           <Route path="/members" element={<Members />} />
           <Route path="/info" element={<Info />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center py-24"><span className="text-gray-400 font-sans text-sm">Loading admin…</span></div>}>
+                <Admin />
+              </Suspense>
+            </ProtectedRoute>
+          } />
           <Route path="/pairings/:tournamentId" element={<Pairings />} />
           <Route path="/sponsors" element={<Sponsors />} />
           {/* Legacy redirects */}
