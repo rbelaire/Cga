@@ -5,9 +5,10 @@ import SearchBar from '../components/ui/SearchBar'
 import { compareByLastName } from '../utils/formatName'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
+import { FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
 
-const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
-const TABS = ['All', ...FLIGHTS, 'New Players']
+const FLIGHTS = FLIGHT_ORDER
+const TABS = ['All', ...FLIGHTS, NEW_PLAYERS_FLIGHT]
 
 export default function Members() {
   useEffect(() => { document.title = 'Members | CGA 2026' }, [])
@@ -91,7 +92,7 @@ export default function Members() {
 
   const baseList = useMemo(() => {
     if (tab === 'All') return [...enrichedMembers].sort(compareByLastName)
-    if (tab === 'New Players') return newPlayers
+    if (tab === NEW_PLAYERS_FLIGHT) return newPlayers
     return byFlight[tab] ?? []
   }, [tab, enrichedMembers, byFlight, newPlayers])
 
@@ -128,7 +129,7 @@ export default function Members() {
               {label}
               {label !== 'All' && (
                 <span className="ml-1.5 text-xs opacity-70">
-                  ({label === 'New Players' ? newPlayers.length : (byFlight[label] ?? []).length})
+                  ({label === NEW_PLAYERS_FLIGHT ? newPlayers.length : (byFlight[label] ?? []).length})
                 </span>
               )}
             </button>

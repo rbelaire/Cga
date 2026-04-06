@@ -8,8 +8,9 @@ import { formatName } from '../utils/formatName'
 import { computeScratch } from '../utils/computeScratch'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
+import { FLIGHT_ORDER } from '../utils/flightOrder'
 
-const FLIGHTS = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+const FLIGHTS = FLIGHT_ORDER
 
 export default function Home() {
   useEffect(() => { document.title = 'Carencro Golf Association' }, [])

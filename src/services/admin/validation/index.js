@@ -1,4 +1,6 @@
-const SCORE_FLIGHTS_DEFAULT = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight', 'New Players']
+import { SCORE_FLIGHTS } from '../../../utils/flightOrder.js'
+
+const SCORE_FLIGHTS_DEFAULT = SCORE_FLIGHTS
 
 function hasText(v) {
   return typeof v === 'string' && v.trim().length > 0
