@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { formatName } from '../../utils/formatName'
 
 function isBubble(rounds) {
@@ -120,7 +120,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3, showBu
     )
   }
 
-  const sorted = sortKey
+  const sorted = useMemo(() => sortKey
     ? [...data].sort((a, b) => {
         const av = a[sortKey]
         const bv = b[sortKey]
@@ -130,7 +130,7 @@ export default function StandingsTable({ data, columns, highlightTop = 3, showBu
         const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv
         return sortDir === 'asc' ? cmp : -cmp
       })
-    : data
+    : data, [data, sortKey, sortDir])
 
   const metricCols = defaultColumns.filter(c => !['rank', 'name', 'trend'].includes(c.key))
   const primaryMetricCol = metricCols.find((c) => ['poy', 'scratchPts', 'points'].includes(c.key))

@@ -16,7 +16,7 @@ export function AuthProvider({ children }) {
 
     const failOpenTimer = setTimeout(() => {
       if (!cancelled) setLoading(false)
-    }, 4000)
+    }, 10000)
 
     const unsubAuth = listenForAuthChanges((nextUser) => {
       clearTimeout(failOpenTimer)
