@@ -63,6 +63,13 @@ test('vite base path and hash router are configured for GitHub Pages', () => {
   assert.match(appSource, /<HashRouter>/)
 })
 
+
+test('404 fallback redirects deep links to hash routes', () => {
+  const fallback = read('public/404.html')
+  assert.match(fallback, /window\.location\.replace\(nextUrl\)/)
+  assert.match(fallback, /var\s+base\s*=\s*'\/Cga\/'/)
+})
+
 test('sponsor data does not use placeholder domains', () => {
   const sponsors = JSON.parse(read('src/data/sponsors.json'))
   const badUrls = Object.values(sponsors)

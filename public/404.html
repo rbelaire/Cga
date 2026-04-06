@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CGA Redirect</title>
+    <script>
+      (function redirectToHashRoute() {
+        var path = window.location.pathname || '/'
+        var search = window.location.search || ''
+        var hash = window.location.hash || ''
+        var base = '/Cga/'
+
+        if (path.indexOf(base) !== 0) {
+          window.location.replace(base)
+          return
+        }
+
+        var route = path.slice(base.length)
+        var normalized = route ? '/' + route.replace(/^\/+/, '') : '/'
+        var nextUrl = base + '#' + normalized + search + hash
+        window.location.replace(nextUrl)
+      })()
+    </script>
+  </head>
+  <body></body>
+</html>

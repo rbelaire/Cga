@@ -10,8 +10,8 @@ import { upsertUserProfile } from './firestore'
 
 const googleProvider = new GoogleAuthProvider()
 
-export function listenForAuthChanges(callback) {
-  return onAuthStateChanged(auth, callback)
+export function listenForAuthChanges(callback, onError) {
+  return onAuthStateChanged(auth, callback, onError)
 }
 
 export async function loginWithEmailPassword(email, password) {
