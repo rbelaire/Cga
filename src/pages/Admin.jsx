@@ -45,7 +45,6 @@ import {
 } from '../exports/pdfExports'
 import { compareFlights, FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
 import { AdminPaymentsPanel } from './admin/AdminPaymentsPanel'
-import { AdminCreditsPanel } from './admin/AdminCreditsPanel'
 import { AdminBulkImportPanel } from './admin/AdminBulkImportPanel'
 
 const FLIGHTS          = FLIGHT_ORDER
@@ -113,6 +112,18 @@ const ExportIcon = ({ className }) => (
 const FolderIcon = ({ className }) => (
   <AdminActionIcon className={className}>
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h6l2 2h10v10H3V7z" />
+  </AdminActionIcon>
+)
+
+const ArchiveIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 4h14a1 1 0 011 1v2H4V5a1 1 0 011-1zm0 4h14v12a1 1 0 01-1 1H6a1 1 0 01-1-1V8zm5 4h4" />
+  </AdminActionIcon>
+)
+
+const ClockListIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
   </AdminActionIcon>
 )
 
@@ -972,7 +983,6 @@ function AdminPanel({ currentUser }) {
   const [paymentSearch, setPaymentSearch] = useState('')
   const [paymentCreditInputs, setPaymentCreditInputs] = useState({})
   const [userSearch, setUserSearch] = useState('')
-  const [showExportPanel, setShowExportPanel] = useState(false)
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'member' })
   const [showTournamentInfoEditor, setShowTournamentInfoEditor] = useState(false)
   const [showPastTournaments, setShowPastTournaments] = useState(false)
@@ -1004,11 +1014,6 @@ function AdminPanel({ currentUser }) {
 
   // flight management edit state
   const [flightSearch,  setFlightSearch]  = useState('')
-  const [creditSearch, setCreditSearch] = useState('')
-  const [creditInputs, setCreditInputs] = useState({})
-  const [fieldSearch, setFieldSearch] = useState('')
-  const [fieldFlightFilter, setFieldFlightFilter] = useState('all')
-
   // Excel import state
   const [importPreview,  setImportPreview]  = useState(null)   // { matched, unmatched } | null
   const [importSaving,   setImportSaving]   = useState(false)
@@ -1016,7 +1021,7 @@ function AdminPanel({ currentUser }) {
   const [importError,    setImportError]    = useState(null)   // error message | null
   const fileInputRef = useRef(null)
   const [bulkImportType, setBulkImportType] = useState('credits')
-  const [bulkImportMode] = useState('add-only')
+  const bulkImportMode = 'add-only'
   const [bulkImportFileName, setBulkImportFileName] = useState('')
   const [bulkImportPlan, setBulkImportPlan] = useState(null)
   const [bulkImportStatus, setBulkImportStatus] = useState(null)
@@ -1135,7 +1140,7 @@ function AdminPanel({ currentUser }) {
 
   function nextLifecycleStamp() {
     lifecycleStampRef.current += 1
-    return new Date(Date.UTC(2026, 0, 1, 0, 0, lifecycleStampRef.current)).toISOString()
+    return new Date(Date.UTC(new Date().getFullYear(), 0, 1, 0, 0, lifecycleStampRef.current)).toISOString()
   }
 
   function undoRecentAction(actionId) {
@@ -1261,65 +1266,6 @@ function AdminPanel({ currentUser }) {
     ).sort((a, b) => compareByLastName(a, b)),
     [data, tid, pairedNames]
   )
-  const fieldPairingLookup = useMemo(() => {
-    const lookup = {}
-    currentPairings.forEach((card, idx) => {
-      const label = card?.pairing || `Group ${idx + 1}`
-      ;(card.players ?? []).forEach(player => {
-        if (player?.name) lookup[player.name] = label
-      })
-    })
-    return lookup
-  }, [currentPairings])
-  const currentFieldPlayers = useMemo(() => {
-    const membersLookup = Object.fromEntries(effectiveMembers.map(member => [member.name, member]))
-    const byName = {}
-    ALL_SCORE_TABS.forEach(flight => {
-      ;(data[tid]?.[flight] ?? []).forEach(player => {
-        const name = player?.name
-        if (!name) return
-        const rosterRecord = membersLookup[name] ?? {}
-        byName[name] = {
-          name,
-          flight: player.flight ?? rosterRecord.flight ?? (flight === 'New Players' ? null : flight),
-          tee: player.tee ?? rosterRecord.tee ?? null,
-          ptm: player.ptm ?? rosterRecord.ptm ?? null,
-          pairing: fieldPairingLookup[name] ?? null,
-        }
-      })
-    })
-    return Object.values(byName).sort(compareByLastName)
-  }, [data, tid, effectiveMembers, fieldPairingLookup])
-  const filteredFieldPlayers = useMemo(() => {
-    const search = fieldSearch.trim().toLowerCase()
-    return currentFieldPlayers.filter(player => {
-      const matchesSearch = !search || player.name.toLowerCase().includes(search) || formatName(player.name).toLowerCase().includes(search)
-      const matchesFlight = fieldFlightFilter === 'all'
-        ? true
-        : fieldFlightFilter === '__unassigned__'
-          ? !player.flight
-          : player.flight === fieldFlightFilter
-      return matchesSearch && matchesFlight
-    })
-  }, [currentFieldPlayers, fieldSearch, fieldFlightFilter])
-  const creditRoster = useMemo(() => {
-    const search = creditSearch.trim().toLowerCase()
-    return effectiveMembers
-      .filter(member => {
-        if (!search) return true
-        return member.name.toLowerCase().includes(search) || formatName(member.name).toLowerCase().includes(search)
-      })
-      .sort(compareByLastName)
-  }, [effectiveMembers, creditSearch])
-  const creditTotal = useMemo(
-    () => Object.values(credits).reduce((sum, value) => sum + (Number.isFinite(Number(value)) ? Number(value) : 0), 0),
-    [credits]
-  )
-  const creditNonZero = useMemo(
-    () => Object.values(credits).filter(value => Number.isFinite(Number(value)) && Number(value) !== 0).length,
-    [credits]
-  )
-
   // ── Score data mutations ──────────────────────────────────────────────────────
   function togglePoolSelect(name) {
     setSelectedPool(prev => {
@@ -1693,27 +1639,6 @@ function AdminPanel({ currentUser }) {
       const nextValue = Math.max(0, +(current + n).toFixed(2))
       return { ...prev, [name]: nextValue }
     })
-    setCreditInputs(prev => ({ ...prev, [name]: '' }))
-  }
-
-  function clearCredit(name) {
-    setCredits(prev => {
-      if (!(name in prev)) return prev
-      const next = { ...prev }
-      delete next[name]
-      return next
-    })
-    setCreditInputs(prev => {
-      if (!(name in prev)) return prev
-      const next = { ...prev }
-      delete next[name]
-      return next
-    })
-  }
-
-  function clearAllCredits() {
-    setCredits({})
-    setCreditInputs({})
   }
 
   async function saveCredits() {
@@ -2101,13 +2026,6 @@ function AdminPanel({ currentUser }) {
       saveAction: 'users',
       saving: usersSaving,
     },
-    {
-      key: 'tournament-info',
-      label: 'Tournament Info Drafts',
-      dirty: Object.values(tournamentInfoDrafts).some(d => d && Object.keys(d).length > 0),
-      saveAction: null,
-      saving: false,
-    },
   ]), [
     data, cloudScores, scoresSaving,
     pairingsDirty, pairingsSaving,
@@ -2137,11 +2055,12 @@ function AdminPanel({ currentUser }) {
     { key: 'entries',            label: 'Entries',            Icon: ReceiptIcon,   onClick: () => setAdminMode('payments'),   active: adminMode === 'payments' },
     { key: 'pairings',           label: 'Pairings',           Icon: UsersIcon,     onClick: () => setAdminMode('pairings'),   active: adminMode === 'pairings' },
     { key: 'scores',             label: 'Scores',             Icon: GolfFlagIcon,  onClick: () => setAdminMode('scores'),     active: adminMode === 'scores' },
-    { key: 'results',            label: 'Results',            Icon: TrophyIcon,    onClick: () => setAdminMode('scores'),     active: false },
-    { key: 'exports',            label: 'Exports',            Icon: ExportIcon,    onClick: () => setShowExportPanel(true),   active: false },
+    { key: 'exports',            label: 'Exports',            Icon: ExportIcon,    onClick: () => setAdminMode('exports'),    active: adminMode === 'exports' },
     { key: 'player-management',  label: 'Player Management',  Icon: FolderIcon,    onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
     { key: 'bulk-import',        label: 'Bulk Import',        Icon: FolderIcon,    onClick: () => setAdminMode('bulk-import'),active: adminMode === 'bulk-import' },
-    { key: 'member-management',  label: 'Member Management',  Icon: UsersIcon,     onClick: () => setAdminMode('users'),      active: adminMode === 'users' || adminMode === 'snapshots' || adminMode === 'changelog' },
+    { key: 'member-management',  label: 'Member Management',  Icon: UsersIcon,     onClick: () => setAdminMode('users'),      active: adminMode === 'users' },
+    { key: 'snapshots',          label: 'Snapshots',          Icon: ArchiveIcon,   onClick: () => setAdminMode('snapshots'),  active: adminMode === 'snapshots' },
+    { key: 'changelog',          label: 'Changelog',          Icon: ClockListIcon, onClick: () => setAdminMode('changelog'),  active: adminMode === 'changelog' },
   ]
 
   async function saveAllDirtyDrafts() {
@@ -2186,7 +2105,7 @@ function AdminPanel({ currentUser }) {
     }
     if (dirtyKeys.has('credits')) setCredits(cloudCredits)
     if (dirtyKeys.has('users')) setUsersDraft(cloudUsers)
-    if (dirtyKeys.has('tournament-info')) setTournamentInfoDrafts({})
+    setTournamentInfoDrafts({})
     if (dirtyKeys.has('members')) {
       const base = Object.fromEntries((membersData || []).map(m => [m.name, { flight: m.flight, ptm: m.ptm, tee: m.tee ?? null }]))
       setMembersOverride(base)
@@ -2685,7 +2604,7 @@ function AdminPanel({ currentUser }) {
                 if (nextWorkflowStep.key === 'memo') markMemoSent(dashboardTid)
                 if (nextWorkflowStep.key === 'birdie') generateBirdieExport(dashboardTid)
                 if (nextWorkflowStep.key === 'payout') generatePayoutDocument(dashboardTid)
-                if (nextWorkflowStep.key === 'export') setShowExportPanel(true)
+                if (nextWorkflowStep.key === 'export') setAdminMode('exports')
                 if (action.mode) setAdminMode(action.mode)
               }}
               className="inline-flex items-center justify-center rounded-md bg-forest px-3 py-2 text-xs font-sans font-semibold text-white hover:bg-forest/90"
@@ -2706,7 +2625,7 @@ function AdminPanel({ currentUser }) {
       </section>
 
       <section className="mb-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11">
           {primaryActions.map(action => (
             <button
               key={action.key}
@@ -2722,13 +2641,6 @@ function AdminPanel({ currentUser }) {
               <span>{action.label}</span>
             </button>
           ))}
-        </div>
-      </section>
-
-      <section className="mb-6">
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setAdminMode('snapshots')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Snapshots</button>
-          <button type="button" onClick={() => setAdminMode('changelog')} className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-sans font-semibold text-gray-700 hover:border-gray-400 hover:text-darktext">Changelog</button>
         </div>
       </section>
 
@@ -2786,21 +2698,6 @@ function AdminPanel({ currentUser }) {
           onMarkMemoSent={() => markMemoSent(dashboardTid)}
           onExportBirdiePool={() => generateBirdieExport(dashboardTid)}
           onGeneratePayout={() => generatePayoutDocument(dashboardTid)}
-          onGoToResults={() => setAdminMode('scores')}
-        />
-      )}
-
-      {adminMode === 'field' && (
-        <FieldPanel
-          tournament={tournament}
-          fieldPlayers={filteredFieldPlayers}
-          fieldCount={currentFieldPlayers.length}
-          fieldCap={dashboardWorkflow.counts.fieldCap}
-          fieldSearch={fieldSearch}
-          setFieldSearch={setFieldSearch}
-          fieldFlightFilter={fieldFlightFilter}
-          setFieldFlightFilter={setFieldFlightFilter}
-          flightTagStyles={flightTagStyles}
         />
       )}
 
@@ -2877,28 +2774,6 @@ function AdminPanel({ currentUser }) {
               setImportError={setImportError}
             />
           </section>
-
-          <AdminCreditsPanel
-            creditSearch={creditSearch}
-            setCreditSearch={setCreditSearch}
-            creditNonZero={creditNonZero}
-            creditTotal={creditTotal}
-            saveCredits={saveCredits}
-            creditsSaving={creditsSaving}
-            creditsSaveStatus={creditsSaveStatus}
-            onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
-            onClearAllCredits={clearAllCredits}
-            credits={credits}
-            creditRoster={creditRoster}
-            creditInputs={creditInputs}
-            setCreditInputs={setCreditInputs}
-            applyCredit={applyCredit}
-            clearCredit={clearCredit}
-            flightTagStyles={flightTagStyles}
-            SaveBtn={SaveBtn}
-            PdfBtn={PdfBtn}
-            CheckIcon={CheckIcon}
-          />
 
           <BeginningPtmPanel livePtmData={livePtmData} logChange={logChange} openConfirm={openConfirm} />
         </div>
@@ -2987,18 +2862,14 @@ function AdminPanel({ currentUser }) {
         />
       )}
 
-      {showExportPanel && (
+      {adminMode === 'exports' && (
         <ExportPanel
           tournament={tournament}
           tournamentInfo={tournamentInfo}
-          membersData={membersData}
           totalPlayers={totalPlayers}
-          tournamentData={data[tid] ?? {}}
           currentPairings={currentPairings}
-          paymentMap={paymentMap}
           paymentPaidCount={paymentPaidCount}
           credits={credits}
-          onClose={() => setShowExportPanel(false)}
           onOpenTournamentInfoEditor={() => setShowTournamentInfoEditor(true)}
           onExportPtmPDF={() => exportPtmPDF(membersData)}
           onExportPtmXLSX={() => exportPtmXLSX(membersData)}
@@ -3132,14 +3003,14 @@ function AdminPanel({ currentUser }) {
 function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
-  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout, onGoToResults,
+  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout,
 }) {
   const lifecycleActions = {
     memo: { label: 'Mark Sent', action: onMarkMemoSent },
     field: { label: 'Review Entries', action: onGoToPayments },
     pairingsLifecycle: { label: workflow.counts.pairingsState === 'published' ? 'Edit Pairings' : 'Generate Pairings', action: onGoToPairings },
     birdie: { label: 'Export', action: onExportBirdiePool },
-    scoresLifecycle: { label: workflow.counts.resultsPublished ? 'View Results' : 'Enter Scores', action: workflow.counts.resultsPublished ? onGoToResults : onGoToScores },
+    scoresLifecycle: { label: workflow.counts.resultsPublished ? 'View Results' : 'Enter Scores', action: onGoToScores },
     payout: { label: 'Generate', action: onGeneratePayout },
   }
 
@@ -3159,8 +3030,7 @@ function DashboardPanel({
         <div className="mt-4 flex flex-wrap gap-2">
           <button onClick={onGoToPayments} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Entries</button>
           <button onClick={onGoToPairings} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Pairings</button>
-          <button onClick={onGoToScores} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Scores</button>
-          <button onClick={onGoToResults} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Results</button>
+          <button onClick={onGoToScores} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Scores / Results</button>
         </div>
       </section>
 
@@ -3291,86 +3161,6 @@ function TournamentWorkflowTracker({ workflow, actions = {} }) {
           )
         })}
       </ol>
-    </div>
-  )
-}
-
-function FieldPanel({
-  tournament,
-  fieldPlayers,
-  fieldCount,
-  fieldCap,
-  fieldSearch,
-  setFieldSearch,
-  fieldFlightFilter,
-  setFieldFlightFilter,
-  flightTagStyles,
-}) {
-  return (
-    <div className="space-y-4">
-      <section className="bg-white border border-gray-200 rounded-lg p-5">
-        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-1">Current Tournament Field</p>
-        <h2 className="text-darktext font-serif text-2xl font-semibold">{tournament?.name ?? 'No tournament selected'}</h2>
-        <p className="text-gray-500 font-sans text-sm mt-1">{fieldCount} / {fieldCap} players entered · {Math.max(fieldCap - fieldCount, 0)} spots remaining</p>
-      </section>
-
-      <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-forest px-4 py-3 flex flex-wrap items-center gap-2">
-          <span className="text-white font-sans text-sm font-semibold">Field</span>
-          <span className="text-white/60 font-mono text-xs">{fieldPlayers.length} shown</span>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              value={fieldSearch}
-              onChange={e => setFieldSearch(e.target.value)}
-              placeholder="Search players…"
-              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-gold w-44"
-            />
-            <select
-              value={fieldFlightFilter}
-              onChange={e => setFieldFlightFilter(e.target.value)}
-              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-gold"
-            >
-              <option value="all" className="text-darktext">All flights</option>
-              {FLIGHTS.map(flight => <option key={flight} value={flight} className="text-darktext">{flight}</option>)}
-              <option value="__unassigned__" className="text-darktext">Unassigned</option>
-            </select>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="table-header text-gray-500 text-left">Player</th>
-                <th className="table-header text-gray-500 text-left">Flight</th>
-                <th className="table-header text-gray-500 text-center">Tee</th>
-                <th className="table-header text-gray-500 text-left">Pairing / Group</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fieldPlayers.map((player, idx) => {
-                return (
-                  <tr key={player.name} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                    <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">{formatName(player.name)}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-xs border px-2 py-0.5 rounded-full font-sans ${player.flight ? (flightTagStyles[player.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned}`}>
-                        {player.flight ?? 'Unassigned'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center"><TeeTag tee={player.tee} /></td>
-                    <td className="px-4 py-2.5 text-sm font-sans text-gray-600">{player.pairing ?? '—'}</td>
-                  </tr>
-                )
-              })}
-              {fieldPlayers.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">No players in the active tournament field for this filter.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   )
 }
@@ -3883,25 +3673,22 @@ function UsersPanel({
 }
 
 function ExportPanel({
-  tournament, tournamentInfo, totalPlayers, currentPairings, paymentPaidCount, credits, onClose,
+  tournament, tournamentInfo, totalPlayers, currentPairings, paymentPaidCount, credits,
   onOpenTournamentInfoEditor, onExportPtmPDF, onExportPtmXLSX, onExportResultsPDF, onExportResultsXLSX,
   onExportPairingsPDF, onExportPaymentsPDF, onExportPaymentsXLSX, onExportCreditsPDF,
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 p-4 flex items-end sm:items-center sm:justify-center">
-      <div className="w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-xl">
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold font-sans text-forest">Export</h3>
-          <button onClick={onClose} className="px-2.5 py-1.5 text-xs rounded-md border border-gray-300">Close</button>
-        </div>
-        <div className="divide-y divide-gray-100">
-          <ExportRow title="Tournament Info" description="Registration sheet with date, course, entry fee, and Venmo QR"><PdfBtn onClick={onOpenTournamentInfoEditor} disabled={!tournamentInfo}>PDF</PdfBtn></ExportRow>
-          <ExportRow title="Points to Make — Full Roster" description="All members grouped by flight with their PTM targets"><PdfBtn onClick={onExportPtmPDF}>PDF</PdfBtn><XlsxBtn onClick={onExportPtmXLSX}>Excel</XlsxBtn></ExportRow>
-          <ExportRow title="Tournament Results" description="Per-flight leaderboard with rank, score, +/−, and POY points"><PdfBtn onClick={onExportResultsPDF} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportResultsXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
-          <ExportRow title="Pairings" description="Tee-time groupings for the round"><PdfBtn onClick={onExportPairingsPDF} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn></ExportRow>
-          <ExportRow title="Payment Status" description="List of paid players with Venmo QR code"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
-          <ExportRow title="Credit on Books" description="Member credit balances with totals"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn></ExportRow>
-        </div>
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-forest px-4 py-2.5">
+        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-white/70">Exports</p>
+      </div>
+      <div className="divide-y divide-gray-100">
+        <ExportRow title="Tournament Info" description="Registration sheet with date, course, entry fee, and Venmo QR"><PdfBtn onClick={onOpenTournamentInfoEditor} disabled={!tournamentInfo}>PDF</PdfBtn></ExportRow>
+        <ExportRow title="Points to Make — Full Roster" description="All members grouped by flight with their PTM targets"><PdfBtn onClick={onExportPtmPDF}>PDF</PdfBtn><XlsxBtn onClick={onExportPtmXLSX}>Excel</XlsxBtn></ExportRow>
+        <ExportRow title="Tournament Results" description="Per-flight leaderboard with rank, score, +/−, and POY points"><PdfBtn onClick={onExportResultsPDF} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportResultsXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
+        <ExportRow title="Pairings" description="Tee-time groupings for the round"><PdfBtn onClick={onExportPairingsPDF} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn></ExportRow>
+        <ExportRow title="Payment Status" description="List of paid players with Venmo QR code"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
+        <ExportRow title="Credit on Books" description="Member credit balances with totals"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn></ExportRow>
       </div>
     </div>
   )
@@ -3972,7 +3759,7 @@ function ScoreEntryPanel({
               <LockIcon className="w-10 h-10 text-gray-300 mb-3 opacity-70" />
               <p className="font-sans font-semibold text-darktext mb-1">Score entry locked</p>
               <p className="text-gray-400 font-sans text-sm mb-4">
-                Post pairings first — Step 2 above.
+                Pairings must be published before scores can be entered.
               </p>
               <button onClick={onGoToPairings} className="btn-primary text-sm">
                 Go to Pairings →
@@ -4460,6 +4247,7 @@ function FlightManagementPanel({
   const [editingRows, setEditingRows] = useState({})
   const [rowDrafts, setRowDrafts] = useState({})
   const [creditAdjustments, setCreditAdjustments] = useState({})
+  const [creditAppliedFlash, setCreditAppliedFlash] = useState({})
   const [selectedRows, setSelectedRows] = useState(new Set())
   const [bulkFlight, setBulkFlight] = useState('')
   const [bulkTee, setBulkTee] = useState('')
@@ -4576,6 +4364,8 @@ function FlightManagementPanel({
     if (!Number.isFinite(parsed) || parsed === 0) return
     applyCredit(name, parsed)
     setCreditAdjustments(prev => ({ ...prev, [name]: '' }))
+    setCreditAppliedFlash(prev => ({ ...prev, [name]: true }))
+    setTimeout(() => setCreditAppliedFlash(prev => ({ ...prev, [name]: false })), 1500)
   }
 
   function toggleSelect(name) {
@@ -4890,7 +4680,7 @@ function FlightManagementPanel({
                           onClick={() => applyRowCredit(row.name)}
                           disabled={!creditAdjustments[row.name]}
                           title="Apply adjustment"
-                          className="w-7 h-7 flex items-center justify-center bg-forest text-white rounded text-sm font-bold disabled:opacity-30 hover:bg-forest/80 transition-colors"
+                          className={`w-7 h-7 flex items-center justify-center rounded text-sm font-bold disabled:opacity-30 transition-colors ${creditAppliedFlash[row.name] ? 'bg-green-600 text-white' : 'bg-forest text-white hover:bg-forest/80'}`}
                         >
                           ✓
                         </button>
