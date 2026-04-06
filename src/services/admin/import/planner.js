@@ -314,8 +314,24 @@ function planResultsImport(rows, context, mode) {
   return plan
 }
 
+function toLastFirstKey(name) {
+  // Convert "First Last" → "last, first" so import files using either format match
+  const parts = name.trim().split(/\s+/)
+  if (parts.length < 2) return null
+  const last = parts[parts.length - 1]
+  const first = parts.slice(0, -1).join(' ')
+  return normalizeKey(`${last}, ${first}`)
+}
+
 export function buildImportContext({ members = [], resultsByTournament = {}, credits = {}, creditTransactions = [] }) {
-  const memberLookup = new Map(members.map(member => [normalizeKey(member.name), member.name]))
+  const memberLookup = new Map()
+  members.forEach(member => {
+    memberLookup.set(normalizeKey(member.name), member.name)
+    const lastFirstKey = toLastFirstKey(member.name)
+    if (lastFirstKey && !memberLookup.has(lastFirstKey)) {
+      memberLookup.set(lastFirstKey, member.name)
+    }
+  })
   const memberPtmLookup = Object.fromEntries(members.map(member => [member.name, member.ptm]))
 
   const creditTransactionKeys = (creditTransactions || []).map((entry) => {
