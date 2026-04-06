@@ -10,13 +10,10 @@ import { DB } from '../db'
 import { buildFlightWinnerCards } from '../utils/flightWinners'
 import { useAuth } from '../context/AuthContext'
 import {
-  listenFavorites,
   listenSavedFilter,
   listenSavedView,
-  removeFavorite,
   saveSavedFilter,
   saveSavedView,
-  setFavorite,
 } from '../lib/firebase/firestore'
 
 function FlightLeaderboards({ leaderboard }) {
@@ -69,7 +66,6 @@ export default function Tournaments() {
   const { user } = useAuth()
 
   const [seasonView, setSeasonView] = useState('all')
-  const [favoriteIds, setFavoriteIds] = useState(new Set())
 
   const upcoming = schedule.filter((t) => t.status === 'upcoming')
   const completed = schedule.filter((t) => t.status === 'completed')
@@ -96,30 +92,11 @@ export default function Tournaments() {
     })
   }, [user?.uid])
 
-  useEffect(() => {
-    if (!user?.uid) return undefined
-
-    return listenFavorites(user.uid, 'tournament', (docs) => {
-      setFavoriteIds(new Set(docs.map((d) => d.entityId)))
-    })
-  }, [user?.uid])
-
   const saveFilterPreference = async (nextView) => {
     setSeasonView(nextView)
     if (user?.uid) {
       await saveSavedFilter(user.uid, 'tournaments', { seasonView: nextView })
     }
-  }
-
-  const toggleFavorite = async (tournament) => {
-    if (!user?.uid) return
-
-    if (favoriteIds.has(tournament.id)) {
-      await removeFavorite(user.uid, 'tournament', tournament.id)
-      return
-    }
-
-    await setFavorite(user.uid, 'tournament', tournament.id, tournament.name)
   }
 
   const onToggleExpanded = async (tournamentId, isOpen) => {
@@ -174,17 +151,7 @@ export default function Tournaments() {
           <h2 className="text-lg font-sans font-semibold text-forest uppercase tracking-widest mb-4">Upcoming</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {upcoming.map((t) => (
-              <div key={t.id} className="relative">
-                {user && (
-                  <button
-                    type="button"
-                    onClick={() => toggleFavorite(t)}
-                    className="absolute right-3 top-3 z-10 text-sm px-2 py-1 rounded bg-white/90 border border-gray-200"
-                    aria-label={`Favorite ${t.name}`}
-                  >
-                    {favoriteIds.has(t.id) ? '★' : '☆'}
-                  </button>
-                )}
+              <div key={t.id}>
                 <TournamentCard tournament={t} />
               </div>
             ))}
@@ -207,13 +174,10 @@ export default function Tournaments() {
                     aria-expanded={isOpen}
                   >
                     <div>
-                      <h3 className="text-darktext font-serif text-xl font-semibold mb-1">{t.name} {favoriteIds.has(t.id) && <span title="Favorite">★</span>}</h3>
+                      <h3 className="text-darktext font-serif text-xl font-semibold mb-1">{t.name}</h3>
                       <p className="text-gray-500 font-sans text-sm">{formatDateLong(t.date)} · {t.course}</p>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      {user && (
-                        <span className="text-xs text-gray-500 hidden sm:block">{favoriteIds.has(t.id) ? 'Favorited' : 'Not favorited'}</span>
-                      )}
                       <span className="text-xs bg-gray-100 text-gray-600 border border-gray-200 px-2.5 py-1 rounded-full font-sans hidden sm:block">
                         {t.format}
                       </span>
