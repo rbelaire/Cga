@@ -1,8 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import { formatName } from '../utils/formatName'
-import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 
 const flightTagStyles = {
@@ -26,13 +25,23 @@ function EmptyPairingsIcon() {
 
 export default function Pairings() {
   const { tournamentId } = useParams()
-  const { data: pairingsMap } = useFireData(DB.listenPairings, {})
-  const { data: lifecycle } = useFireData(DB.listenTournamentLifecycle, {})
 
-  const pairingsState = lifecycle?.[tournamentId]?.pairingsState
-  const hasLegacyPairings = Boolean(pairingsMap?.[tournamentId])
+  // Subscribe only to this tournament's documents — avoids loading the entire
+  // pairings map which grows with every tournament added.
+  const [pairingsDoc,  setPairingsDoc]  = useState(null)
+  const [lifecycleDoc, setLifecycleDoc] = useState(null)
+
+  useEffect(() => {
+    if (!tournamentId) return
+    const u1 = DB.listenPairingsForTournament(tournamentId, setPairingsDoc)
+    const u2 = DB.listenLifecycleForTournament(tournamentId, setLifecycleDoc)
+    return () => { u1(); u2() }
+  }, [tournamentId])
+
+  const pairingsState     = lifecycleDoc?.pairingsState
+  const hasLegacyPairings = Boolean(pairingsDoc)
   const isPublished = pairingsState === 'published' || (!pairingsState && hasLegacyPairings)
-  const data = isPublished ? pairingsMap?.[tournamentId] ?? null : null
+  const data = isPublished ? pairingsDoc : null
 
   useEffect(() => {
     document.title = data ? `Pairings | ${data.tournament}` : 'Pairings | CGA 2026'

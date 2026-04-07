@@ -14,6 +14,7 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
 
+    // ── Per-user data ────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
@@ -30,9 +31,51 @@ service cloud.firestore {
       allow read, write: if isOwner(request.resource.data.uid) || isOwner(resource.data.uid);
     }
 
+    // ── Fixed-size CGA documents (public read, admin write) ──────────────────
+    // members, standings, poy, credits, users, ptm, beginningOfYearPtm,
+    // changelog, creditTransactions
     match /cga/{docId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // ── Per-tournament collections (public read, admin write) ────────────────
+    // Each collection stores one document per tournament ID, preventing any
+    // single document from growing toward Firestore's 1 MB limit.
+
+    match /cgaResults/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /cgaScores/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /cgaPairings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /cgaPayments/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /cgaLifecycle/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /cgaPaymentMeta/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Snapshot collection (admin only — contains full data copies) ─────────
+    match /cgaSnapshots/{docId} {
+      allow read, write: if isAdmin();
     }
   }
 }

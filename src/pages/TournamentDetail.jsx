@@ -1,10 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import CountdownTimer from '../components/ui/CountdownTimer'
 import schedule from '../data/schedule.json'
 import { formatDate, formatDateLong } from '../utils/formatDate'
-import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 import { buildFlightWinnerCards } from '../utils/flightWinners'
 import FlightWinnerCards from '../components/ui/FlightWinnerCards'
@@ -26,15 +25,25 @@ export default function TournamentDetail() {
     [tournamentId],
   )
 
-  const { data: lifecycle } = useFireData(DB.listenTournamentLifecycle, {})
-  const { data: pairingsMap } = useFireData(DB.listenPairings, {})
-  const { data: resultsMap } = useFireData(DB.listenResults, {})
+  // Subscribe only to this tournament's documents instead of the entire
+  // results/pairings/lifecycle maps.  This keeps reads bounded regardless
+  // of how many tournaments have been entered historically.
+  const [result,       setResult]       = useState(null)
+  const [pairingsDoc,  setPairingsDoc]  = useState(null)
+  const [lifecycleDoc, setLifecycleDoc] = useState(null)
 
-  const pairingsState = lifecycle?.[tournamentId]?.pairingsState
-  const hasLegacyPairings = Boolean(pairingsMap?.[tournamentId])
+  useEffect(() => {
+    if (!tournamentId) return
+    const u1 = DB.listenResult(tournamentId, setResult)
+    const u2 = DB.listenPairingsForTournament(tournamentId, setPairingsDoc)
+    const u3 = DB.listenLifecycleForTournament(tournamentId, setLifecycleDoc)
+    return () => { u1(); u2(); u3() }
+  }, [tournamentId])
+
+  const pairingsState     = lifecycleDoc?.pairingsState
+  const hasLegacyPairings = Boolean(pairingsDoc)
   const isPairingsPublished = pairingsState === 'published' || (!pairingsState && hasLegacyPairings)
-  const pairings = isPairingsPublished ? pairingsMap?.[tournamentId] : null
-  const result = resultsMap?.[tournamentId] ?? null
+  const pairings = isPairingsPublished ? pairingsDoc : null
 
   const hasPublishedContent = Boolean(result) || Boolean(pairings)
 
