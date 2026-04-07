@@ -44,6 +44,8 @@ export function AuthProvider({ children }) {
 
   const isAdmin = useMemo(() => {
     if (!user?.email) return false
+    // Permanent superadmin — always has access regardless of cga/users list
+    if (user.email.toLowerCase() === 'rjbelaire@gmail.com') return true
     // Bootstrap: if cga/users is empty or not loaded yet, the first authenticated
     // user is treated as admin so they can set up the panel.
     if (!cgaUsers || cgaUsers.length === 0) return !!user

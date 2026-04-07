@@ -59,7 +59,8 @@ export async function upsertUserProfile(user, roles) {
   const userRef = doc(db, 'users', user.uid)
   const existing = await getDoc(userRef)
   const existingData = existing.exists() ? existing.data() : null
-  const nextRoles = Array.isArray(roles) ? roles : (existingData?.roles ?? ['member'])
+  const isSuperAdmin = user.email?.toLowerCase() === 'rjbelaire@gmail.com'
+  const nextRoles = isSuperAdmin ? ['admin'] : (Array.isArray(roles) ? roles : (existingData?.roles ?? ['member']))
 
   const base = {
     uid: user.uid,
