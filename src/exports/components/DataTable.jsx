@@ -8,6 +8,7 @@ export function drawDataTable(doc, {
   columnStyles = {},
   headFill = PDF_COLORS.blue,
   didParseCell,
+  margin: marginOverride = {},
 }) {
   autoTable(doc, {
     head: [head],
@@ -18,21 +19,21 @@ export function drawDataTable(doc, {
       fillColor: headFill,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 8.5,
-      cellPadding: 2.4,
+      fontSize: 8,
+      cellPadding: 2,
     },
     alternateRowStyles: { fillColor: PDF_COLORS.rowAlt },
     styles: {
-      fontSize: 8.5,
-      cellPadding: 2.2,
+      fontSize: 8,
+      cellPadding: 1.8,
       overflow: 'linebreak',
       textColor: PDF_COLORS.primaryText,
       lineColor: PDF_COLORS.border,
       lineWidth: 0.1,
     },
     columnStyles,
-    margin: { left: 14, right: 14 },
+    margin: { left: 14, right: 14, bottom: 20, ...marginOverride },
     didParseCell,
   })
-  return doc.lastAutoTable.finalY + 6
+  return doc.lastAutoTable.finalY + 5
 }

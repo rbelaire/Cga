@@ -1,9 +1,10 @@
+import autoTable from 'jspdf-autotable'
 import { createExportPage, ensurePageSpace } from './components/ExportPage'
 import { drawStatGrid } from './components/StatGrid'
 import { drawSectionCard } from './components/SectionCard'
 import { drawDataTable } from './components/DataTable'
 import { drawEmptyState } from './components/EmptyState'
-import { FLIGHT_CODES, PDF_COLORS } from './utils/constants'
+import { FLIGHT_CODES, PDF_COLORS, PDF_LAYOUT } from './utils/constants'
 import { formatCurrency, formatDate, formatPTM, formatScore, formatText, formatTrend, formatValue } from './utils/formatters'
 import { sanitizeTournamentData } from './utils/sanitize'
 
@@ -88,6 +89,81 @@ export async function exportTournamentInfoPDF({ tournament, venmoImageUrl, logoU
   doc.save(safeFilename(clean.id, 'tournament-info'))
 }
 
+// Draw pairings as a compact 3-column card grid
+function drawPairingCards(doc, { groups, startY }) {
+  const COLS = 3
+  const pageW = doc.internal.pageSize.getWidth()
+  const ML = 14
+  const GAP = 3
+  const cardW = (pageW - ML * 2 - GAP * (COLS - 1)) / COLS
+  const TITLE_H = 6.5
+  const ROW_H = 4.8
+  const PAD_B = 2.5
+
+  // Split into rows of COLS
+  const rows = []
+  for (let i = 0; i < groups.length; i += COLS) rows.push(groups.slice(i, i + COLS))
+
+  let y = startY
+  for (const rowGroups of rows) {
+    const maxPlayers = Math.max(...rowGroups.map(g => (g.players ?? []).length), 1)
+    const cardH = TITLE_H + maxPlayers * ROW_H + PAD_B
+
+    // Page break if needed
+    if (y + cardH > PDF_LAYOUT.bottomSafeY) {
+      doc.addPage()
+      y = PDF_LAYOUT.newPageTopY
+    }
+
+    rowGroups.forEach((group, colIdx) => {
+      const x = ML + colIdx * (cardW + GAP)
+      const players = group.players ?? []
+      const thisH = TITLE_H + Math.max(players.length, 1) * ROW_H + PAD_B
+
+      // Card background
+      doc.setDrawColor(...PDF_COLORS.border)
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(x, y, cardW, thisH, 1.2, 1.2, 'FD')
+
+      // Title bar (blue, top portion only — square off bottom edge)
+      doc.setFillColor(...PDF_COLORS.blue)
+      doc.roundedRect(x, y, cardW, TITLE_H, 1.2, 1.2, 'F')
+      doc.rect(x, y + TITLE_H / 2, cardW, TITLE_H / 2, 'F')
+
+      // Title text
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7.5)
+      doc.setTextColor(255, 255, 255)
+      doc.text(group.pairing ?? `Pairing ${colIdx + 1}`, x + 2.5, y + TITLE_H - 1.2)
+
+      // Players
+      if (players.length === 0) {
+        doc.setFont('helvetica', 'italic')
+        doc.setFontSize(6.5)
+        doc.setTextColor(...PDF_COLORS.mutedText)
+        doc.text('No players assigned', x + 2.5, y + TITLE_H + ROW_H * 0.7)
+      } else {
+        players.forEach((p, pidx) => {
+          const code = FLIGHT_CODES[p.flight] ?? FLIGHT_CODES.Unassigned
+          const name = formatText(p.name, 'TBD')
+          const py = y + TITLE_H + pidx * ROW_H + ROW_H * 0.7
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(7)
+          doc.setTextColor(...PDF_COLORS.primaryText)
+          doc.text(name, x + 2.5, py)
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(6.5)
+          doc.setTextColor(...PDF_COLORS.mutedText)
+          doc.text(`[${code}]`, x + cardW - 2.5, py, { align: 'right' })
+        })
+      }
+    })
+
+    y += cardH + GAP
+  }
+  return y
+}
+
 export async function exportPairingsPDF({ tournament, pairings, logoUrl }) {
   const clean = sanitizeTournamentData({ ...tournament, groups: pairings })
   const logo = await loadAssetBase64(logoUrl)
@@ -107,20 +183,7 @@ export async function exportPairingsPDF({ tournament, pairings, logoUrl }) {
     highlight: true,
   })
 
-  for (let i = 0; i < groups.length; i += 1) {
-    const group = groups[i]
-    const lines = (group.players ?? []).map((p, idx) => {
-      const code = FLIGHT_CODES[p.flight] ?? FLIGHT_CODES.Unassigned
-      const name = formatText(p.name, 'Not available')
-      return `${idx + 1}. ${name} [${code}]`
-    })
-    y = ensurePageSpace(doc, y, 20 + (lines.length * 6))
-    y = drawSectionCard(doc, {
-      y,
-      title: `Group ${i + 1}`,
-      rows: lines.length ? lines : ['No players assigned'],
-    })
-  }
+  drawPairingCards(doc, { groups, startY: y })
 
   withFooter('CGA Pairings Sheet')
   doc.save(safeFilename(clean.id, 'pairings'))
@@ -255,28 +318,72 @@ export async function exportPtmPDF({ members, flights, logoUrl }) {
     else unassigned.push(m)
   })
 
-  let y = cursorY
-  const drawGroup = (label, membersInFlight) => {
-    if (!membersInFlight.length) return
-    y = ensurePageSpace(doc, y, 30)
-    y = drawSectionCard(doc, { y, title: label, rows: [] })
-    y = drawDataTable(doc, {
-      startY: y - 2,
-      head: ['Player', 'PTM', 'Tee'],
-      body: membersInFlight
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(m => [formatText(m.name, 'Not available'), formatPTM(m.ptm), formatValue(m.tee, 'text') || '—']),
-      columnStyles: {
-        0: { cellWidth: 120 },
-        1: { halign: 'center', cellWidth: 22, fontStyle: 'bold' },
-        2: { halign: 'center', cellWidth: 22 },
-      },
-    })
+  // Build ordered list of non-empty flight groups
+  const allGroups = [
+    ...flights
+      .filter(fl => grouped[fl].length > 0)
+      .map(fl => ({ label: fl, rows: grouped[fl].slice().sort((a, b) => a.name.localeCompare(b.name)) })),
+    ...(unassigned.length
+      ? [{ label: 'Unassigned', rows: unassigned.slice().sort((a, b) => a.name.localeCompare(b.name)) }]
+      : []),
+  ]
+
+  // 2-column layout: compute margins for each column
+  const pageW = doc.internal.pageSize.getWidth()
+  const ML = PDF_LAYOUT.marginX
+  const MR = PDF_LAYOUT.marginX
+  const COL_GAP = 5
+  const halfW = (pageW - ML - MR - COL_GAP) / 2
+  const leftMR  = pageW - ML - halfW   // right margin when drawing in left column
+  const rightML = ML + halfW + COL_GAP // left margin when drawing in right column
+
+  const colStyles = {
+    0: { cellWidth: 57 },
+    1: { halign: 'center', cellWidth: 14, fontStyle: 'bold' },
+    2: { halign: 'center', cellWidth: 11 },
   }
 
-  flights.forEach(fl => drawGroup(fl, grouped[fl]))
-  drawGroup('Unassigned', unassigned)
+  const drawFlightTable = (group, marginLeft, marginRight, startY) => {
+    const sy = drawSectionCard(doc, {
+      x: marginLeft,
+      width: pageW - marginLeft - marginRight,
+      y: startY,
+      title: group.label,
+      rows: [],
+    })
+    autoTable(doc, {
+      head: [['Player', 'PTM', 'T']],
+      body: group.rows.map(m => [
+        formatText(m.name, 'Not available'),
+        formatPTM(m.ptm),
+        formatValue(m.tee, 'text') || '—',
+      ]),
+      startY: sy - 2,
+      theme: 'striped',
+      headStyles: { fillColor: PDF_COLORS.blue, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 2 },
+      alternateRowStyles: { fillColor: PDF_COLORS.rowAlt },
+      styles: { fontSize: 8, cellPadding: 1.8, overflow: 'linebreak', textColor: PDF_COLORS.primaryText, lineColor: PDF_COLORS.border, lineWidth: 0.1 },
+      columnStyles: colStyles,
+      margin: { left: marginLeft, right: marginRight, bottom: 20 },
+    })
+    return doc.lastAutoTable.finalY + 5
+  }
+
+  let y = cursorY
+
+  for (let i = 0; i < allGroups.length; i += 2) {
+    const left  = allGroups[i]
+    const right = allGroups[i + 1]
+
+    // Page break: need at least enough room for a header + a few rows
+    y = ensurePageSpace(doc, y, 30)
+    const rowStartY = y
+
+    const leftEnd  = drawFlightTable(left, ML, leftMR, rowStartY)
+    const rightEnd = right ? drawFlightTable(right, rightML, MR, rowStartY) : rowStartY
+
+    y = Math.max(leftEnd, rightEnd)
+  }
 
   withFooter('CGA Points to Make')
   doc.save('cga-2026-points-to-make.pdf')
