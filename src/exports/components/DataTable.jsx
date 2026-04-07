@@ -9,6 +9,9 @@ export function drawDataTable(doc, {
   headFill = PDF_COLORS.blue,
   didParseCell,
   margin: marginOverride = {},
+  fontSize = 8,
+  cellPadding = 1.8,
+  headCellPadding = 2,
 }) {
   autoTable(doc, {
     head: [head],
@@ -19,13 +22,13 @@ export function drawDataTable(doc, {
       fillColor: headFill,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 8,
-      cellPadding: 2,
+      fontSize,
+      cellPadding: headCellPadding,
     },
     alternateRowStyles: { fillColor: PDF_COLORS.rowAlt },
     styles: {
-      fontSize: 8,
-      cellPadding: 1.8,
+      fontSize,
+      cellPadding,
       overflow: 'linebreak',
       textColor: PDF_COLORS.primaryText,
       lineColor: PDF_COLORS.border,
