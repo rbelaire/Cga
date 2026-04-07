@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
+import * as XLSXStyle from 'xlsx-js-style'
 import { Link } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
@@ -720,9 +721,8 @@ function exportBirdiePoolXLSX(tournament, flightData) {
       return [index + 1, last, first, ...Array.from({ length: 18 }, () => '')]
     }),
   ]
-  const ws = XLSX.utils.aoa_to_sheet(wsData)
+  const ws = XLSXStyle.utils.aoa_to_sheet(wsData)
 
-  // Subtle structure-preserving layout tweaks.
   ws['!cols'] = [
     { wch: 4 },  // #
     { wch: 18 }, // Last
@@ -731,7 +731,7 @@ function exportBirdiePoolXLSX(tournament, flightData) {
   ]
   ws['!freeze'] = { xSplit: 3, ySplit: 1, topLeftCell: 'D2', state: 'frozen', activePane: 'bottomRight' }
 
-  const range = XLSX.utils.decode_range(ws['!ref'] || `A1:${XLSX.utils.encode_cell({ r: wsData.length - 1, c: headers.length - 1 })}`)
+  const range = XLSXStyle.utils.decode_range(ws['!ref'] || `A1:${XLSXStyle.utils.encode_cell({ r: wsData.length - 1, c: headers.length - 1 })}`)
   const thinBorder = {
     top: { style: 'thin', color: { rgb: BORDER_COLOR } },
     bottom: { style: 'thin', color: { rgb: BORDER_COLOR } },
@@ -741,7 +741,7 @@ function exportBirdiePoolXLSX(tournament, flightData) {
 
   for (let row = range.s.r; row <= range.e.r; row += 1) {
     for (let col = range.s.c; col <= range.e.c; col += 1) {
-      const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
+      const cellAddress = XLSXStyle.utils.encode_cell({ r: row, c: col })
       if (!ws[cellAddress]) ws[cellAddress] = { t: 's', v: '' }
       const isHeader = row === 0
       const isCoreHeader = isHeader && col <= 2
@@ -768,9 +768,9 @@ function exportBirdiePoolXLSX(tournament, flightData) {
     }
   }
 
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Birdie Pool')
-  XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-birdie-pool.xlsx`)
+  const wb = XLSXStyle.utils.book_new()
+  XLSXStyle.utils.book_append_sheet(wb, ws, 'Birdie Pool')
+  XLSXStyle.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-birdie-pool.xlsx`)
 }
 
 function exportPayoutDocXLSX(tournament, resultDoc) {
@@ -2915,6 +2915,7 @@ function AdminPanel({ currentUser }) {
           onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData)}
           onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
           onExportCreditsXLSX={() => exportCreditsXLSX(credits, membersData)}
+          onExportBirdiePoolXLSX={() => exportBirdiePoolXLSX(tournament, data[tid] ?? {})}
         />
       )}
 
@@ -3712,7 +3713,12 @@ function ExportPanel({
   tournament, tournamentInfo, totalPlayers, currentPairings, paymentPaidCount, credits,
   onOpenTournamentInfoEditor, onExportPtmPDF, onExportPtmXLSX, onExportResultsPDF, onExportResultsXLSX,
   onExportPairingsPDF, onExportPaymentsPDF, onExportPaymentsXLSX, onExportCreditsPDF, onExportCreditsXLSX,
+  onExportBirdiePoolXLSX,
 }) {
+  const birdieDesc = totalPlayers > 0
+    ? <span>Birdie pool sheet with hole columns — <span className="text-forest font-semibold">{totalPlayers} player{totalPlayers !== 1 ? 's' : ''} in field</span></span>
+    : 'Birdie pool sheet with hole columns — no field set yet'
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
       <div className="bg-forest px-4 py-2.5">
@@ -3722,6 +3728,7 @@ function ExportPanel({
         <ExportRow title="Tournament Info" description="Registration sheet with date, course, entry fee, and Venmo QR"><PdfBtn onClick={onOpenTournamentInfoEditor} disabled={!tournamentInfo}>PDF</PdfBtn></ExportRow>
         <ExportRow title="Points to Make — Full Roster" description="All members grouped by flight with their PTM targets"><PdfBtn onClick={onExportPtmPDF}>PDF</PdfBtn><XlsxBtn onClick={onExportPtmXLSX}>Excel</XlsxBtn></ExportRow>
         <ExportRow title="Tournament Results" description="Per-flight leaderboard with rank, score, +/−, and POY points"><PdfBtn onClick={onExportResultsPDF} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportResultsXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
+        <ExportRow title="Birdie Pool" description={birdieDesc}><XlsxBtn onClick={onExportBirdiePoolXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
         <ExportRow title="Pairings" description="Tee-time groupings for the round"><PdfBtn onClick={onExportPairingsPDF} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn></ExportRow>
         <ExportRow title="Payment Status" description="List of paid players with Venmo QR code"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
         <ExportRow title="Credit on Books" description="Member credit balances with totals"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportCreditsXLSX} disabled={Object.keys(credits).length === 0}>Excel</XlsxBtn></ExportRow>
