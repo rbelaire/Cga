@@ -265,9 +265,9 @@ function planResultsImport(rows, context, mode) {
       plan.issues.push(rowIssue(rowNumber, 'Missing required values (tournamentId, flight, member, score).', 'Complete all required fields in this row.'))
       return
     }
-    if (!resultsByTournament[tournamentId]) {
+    if (!resultsByTournament[tournamentId] && !context.scheduleIds.has(tournamentId)) {
       plan.invalidRows += 1
-      plan.issues.push(rowIssue(rowNumber, `Tournament ${tournamentId} does not exist in results.`, 'Import the tournament first (Tournaments template), then retry this results import.'))
+      plan.issues.push(rowIssue(rowNumber, `Tournament ${tournamentId} does not exist in results or schedule.`, 'Check the tournamentId matches an entry in schedule.json or import the tournament first.'))
       return
     }
     if (!memberLookup.has(normalizeKey(member))) {
@@ -323,7 +323,7 @@ function toLastFirstKey(name) {
   return normalizeKey(`${last}, ${first}`)
 }
 
-export function buildImportContext({ members = [], resultsByTournament = {}, credits = {}, creditTransactions = [] }) {
+export function buildImportContext({ members = [], resultsByTournament = {}, credits = {}, creditTransactions = [], schedule = [] }) {
   const memberLookup = new Map()
   members.forEach(member => {
     memberLookup.set(normalizeKey(member.name), member.name)
@@ -344,12 +344,15 @@ export function buildImportContext({ members = [], resultsByTournament = {}, cre
     return [normalizeKey(member), date, amount.toFixed(2), normalizeKey(note), normalizeKey(reference)].join('|')
   }).filter(Boolean)
 
+  const scheduleIds = new Set((schedule || []).map(t => t.id).filter(Boolean))
+
   return {
     memberLookup,
     memberPtmLookup,
     resultsByTournament,
     credits,
     creditTransactionKeys,
+    scheduleIds,
   }
 }
 
