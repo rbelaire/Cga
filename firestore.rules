@@ -15,8 +15,11 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSuperAdmin() || (
-        isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin'])
+        isSignedIn() && (
+          // Bootstrap: allow any authenticated user when cga/users doesn't exist yet
+          !exists(/databases/$(database)/documents/cga/users) ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin'])
+        )
       );
     }
 
