@@ -39,7 +39,7 @@ import {
 } from '../services/admin/validation'
 import {
   exportPairingsPDF as exportPairingsPdfV2,
-  exportPaymentsPDF as exportPaymentsPdfV2,
+  exportFieldRosterPDF as exportFieldRosterPdfV2,
   exportPtmPDF as exportPtmPdfV2,
   exportResultsPDF as exportResultsPdfV2,
   exportTournamentInfoPDF as exportTournamentInfoPdfV2,
@@ -796,21 +796,22 @@ function exportPayoutDocXLSX(tournament, resultDoc) {
   return true
 }
 
-// ── Excel: Payment Status ─────────────────────────────────────────────────────
+// ── Excel: Field Roster ──────────────────────────────────────────────────────
 function exportPaymentsXLSX(tournament, paymentMap, membersList) {
   if (!tournament) return
   const wsData = [
-    ['Player', 'Flight', 'Paid'],
+    ['Player', 'Flight'],
     ...membersList
-      .filter(m => m.active !== false)
+      .filter(m => m.active !== false && paymentMap[m.name])
       .slice()
       .sort(compareByLastName)
-      .map(m => [m.name, m.flight ?? 'Unassigned', paymentMap[m.name] ? 'Yes' : 'No']),
+      .map(m => [m.name, m.flight ?? 'Unassigned']),
   ]
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet(wsData)
-  XLSX.utils.book_append_sheet(wb, ws, 'Payments')
-  XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-payments.xlsx`)
+  ws['!cols'] = [{ wch: 28 }, { wch: 16 }]
+  XLSX.utils.book_append_sheet(wb, ws, 'Field Roster')
+  XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-field-roster.xlsx`)
 }
 
 // ── Excel: Points to Make ─────────────────────────────────────────────────────
@@ -868,10 +869,10 @@ function PdfBtn({ onClick, children, disabled = false }) {
   )
 }
 
-// ── PDF: Payment Status ───────────────────────────────────────────────────────
+// ── PDF: Field Roster ────────────────────────────────────────────────────────
 async function exportPaymentsPDF(tournament, paymentMap, membersList) {
   if (!tournament) return
-  await exportPaymentsPdfV2({
+  await exportFieldRosterPdfV2({
     tournament,
     paymentMap,
     members: membersList,
@@ -3734,7 +3735,7 @@ function ExportPanel({
         <ExportRow title="Tournament Results" description="Per-flight leaderboard with rank, score, +/−, and POY points"><PdfBtn onClick={onExportResultsPDF} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportResultsXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
         <ExportRow title="Birdie Pool" description={birdieDesc}><XlsxBtn onClick={onExportBirdiePoolXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
         <ExportRow title="Pairings" description="Tee-time groupings for the round"><PdfBtn onClick={onExportPairingsPDF} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn></ExportRow>
-        <ExportRow title="Payment Status" description="List of paid players with Venmo QR code"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
+        <ExportRow title="Field Roster" description="Players in the field grouped by flight"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
         <ExportRow title="Credit on Books" description="Member credit balances by flight"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportCreditsXLSX} disabled={Object.keys(credits).length === 0}>Excel</XlsxBtn></ExportRow>
       </div>
     </div>

@@ -205,12 +205,29 @@ export const DB = {
   // Each tournament's data lives in its own document, so the collection grows
   // safely without any single document approaching the 1 MB Firestore limit.
 
-  // Pairings — cgaPairings/{tid}
-  getPairings:    () => colGetAll('cgaPairings'),
-  savePairings:   (map) => colSetMap('cgaPairings', map),
-  listenPairings: (cb)  => colListen('cgaPairings', cb),
+  // Pairings — cgaPairings/{tid}  stored as { pairings: [...] } objects
+  // Firestore rejects bare arrays as document data, so we wrap/unwrap at this layer.
+  getPairings: () => colGetAll('cgaPairings').then(raw => {
+    const out = {}
+    Object.entries(raw).forEach(([id, doc]) => {
+      out[id] = Array.isArray(doc) ? doc : (doc?.pairings ?? [])
+    })
+    return out
+  }),
+  savePairings: (map) => colSetMap('cgaPairings',
+    Object.fromEntries(Object.entries(map).map(([id, v]) => [id, Array.isArray(v) ? { pairings: v } : v]))
+  ),
+  listenPairings: (cb) => colListen('cgaPairings', raw => {
+    const out = {}
+    Object.entries(raw).forEach(([id, doc]) => {
+      out[id] = Array.isArray(doc) ? doc : (doc?.pairings ?? [])
+    })
+    cb(out)
+  }),
   // Targeted listener for public pages — avoids loading every tournament's data
-  listenPairingsForTournament: (tid, cb) => colDocListen('cgaPairings', tid, cb),
+  listenPairingsForTournament: (tid, cb) => colDocListen('cgaPairings', tid, raw =>
+    cb(raw ? (Array.isArray(raw) ? raw : (raw.pairings ?? [])) : null)
+  ),
 
   // Score entry work-in-progress — cgaScores/{tid}
   getScores:    () => colGetAll('cgaScores'),
