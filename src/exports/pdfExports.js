@@ -189,62 +189,95 @@ export async function exportPairingsPDF({ tournament, pairings, logoUrl }) {
   doc.save(safeFilename(clean.id, 'pairings'))
 }
 
-export async function exportPaymentsPDF({ tournament, paymentMap, members, logoUrl }) {
+export async function exportPaymentsPDF({ tournament, paymentMap, members, flights = [], logoUrl }) {
   const clean = sanitizeTournamentData({ ...tournament, paymentMap, members })
   const logo = await loadAssetBase64(logoUrl)
   const { doc, cursorY, withFooter } = createExportPage({
-    title: 'Payment Status',
-    subtitle: 'Member Payment Report',
+    title: 'Payment Report',
+    subtitle: 'Paid Members by Flight',
     tournamentName: clean.name,
     tournamentDate: clean.date,
     logo,
   })
 
-  const rows = clean.members
-    .filter(m => m.name && m.name !== 'Not available')
-    .map(m => ({
-      name: m.name,
-      paid: Boolean(clean.paymentMap[m.name]),
-      method: formatText(clean.paymentMap?.[`${m.name}__method`], ''),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name))
-
-  const paidCount = rows.filter(r => r.paid).length
-  const total = rows.length
-  const unpaidCount = total - paidCount
+  const total = clean.members.filter(m => m.name && m.name !== 'Not available').length
+  const paidCount = Object.keys(clean.paymentMap).filter(k => !k.includes('__') && clean.paymentMap[k]).length
   const pct = total ? `${Math.round((paidCount / total) * 100)}%` : '0%'
 
   let y = drawStatGrid(doc, {
     startY: cursorY,
-    cols: 4,
+    cols: 3,
     stats: [
-      { label: 'Total Players', value: String(total) },
-      { label: 'Paid', value: String(paidCount) },
-      { label: 'Unpaid', value: String(unpaidCount) },
-      { label: 'Paid %', value: pct, highlight: true },
+      { label: 'Total Members', value: String(total) },
+      { label: 'Paid', value: String(paidCount), highlight: true },
+      { label: 'Paid %', value: pct },
     ],
   })
 
-  y = drawDataTable(doc, {
-    startY: y,
-    head: ['Name', 'Status', 'Method'],
-    body: rows.map(r => [r.name, r.paid ? 'Paid' : 'Unpaid', r.method || '—']),
-    columnStyles: {
-      0: { cellWidth: 96 },
-      1: { halign: 'center', cellWidth: 28, fontStyle: 'bold' },
-      2: { halign: 'center', cellWidth: 48 },
-    },
-    didParseCell(data) {
-      if (data.section !== 'body' || data.column.index !== 1) return
-      const paid = rows[data.row.index]?.paid
-      data.cell.styles.fillColor = paid ? PDF_COLORS.badgePaidBg : PDF_COLORS.badgeUnpaidBg
-      data.cell.styles.textColor = paid ? PDF_COLORS.badgePaidText : PDF_COLORS.badgeUnpaidText
-    },
+  // Build flight groups — only paid members, preserving flight order
+  const knownFlights = flights.length ? flights : ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight', 'New Players']
+  const grouped = Object.fromEntries(knownFlights.map(f => [f, []]))
+  const unassigned = []
+
+  clean.members
+    .filter(m => m.name && m.name !== 'Not available' && Boolean(clean.paymentMap[m.name]))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(m => {
+      if (grouped[m.flight]) grouped[m.flight].push(m.name)
+      else unassigned.push(m.name)
+    })
+
+  const allGroups = [
+    ...knownFlights.filter(fl => grouped[fl].length > 0).map(fl => ({ label: fl, names: grouped[fl] })),
+    ...(unassigned.length ? [{ label: 'Unassigned', names: unassigned }] : []),
+  ]
+
+  if (allGroups.length === 0) {
+    drawEmptyState(doc, { message: 'No payments recorded for this tournament', startY: y })
+    withFooter('CGA Payment Report')
+    doc.save(safeFilename(clean.id, 'payments'))
+    return
+  }
+
+  // 3-column compact layout
+  const pageW = doc.internal.pageSize.getWidth()
+  const ML = PDF_LAYOUT.marginX
+  const MR = PDF_LAYOUT.marginX
+  const COL_GAP = 4
+  const colW = (pageW - ML - MR - COL_GAP * 2) / 3
+  const col = (i) => ML + i * (colW + COL_GAP)
+
+  const drawFlightTable = (group, x, startY) => {
+    const sy = drawSectionCard(doc, {
+      x,
+      width: colW,
+      y: startY,
+      title: `${group.label} (${group.names.length})`,
+      rows: [],
+    })
+    autoTable(doc, {
+      head: [['Player']],
+      body: group.names.map(n => [n]),
+      startY: sy - 2,
+      theme: 'striped',
+      headStyles: { fillColor: PDF_COLORS.blue, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, cellPadding: 1.5 },
+      alternateRowStyles: { fillColor: PDF_COLORS.rowAlt },
+      styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', textColor: PDF_COLORS.primaryText, lineColor: PDF_COLORS.border, lineWidth: 0.1 },
+      columnStyles: { 0: { cellWidth: colW } },
+      margin: { left: x, right: pageW - x - colW, bottom: 20 },
+    })
+    return doc.lastAutoTable.finalY + 4
+  }
+
+  // Distribute groups across 3 columns, cycling left→mid→right
+  const colEnds = [y, y, y]
+  allGroups.forEach((group, i) => {
+    const colIdx = i % 3
+    colEnds[colIdx] = drawFlightTable(group, col(colIdx), colEnds[colIdx])
   })
 
   withFooter('CGA Payment Report')
   doc.save(safeFilename(clean.id, 'payments'))
-  return y
 }
 
 export async function exportResultsPDF({ tournament, flightData, flights, calcFlightPOY, logoUrl }) {

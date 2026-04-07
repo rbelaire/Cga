@@ -601,27 +601,29 @@ async function exportCreditsPDF(credits, membersList) {
     .filter(m => m.active !== false)
     .map(m => ({ name: m.name, flight: m.flight ?? 'Unassigned', balance: credits[m.name] ?? 0 }))
     .sort(compareByLastName)
-  const total        = rows.reduce((s, r) => s + r.balance, 0)
   const nonZeroCount = rows.filter(r => r.balance !== 0).length
+  // Column widths must sum exactly to pageWidth − marginLeft − marginRight = 215.9 − 14 − 14 = 187.9mm
   autoTable(doc, {
-    head: [['#', 'Player', 'Flight', 'Balance']],
-    body: rows.map((r, i) => [
-      i + 1, r.name, r.flight,
+    head: [['Player', 'Flight', 'Balance']],
+    body: rows.map(r => [
+      r.name, r.flight,
       r.balance === 0 ? '$0.00' : `${r.balance < 0 ? '−' : ''}$${Math.abs(r.balance).toFixed(2)}`,
     ]),
-    foot:   [['', '', 'TOTAL', `${total < 0 ? '−' : ''}$${Math.abs(total).toFixed(2)}`]],
     startY: y, theme: 'striped',
-    headStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-    footStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+    headStyles:         { fillColor: PDF_NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
     alternateRowStyles: { fillColor: [245, 248, 252] },
-    styles:             { fontSize: 8, cellPadding: 2 },
-    columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'right', cellWidth: 30 } },
-    margin: { left: 14, right: 14 },
+    styles:             { fontSize: 7.5, cellPadding: 1.5 },
+    columnStyles: {
+      0: { cellWidth: 120.9 },
+      1: { cellWidth: 38, halign: 'left' },
+      2: { cellWidth: 29, halign: 'right' },
+    },
+    margin: { left: 14, right: 14, bottom: 20 },
     didParseCell(data) {
       if (data.section !== 'body') return
       const r = rows[data.row.index]
       if (!r) return
-      if (data.column.index === 3) {
+      if (data.column.index === 2) {
         if (r.balance > 0)      data.cell.styles.textColor = [0, 140, 60]
         else if (r.balance < 0) data.cell.styles.textColor = [180, 30, 30]
         else                    data.cell.styles.textColor = [180, 180, 180]
@@ -629,7 +631,7 @@ async function exportCreditsPDF(credits, membersList) {
       if (r.balance !== 0) data.cell.styles.fontStyle = 'bold'
     },
   })
-  addPdfFooter(doc, `${nonZeroCount} member${nonZeroCount !== 1 ? 's' : ''} with balance · Total: $${total.toFixed(2)}`)
+  addPdfFooter(doc, `${nonZeroCount} member${nonZeroCount !== 1 ? 's' : ''} with a balance`)
   doc.save('cga-2026-credit-on-books.pdf')
 }
 
@@ -873,6 +875,7 @@ async function exportPaymentsPDF(tournament, paymentMap, membersList) {
     tournament,
     paymentMap,
     members: membersList,
+    flights: [...FLIGHTS, NEW_PLAYERS_FLIGHT],
     logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
   })
 }
@@ -2811,7 +2814,7 @@ function AdminPanel({ currentUser }) {
             />
           </section>
 
-          <BeginningPtmPanel livePtmData={livePtmData} logChange={logChange} openConfirm={openConfirm} />
+          <BeginningPtmPanel livePtmData={livePtmData?.length ? livePtmData : membersData} logChange={logChange} openConfirm={openConfirm} />
         </div>
       )}
 
@@ -3732,7 +3735,7 @@ function ExportPanel({
         <ExportRow title="Birdie Pool" description={birdieDesc}><XlsxBtn onClick={onExportBirdiePoolXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
         <ExportRow title="Pairings" description="Tee-time groupings for the round"><PdfBtn onClick={onExportPairingsPDF} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn></ExportRow>
         <ExportRow title="Payment Status" description="List of paid players with Venmo QR code"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
-        <ExportRow title="Credit on Books" description="Member credit balances with totals"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportCreditsXLSX} disabled={Object.keys(credits).length === 0}>Excel</XlsxBtn></ExportRow>
+        <ExportRow title="Credit on Books" description="Member credit balances by flight"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportCreditsXLSX} disabled={Object.keys(credits).length === 0}>Excel</XlsxBtn></ExportRow>
       </div>
     </div>
   )
