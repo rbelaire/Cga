@@ -599,12 +599,7 @@ async function exportCreditsPDF(credits, membersList) {
   const rows = membersList
     .filter(m => m.active !== false)
     .map(m => ({ name: m.name, flight: m.flight ?? 'Unassigned', balance: credits[m.name] ?? 0 }))
-    .sort((a, b) => {
-      if (a.balance !== 0 && b.balance === 0) return -1
-      if (a.balance === 0 && b.balance !== 0) return 1
-      if (a.balance !== b.balance) return b.balance - a.balance
-      return a.name.localeCompare(b.name)
-    })
+    .sort(compareByLastName)
   const total        = rows.reduce((s, r) => s + r.balance, 0)
   const nonZeroCount = rows.filter(r => r.balance !== 0).length
   autoTable(doc, {
@@ -635,6 +630,25 @@ async function exportCreditsPDF(credits, membersList) {
   })
   addPdfFooter(doc, `${nonZeroCount} member${nonZeroCount !== 1 ? 's' : ''} with balance · Total: $${total.toFixed(2)}`)
   doc.save('cga-2026-credit-on-books.pdf')
+}
+
+// ── Excel: Credit on Books ────────────────────────────────────────────────────
+function exportCreditsXLSX(credits, membersList) {
+  const rows = membersList
+    .filter(m => m.active !== false)
+    .map(m => ({ name: m.name, flight: m.flight ?? 'Unassigned', balance: credits[m.name] ?? 0 }))
+    .sort(compareByLastName)
+  const total = rows.reduce((s, r) => s + r.balance, 0)
+  const wb = XLSX.utils.book_new()
+  const wsData = [
+    ['Player', 'Flight', 'Credit on Books'],
+    ...rows.map(r => [formatName(r.name), r.flight, r.balance]),
+    ['', 'TOTAL', total],
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(wsData)
+  ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 18 }]
+  XLSX.utils.book_append_sheet(wb, ws, 'Credit on Books')
+  XLSX.writeFile(wb, 'cga-2026-credit-on-books.xlsx')
 }
 
 // ── Excel: Tournament Results ─────────────────────────────────────────────────
@@ -976,6 +990,16 @@ function AdminPanel({ currentUser }) {
   const pastTournaments = useMemo(() => getPastTournaments(schedule), [])
   const defaultTournamentId = currentTournaments[0]?.id ?? pastTournaments[0]?.id ?? schedule[0]?.id ?? ''
 
+  // Tournaments that exist in Firestore results but are not in the current schedule.json
+  // (e.g. previous seasons). Build a minimal tournament object from the stored result doc.
+  const archivedTournaments = useMemo(() => {
+    const scheduleIds = new Set(schedule.map(t => t.id))
+    return Object.entries(allResults)
+      .filter(([id]) => !scheduleIds.has(id))
+      .map(([id, r]) => ({ id, name: r.name ?? id, date: r.date ?? '', course: r.course ?? '', archived: true }))
+      .sort((a, b) => b.date.localeCompare(a.date))
+  }, [allResults])
+
   const [tid,          setTid]          = useState(defaultTournamentId)
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
@@ -1169,8 +1193,14 @@ function AdminPanel({ currentUser }) {
     return () => clearTimeout(timer)
   }, [actionFeedback])
 
-  const tournament     = schedule.find(t => t.id === tid)
+  const tournament     = schedule.find(t => t.id === tid) ?? archivedTournaments.find(t => t.id === tid)
   const nextTournament = currentTournaments[0] ?? pastTournaments[0] ?? null
+  // For archived tournaments, live scores may be absent; fall back to the published leaderboard.
+  const effectiveFlightData = useMemo(() => {
+    const live = data[tid] ?? {}
+    const hasLive = Object.values(live).some(fl => Array.isArray(fl) && fl.length > 0)
+    return hasLive ? live : (allResults[tid]?.leaderboard ?? {})
+  }, [data, tid, allResults])
   const tournamentInfo = tournament ? { ...tournament, ...(tournamentInfoDrafts[tournament.id] ?? {}) } : null
   const nextTournamentInfo = nextTournament ? { ...nextTournament, ...(tournamentInfoDrafts[nextTournament.id] ?? {}) } : null
   const totalPlayers = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
@@ -2555,6 +2585,11 @@ function AdminPanel({ currentUser }) {
                   {pastTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
                 </optgroup>
               )}
+              {archivedTournaments.length > 0 && (
+                <optgroup label="Archived (Previous Seasons)">
+                  {archivedTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
+                </optgroup>
+              )}
             </select>
             <button
               type="button"
@@ -2672,7 +2707,7 @@ function AdminPanel({ currentUser }) {
           scoresSaveStatus={scoresSaveStatus}
           tournament={tournament}
           totalPlayers={totalPlayers}
-          onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
+          onExportResultsPDF={() => exportResultsPDF(tournament, effectiveFlightData)}
           pairingsPosted={pairingsPosted}
           onGoToPairings={() => setAdminMode('pairings')}
         />
@@ -2873,12 +2908,13 @@ function AdminPanel({ currentUser }) {
           onOpenTournamentInfoEditor={() => setShowTournamentInfoEditor(true)}
           onExportPtmPDF={() => exportPtmPDF(membersData)}
           onExportPtmXLSX={() => exportPtmXLSX(membersData)}
-          onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
-          onExportResultsXLSX={() => exportResultsXLSX(tournament, data[tid] ?? {})}
+          onExportResultsPDF={() => exportResultsPDF(tournament, effectiveFlightData)}
+          onExportResultsXLSX={() => exportResultsXLSX(tournament, effectiveFlightData)}
           onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}
           onExportPaymentsPDF={() => exportPaymentsPDF(tournament, paymentMap, membersData)}
           onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData)}
           onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
+          onExportCreditsXLSX={() => exportCreditsXLSX(credits, membersData)}
         />
       )}
 
@@ -3675,7 +3711,7 @@ function UsersPanel({
 function ExportPanel({
   tournament, tournamentInfo, totalPlayers, currentPairings, paymentPaidCount, credits,
   onOpenTournamentInfoEditor, onExportPtmPDF, onExportPtmXLSX, onExportResultsPDF, onExportResultsXLSX,
-  onExportPairingsPDF, onExportPaymentsPDF, onExportPaymentsXLSX, onExportCreditsPDF,
+  onExportPairingsPDF, onExportPaymentsPDF, onExportPaymentsXLSX, onExportCreditsPDF, onExportCreditsXLSX,
 }) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -3688,7 +3724,7 @@ function ExportPanel({
         <ExportRow title="Tournament Results" description="Per-flight leaderboard with rank, score, +/−, and POY points"><PdfBtn onClick={onExportResultsPDF} disabled={!tournament || totalPlayers === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportResultsXLSX} disabled={!tournament || totalPlayers === 0}>Excel</XlsxBtn></ExportRow>
         <ExportRow title="Pairings" description="Tee-time groupings for the round"><PdfBtn onClick={onExportPairingsPDF} disabled={!tournament || currentPairings.length === 0}>PDF</PdfBtn></ExportRow>
         <ExportRow title="Payment Status" description="List of paid players with Venmo QR code"><PdfBtn onClick={onExportPaymentsPDF} disabled={!tournament || paymentPaidCount === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>Excel</XlsxBtn></ExportRow>
-        <ExportRow title="Credit on Books" description="Member credit balances with totals"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn></ExportRow>
+        <ExportRow title="Credit on Books" description="Member credit balances with totals"><PdfBtn onClick={onExportCreditsPDF} disabled={Object.keys(credits).length === 0}>PDF</PdfBtn><XlsxBtn onClick={onExportCreditsXLSX} disabled={Object.keys(credits).length === 0}>Excel</XlsxBtn></ExportRow>
       </div>
     </div>
   )
