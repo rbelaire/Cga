@@ -873,6 +873,7 @@ async function exportPaymentsPDF(tournament, paymentMap, membersList) {
     tournament,
     paymentMap,
     members: membersList,
+    flights: [...FLIGHTS, NEW_PLAYERS_FLIGHT],
     logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
   })
 }
