@@ -346,10 +346,21 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
     return y
   }
 
+  // Column widths must sum exactly to pageWidth − marginLeft − marginRight = 187.9mm
+  // Rank=14 + PTM=14 + Score=17 + +/-=14 + POY=17 + Player=111.9 = 187.9mm
+  const resultsColumnStyles = {
+    0: { halign: 'center', cellWidth: 14, fontStyle: 'bold' },
+    1: { cellWidth: 111.9 },
+    2: { halign: 'center', cellWidth: 14 },
+    3: { halign: 'center', cellWidth: 17, fontStyle: 'bold' },
+    4: { halign: 'center', cellWidth: 14 },
+    5: { halign: 'center', cellWidth: 17 },
+  }
+
   for (const fl of flights) {
     const rows = calcFlightPOY(flightData?.[fl] ?? [])
     if (!rows.length) continue
-    y = ensurePageSpace(doc, y, 36)
+    y = ensurePageSpace(doc, y, 24)
     y = drawSectionCard(doc, { y, title: fl, rows: [] })
 
     y = drawDataTable(doc, {
@@ -363,13 +374,10 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
         formatTrend(p.plusMinus),
         p.poy == null ? '—' : String(p.poy),
       ]),
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 16, fontStyle: 'bold' },
-        2: { halign: 'center', cellWidth: 16 },
-        3: { halign: 'center', cellWidth: 20, fontStyle: 'bold' },
-        4: { halign: 'center', cellWidth: 16 },
-        5: { halign: 'center', cellWidth: 18 },
-      },
+      columnStyles: resultsColumnStyles,
+      fontSize: 7.5,
+      cellPadding: 1.3,
+      headCellPadding: 1.6,
     })
   }
 
