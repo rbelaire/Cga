@@ -2301,6 +2301,7 @@ function AdminPanel({ currentUser }) {
         resultsByTournament: allResults,
         credits,
         creditTransactions: cloudCreditTransactions,
+        schedule,
       })
       const plan = planBulkImport({
         importType: bulkImportType,
