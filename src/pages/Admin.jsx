@@ -2812,7 +2812,7 @@ function AdminPanel({ currentUser }) {
             />
           </section>
 
-          <BeginningPtmPanel livePtmData={livePtmData} logChange={logChange} openConfirm={openConfirm} />
+          <BeginningPtmPanel livePtmData={livePtmData?.length ? livePtmData : membersData} logChange={logChange} openConfirm={openConfirm} />
         </div>
       )}
 
