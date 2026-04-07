@@ -11,7 +11,24 @@ const FLIGHT_ALIASES = {
 }
 
 function toText(value) {
+  // Excel auto-converts date-like values (e.g. "2026-01") to Date objects
+  // via cellDates:true in the parser. Format them back to ISO date strings.
+  if (value instanceof Date) {
+    const y = value.getFullYear()
+    const m = String(value.getMonth() + 1).padStart(2, '0')
+    const d = String(value.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
   return String(value ?? '').trim()
+}
+
+// Normalize a tournamentId that may have been date-expanded by Excel
+// e.g. "2026-01-01" → "2026-01" when "2026-01" is a known schedule ID
+function normalizeTournamentId(raw, scheduleIds) {
+  if (scheduleIds.has(raw)) return raw
+  const prefix = raw.slice(0, 7) // YYYY-MM
+  if (scheduleIds.has(prefix)) return prefix
+  return raw
 }
 
 function normalizeKey(value) {
@@ -181,7 +198,7 @@ function planTournamentImport(rows, context, mode) {
 
   plan.rowsDetected = rows.length
   rows.forEach(({ rowNumber, row }) => {
-    const tournamentId = toText(row.tournamentId)
+    const tournamentId = normalizeTournamentId(toText(row.tournamentId), context.scheduleIds)
     const title = toText(row.title)
     const date = normalizeDate(row.date)
     const course = toText(row.course)
@@ -253,7 +270,7 @@ function planResultsImport(rows, context, mode) {
   plan.rowsDetected = rows.length
 
   rows.forEach(({ rowNumber, row }) => {
-    const tournamentId = toText(row.tournamentId)
+    const tournamentId = normalizeTournamentId(toText(row.tournamentId), context.scheduleIds)
     const flight = normalizeFlight(row.flight)
     const member = toText(row.member)
     const score = toNumber(row.score)

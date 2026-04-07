@@ -18,7 +18,7 @@ function remapHeaders(row = {}, headerAliases = {}) {
 }
 
 function parseWorkbookBuffer(buffer, headerAliases = {}) {
-  const workbook = XLSX.read(buffer, { type: 'array' })
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   return workbook.SheetNames.map((sheetName) => {
     const ws = workbook.Sheets[sheetName]
     const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' })
@@ -31,7 +31,7 @@ function parseWorkbookBuffer(buffer, headerAliases = {}) {
 }
 
 function parseCsvText(text, headerAliases = {}) {
-  const wb = XLSX.read(text, { type: 'string' })
+  const wb = XLSX.read(text, { type: 'string', cellDates: true })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' })
   return [{
