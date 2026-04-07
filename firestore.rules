@@ -9,9 +9,15 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email == 'rjbelaire@gmail.com';
+    }
+
     function isAdmin() {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+      return isSuperAdmin() || (
+        isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin'])
+      );
     }
 
     // ── Per-user data ────────────────────────────────────────────────────────
