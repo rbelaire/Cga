@@ -12,5 +12,5 @@ export function createExportPage({ title, subtitle, tournamentName, tournamentDa
 export function ensurePageSpace(doc, y, neededHeight) {
   if (y + neededHeight <= PDF_LAYOUT.bottomSafeY) return y
   doc.addPage()
-  return PDF_LAYOUT.bodyTopY
+  return PDF_LAYOUT.newPageTopY
 }

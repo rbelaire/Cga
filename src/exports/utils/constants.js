@@ -23,8 +23,9 @@ export const PDF_TYPOGRAPHY = {
 export const PDF_LAYOUT = {
   marginX: 14,
   topHeaderHeight: 38,
-  bodyTopY: 46,
-  bottomSafeY: 258,
+  bodyTopY: 46,    // page 1 — below the header banner
+  newPageTopY: 16, // pages 2+ — no header, start near top
+  bottomSafeY: 256,
   pageFormat: 'letter',
   unit: 'mm',
 }
@@ -36,5 +37,6 @@ export const FLIGHT_CODES = {
   '3rd Flight': '3F',
   '4th Flight': '4F',
   '5th Flight': '5F',
+  'New Players': 'NP',
   Unassigned: 'UN',
 }
