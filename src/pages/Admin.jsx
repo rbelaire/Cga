@@ -1367,7 +1367,7 @@ function AdminPanel({ currentUser }) {
     // Distribute players from different flights into each group of 4
     // Strategy: interleave by flight so each group has players from 4 different flights
     const byFlight = {}
-    for (const fl of FLIGHTS) {
+    for (const fl of ALL_SCORE_TABS) {
       const ps = allPlayers.filter(p => p.flight === fl)
       if (ps.length) byFlight[fl] = ps
     }
