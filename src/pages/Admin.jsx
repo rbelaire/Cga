@@ -976,6 +976,16 @@ function AdminPanel({ currentUser }) {
   const pastTournaments = useMemo(() => getPastTournaments(schedule), [])
   const defaultTournamentId = currentTournaments[0]?.id ?? pastTournaments[0]?.id ?? schedule[0]?.id ?? ''
 
+  // Tournaments that exist in Firestore results but are not in the current schedule.json
+  // (e.g. previous seasons). Build a minimal tournament object from the stored result doc.
+  const archivedTournaments = useMemo(() => {
+    const scheduleIds = new Set(schedule.map(t => t.id))
+    return Object.entries(allResults)
+      .filter(([id]) => !scheduleIds.has(id))
+      .map(([id, r]) => ({ id, name: r.name ?? id, date: r.date ?? '', course: r.course ?? '', archived: true }))
+      .sort((a, b) => b.date.localeCompare(a.date))
+  }, [allResults])
+
   const [tid,          setTid]          = useState(defaultTournamentId)
   const [poolSearch,   setPoolSearch]   = useState('')
   const [selectedPool, setSelectedPool] = useState(new Set())
@@ -1169,8 +1179,14 @@ function AdminPanel({ currentUser }) {
     return () => clearTimeout(timer)
   }, [actionFeedback])
 
-  const tournament     = schedule.find(t => t.id === tid)
+  const tournament     = schedule.find(t => t.id === tid) ?? archivedTournaments.find(t => t.id === tid)
   const nextTournament = currentTournaments[0] ?? pastTournaments[0] ?? null
+  // For archived tournaments, live scores may be absent; fall back to the published leaderboard.
+  const effectiveFlightData = useMemo(() => {
+    const live = data[tid] ?? {}
+    const hasLive = Object.values(live).some(fl => Array.isArray(fl) && fl.length > 0)
+    return hasLive ? live : (allResults[tid]?.leaderboard ?? {})
+  }, [data, tid, allResults])
   const tournamentInfo = tournament ? { ...tournament, ...(tournamentInfoDrafts[tournament.id] ?? {}) } : null
   const nextTournamentInfo = nextTournament ? { ...nextTournament, ...(tournamentInfoDrafts[nextTournament.id] ?? {}) } : null
   const totalPlayers = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
@@ -2555,6 +2571,11 @@ function AdminPanel({ currentUser }) {
                   {pastTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
                 </optgroup>
               )}
+              {archivedTournaments.length > 0 && (
+                <optgroup label="Archived (Previous Seasons)">
+                  {archivedTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
+                </optgroup>
+              )}
             </select>
             <button
               type="button"
@@ -2672,7 +2693,7 @@ function AdminPanel({ currentUser }) {
           scoresSaveStatus={scoresSaveStatus}
           tournament={tournament}
           totalPlayers={totalPlayers}
-          onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
+          onExportResultsPDF={() => exportResultsPDF(tournament, effectiveFlightData)}
           pairingsPosted={pairingsPosted}
           onGoToPairings={() => setAdminMode('pairings')}
         />
@@ -2873,8 +2894,8 @@ function AdminPanel({ currentUser }) {
           onOpenTournamentInfoEditor={() => setShowTournamentInfoEditor(true)}
           onExportPtmPDF={() => exportPtmPDF(membersData)}
           onExportPtmXLSX={() => exportPtmXLSX(membersData)}
-          onExportResultsPDF={() => exportResultsPDF(tournament, data[tid] ?? {})}
-          onExportResultsXLSX={() => exportResultsXLSX(tournament, data[tid] ?? {})}
+          onExportResultsPDF={() => exportResultsPDF(tournament, effectiveFlightData)}
+          onExportResultsXLSX={() => exportResultsXLSX(tournament, effectiveFlightData)}
           onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}
           onExportPaymentsPDF={() => exportPaymentsPDF(tournament, paymentMap, membersData)}
           onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData)}
