@@ -4266,7 +4266,7 @@ function FlightManagementPanel({
         return {
           id: member.id ?? member.name,
           name: member.name,
-          flight: member.flight ?? null,
+          flight: (member.flight && ALL_SCORE_TABS.includes(member.flight)) ? member.flight : null,
           ptm: fmtPtmValue(member.ptm),
           tee: member.tee ?? null,
           creditOnBooks: Number.isFinite(parsedCredit) ? parsedCredit : 0,
