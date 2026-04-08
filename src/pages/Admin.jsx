@@ -947,6 +947,7 @@ function AdminPanel({ currentUser }) {
   const { data: cloudCreditTransactions = [] } = useFireData(DB.listenCreditTransactions, [])
   const { data: changelog = [] } = useFireData(DB.listenChangelog, [])
   const { data: snapshots = [] } = useFireData(DB.listenSnapshots, [])
+  const { data: liveTournamentStatus } = useFireData(DB.listenTournamentStatus, null)
 
   // Tournament score entry data
   const [data, setData] = useState(() => {
@@ -2495,6 +2496,41 @@ function AdminPanel({ currentUser }) {
     await DB.saveTournamentLifecycle(nextLifecycle).catch(err => console.warn('[CGA] Failed to save tournament lifecycle:', err))
   }
 
+  // ── Tournament completion (site-wide status override) ─────────────────────────
+  async function markTournamentComplete(targetTid) {
+    const prevStatus = liveTournamentStatus
+    const updated = {
+      ...prevStatus,
+      completed: { ...(prevStatus?.completed ?? {}), [targetTid]: true },
+    }
+    try {
+      await DB.saveTournamentStatus(updated)
+      const tName = schedule.find(t => t.id === targetTid)?.name ?? targetTid
+      logChange('Tournament marked complete', tName)
+      registerUndoAction({
+        label: `Mark "${tName}" complete`,
+        undo: () => DB.saveTournamentStatus(prevStatus ?? {})
+          .then(() => logChange('Tournament completion undone', tName))
+          .catch(err => setAdminError(err?.message || 'Undo failed')),
+      })
+    } catch (e) {
+      setAdminError(e?.message || 'Failed to mark tournament complete')
+    }
+  }
+
+  async function unmarkTournamentComplete(targetTid) {
+    const prevStatus = liveTournamentStatus
+    const currentCompleted = { ...(prevStatus?.completed ?? {}) }
+    delete currentCompleted[targetTid]
+    try {
+      await DB.saveTournamentStatus({ ...prevStatus, completed: currentCompleted })
+      const tName = schedule.find(t => t.id === targetTid)?.name ?? targetTid
+      logChange('Tournament completion undone', tName)
+    } catch (e) {
+      setAdminError(e?.message || 'Failed to undo tournament completion')
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <PageWrapper>
@@ -2737,6 +2773,9 @@ function AdminPanel({ currentUser }) {
           onMarkMemoSent={() => markMemoSent(dashboardTid)}
           onExportBirdiePool={() => generateBirdieExport(dashboardTid)}
           onGeneratePayout={() => generatePayoutDocument(dashboardTid)}
+          tournamentCompletionOverrides={liveTournamentStatus?.completed ?? {}}
+          onMarkComplete={() => markTournamentComplete(dashboardTid)}
+          onUnmarkComplete={() => unmarkTournamentComplete(dashboardTid)}
         />
       )}
 
@@ -3045,6 +3084,7 @@ function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
   onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout,
+  tournamentCompletionOverrides, onMarkComplete, onUnmarkComplete,
 }) {
   const lifecycleActions = {
     memo: { label: 'Mark Sent', action: onMarkMemoSent },
@@ -3054,6 +3094,12 @@ function DashboardPanel({
     scoresLifecycle: { label: workflow.counts.resultsPublished ? 'View Results' : 'Enter Scores', action: onGoToScores },
     payout: { label: 'Generate', action: onGeneratePayout },
   }
+
+  const selectedId = selectedTournament?.id
+  // A tournament is statically completed if schedule.json already says so
+  const isStaticCompleted = selectedTournament?.status === 'completed'
+  // A tournament is dynamically completed if the admin marked it at runtime
+  const isDynamicCompleted = !!(tournamentCompletionOverrides ?? {})[selectedId]
 
   return (
     <div className="space-y-5">
@@ -3073,6 +3119,47 @@ function DashboardPanel({
           <button onClick={onGoToPairings} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Pairings</button>
           <button onClick={onGoToScores} className="px-3 py-2 text-xs font-sans font-semibold rounded-md border border-forest/30 text-forest hover:bg-forest/5">Scores / Results</button>
         </div>
+
+        {selectedTournament && (
+          <div className="mt-5 pt-4 border-t border-gray-100">
+            <p className="text-[11px] font-sans font-semibold uppercase tracking-widest text-gray-500 mb-2">Site Completion Status</p>
+            {isStaticCompleted ? (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200">
+                <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
+                <span className="text-xs font-sans font-semibold text-gray-600">Completed (built into schedule)</span>
+              </div>
+            ) : isDynamicCompleted ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-green-50 border border-green-200">
+                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                  <span className="text-xs font-sans font-semibold text-green-700">Marked Complete — site updated</span>
+                </div>
+                <button
+                  onClick={onUnmarkComplete}
+                  className="px-3 py-1.5 text-xs font-sans font-semibold rounded-md border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors"
+                >
+                  Undo Completion
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-white border border-gray-200">
+                  <span className="w-2 h-2 rounded-full bg-gold flex-shrink-0 animate-pulse" />
+                  <span className="text-xs font-sans font-semibold text-gray-600">Upcoming — not yet complete</span>
+                </div>
+                <button
+                  onClick={onMarkComplete}
+                  className="px-3 py-1.5 text-xs font-sans font-semibold rounded-md bg-forest text-white hover:bg-forest/90 transition-colors"
+                >
+                  Mark Tournament Complete
+                </button>
+              </div>
+            )}
+            <p className="mt-2 text-[11px] font-sans text-gray-400">
+              Marking complete updates the home page next-tournament banner and the full schedule instantly across the site.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="bg-white border border-gray-200 rounded-lg p-5">

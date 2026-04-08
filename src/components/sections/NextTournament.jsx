@@ -1,10 +1,16 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import CountdownTimer from '../ui/CountdownTimer'
 import schedule from '../../data/schedule.json'
 import { formatDate } from '../../utils/formatDate'
+import { DB } from '../../db'
+import { useFireData } from '../../hooks/useFireData'
+import { mergeScheduleStatus } from '../../utils/mergeScheduleStatus'
 
 export default function NextTournament() {
-  const next = schedule.find((t) => t.status === 'upcoming')
+  const { data: tournamentStatus } = useFireData(DB.listenTournamentStatus, null)
+  const mergedSchedule = useMemo(() => mergeScheduleStatus(schedule, tournamentStatus), [tournamentStatus])
+  const next = mergedSchedule.find((t) => t.status === 'upcoming')
   if (!next) return null
 
   return (
