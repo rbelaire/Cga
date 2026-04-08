@@ -273,6 +273,12 @@ export const DB = {
     return onSnapshot(q, snap => cb(snap.docs.map(d => ({ ...d.data(), _id: d.id }))))
   },
 
+  // Tournament completion status overrides — cga/tournamentStatus
+  // Stores { completed: { [tid]: true } } for tournaments marked complete at runtime.
+  // Merges with the static schedule.json status so the site can advance without a redeploy.
+  listenTournamentStatus: (cb) => fsListen('cga/tournamentStatus', cb),
+  saveTournamentStatus:   (data) => fsSet('cga/tournamentStatus', data),
+
   // ── Atomic publish ─────────────────────────────────────────────────────────
   // Writes the result document, updated POY standings, and updated PTM standings
   // in a single Firestore batch so partial writes are impossible.

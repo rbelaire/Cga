@@ -11,6 +11,7 @@ import { buildFlightWinnerCards } from '../utils/flightWinners'
 import FlightWinnerCards from '../components/ui/FlightWinnerCards'
 import { sortFlights } from '../utils/flightOrder'
 import { useAuth } from '../context/AuthContext'
+import { mergeScheduleStatus } from '../utils/mergeScheduleStatus'
 import {
   listenSavedFilter,
   listenSavedView,
@@ -73,8 +74,11 @@ export default function Tournaments() {
 
   const [seasonView, setSeasonView] = useState('all')
 
-  const upcoming = schedule.filter((t) => t.status === 'upcoming')
-  const completed = schedule.filter((t) => t.status === 'completed')
+  const { data: tournamentStatus } = useFireData(DB.listenTournamentStatus, null)
+  const mergedSchedule = useMemo(() => mergeScheduleStatus(schedule, tournamentStatus), [tournamentStatus])
+
+  const upcoming = mergedSchedule.filter((t) => t.status === 'upcoming')
+  const completed = mergedSchedule.filter((t) => t.status === 'completed')
   const pct = Math.round((completed.length / schedule.length) * 100)
 
   const [expanded, setExpanded] = useState(state?.expand ?? completed[0]?.id ?? null)
