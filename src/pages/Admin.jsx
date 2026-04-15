@@ -1730,14 +1730,18 @@ function AdminPanel({ currentUser }) {
   }
 
   async function saveMembers() {
-    const updated = membersData.map(m => ({
-      ...m,
-      name:   membersOverride[m.name]?.name   ?? m.name,
-      flight: membersOverride[m.name]?.flight ?? m.flight,
-      ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
-      tee:    membersOverride[m.name]?.tee    ?? m.tee,
-      active: membersOverride[m.name]?.active ?? m.active,
-    }))
+    const updated = membersData.map(m => {
+      const raw = {
+        ...m,
+        name:   membersOverride[m.name]?.name   ?? m.name,
+        flight: membersOverride[m.name]?.flight ?? m.flight,
+        ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
+        tee:    membersOverride[m.name]?.tee    ?? m.tee,
+        active: membersOverride[m.name]?.active ?? m.active,
+      }
+      // Firestore rejects undefined field values; strip them before writing
+      return Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined))
+    })
     if (blockOnValidation(validateMembers(updated))) return false
 
     const ok = await withSaveState(setMembersSaving, setMembersSaveStatus, async () => {
