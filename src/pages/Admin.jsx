@@ -1066,6 +1066,7 @@ function AdminPanel({ currentUser }) {
   const [importError,    setImportError]    = useState(null)   // error message | null
   const fileInputRef = useRef(null)
   const [bulkImportType, setBulkImportType] = useState('credits')
+  const [bulkImportTournamentId, setBulkImportTournamentId] = useState('')
   const bulkImportMode = 'add-only'
   const [bulkImportFileName, setBulkImportFileName] = useState('')
   const [bulkImportPlan, setBulkImportPlan] = useState(null)
@@ -2395,9 +2396,19 @@ function AdminPanel({ currentUser }) {
           tournamentid: 'tournamentId',
         },
       })
-      const rows = collectRowsForImportType(parsedSheets, bulkImportType)
+      let rows = collectRowsForImportType(parsedSheets, bulkImportType)
       if (!rows.length) {
         throw new Error(`No rows found for "${bulkImportType}". Use a sheet named "${bulkImportType}" or upload a single-sheet file.`)
+      }
+
+      if (bulkImportType === 'results') {
+        if (!bulkImportTournamentId) {
+          throw new Error('Select a tournament before uploading results.')
+        }
+        rows = rows.map(({ rowNumber, row }) => ({
+          rowNumber,
+          row: { ...row, tournamentId: bulkImportTournamentId },
+        }))
       }
 
       const context = buildImportContext({
@@ -2987,6 +2998,7 @@ function AdminPanel({ currentUser }) {
             setBulkImportPlan(null)
             setBulkImportError(null)
             setBulkImportStatus(null)
+            setBulkImportTournamentId('')
           }}
           importMode={bulkImportMode}
           importDefinitions={BULK_IMPORT_DEFINITIONS}
@@ -2999,6 +3011,9 @@ function AdminPanel({ currentUser }) {
           onFileSelected={handleBulkImportFile}
           onApply={applyBulkImport}
           currentUser={currentUser}
+          schedule={schedule}
+          selectedTournamentId={bulkImportTournamentId}
+          onTournamentIdChange={setBulkImportTournamentId}
         />
       )}
 

@@ -23,6 +23,9 @@ export function AdminBulkImportPanel({
   onFileSelected,
   onApply,
   currentUser,
+  schedule = [],
+  selectedTournamentId = '',
+  onTournamentIdChange,
 }) {
   const template = getBulkImportTemplateDownload(importType)
   const definition = importDefinitions[importType]
@@ -58,6 +61,24 @@ export function AdminBulkImportPanel({
             />
           </label>
         </div>
+
+        {importType === 'results' && (
+          <div className="mt-3">
+            <label className="text-sm font-sans">
+              <span className="text-xs uppercase tracking-widest text-gray-500">Tournament</span>
+              <select
+                value={selectedTournamentId}
+                onChange={e => onTournamentIdChange?.(e.target.value)}
+                className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              >
+                <option value="">— Select a tournament —</option>
+                {schedule.map(t => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.date})</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
 
         <div className="mt-4 p-3 rounded-md border border-gray-200 bg-gray-50">
           <p className="text-xs font-semibold uppercase tracking-widest text-forest">Template &amp; Rules</p>
