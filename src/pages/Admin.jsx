@@ -817,20 +817,31 @@ function exportPaymentsXLSX(tournament, paymentMap, membersList) {
 
 // ── Excel: Points to Make ─────────────────────────────────────────────────────
 function exportPtmXLSX(membersList) {
+  const roundLabels = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']
+  const memberRow = m => {
+    const hist = Array.isArray(m.history) ? m.history : []
+    return [
+      m.flight ?? 'Unassigned',
+      formatName(m.name),
+      typeof m.ptm === 'number' ? Math.round(m.ptm) : (m.ptm ?? ''),
+      m.tee ?? '',
+      ...roundLabels.map((_, i) => hist[i] ?? ''),
+    ]
+  }
   const wsData = [
-    ['Flight', 'Player', 'PTM', 'Tee'],
+    ['Flight', 'Player', 'PTM', 'Tee', ...roundLabels],
     ...FLIGHTS.flatMap(fl =>
       membersList
         .filter(m => m.active !== false && m.flight === fl)
         .slice()
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(m => [fl, m.name, typeof m.ptm === 'number' ? Math.round(m.ptm) : (m.ptm ?? ''), m.tee ?? ''])
+        .sort(compareByLastName)
+        .map(memberRow)
     ),
     ...membersList
       .filter(m => m.active !== false && !FLIGHTS.includes(m.flight))
       .slice()
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(m => ['Unassigned', m.name, typeof m.ptm === 'number' ? Math.round(m.ptm) : (m.ptm ?? ''), m.tee ?? '']),
+      .sort(compareByLastName)
+      .map(memberRow),
   ]
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet(wsData)

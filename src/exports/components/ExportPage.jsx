@@ -3,8 +3,8 @@ import { PDF_LAYOUT } from '../utils/constants'
 import { drawExportHeader } from './ExportHeader'
 import { drawExportFooter } from './ExportFooter'
 
-export function createExportPage({ title, subtitle, tournamentName, tournamentDate, logo, timestamp = true }) {
-  const doc = new jsPDF({ unit: PDF_LAYOUT.unit, format: PDF_LAYOUT.pageFormat })
+export function createExportPage({ title, subtitle, tournamentName, tournamentDate, logo, timestamp = true, orientation = 'portrait' }) {
+  const doc = new jsPDF({ unit: PDF_LAYOUT.unit, format: PDF_LAYOUT.pageFormat, orientation })
   const y = drawExportHeader(doc, { title, subtitle, tournamentName, tournamentDate, logo })
   return { doc, cursorY: y, withFooter: (footerNote = '') => drawExportFooter(doc, { footerNote, timestamp }) }
 }

@@ -7,6 +7,7 @@ import { drawEmptyState } from './components/EmptyState'
 import { FLIGHT_CODES, PDF_COLORS, PDF_LAYOUT } from './utils/constants'
 import { formatCurrency, formatDate, formatPTM, formatScore, formatText, formatTrend, formatValue } from './utils/formatters'
 import { sanitizeTournamentData } from './utils/sanitize'
+import { formatName, compareByLastName } from '../utils/formatName'
 
 function safeFilename(id, suffix) {
   return `${formatText(id, 'tournament').replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${suffix}.pdf`
@@ -389,12 +390,15 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
 export async function exportPtmPDF({ members, flights, logoUrl }) {
   const clean = sanitizeTournamentData({ members })
   const logo = await loadAssetBase64(logoUrl)
+
+  // Landscape letter: 279.4 × 215.9 mm — wide enough for 10 columns
   const { doc, cursorY, withFooter } = createExportPage({
     title: 'Points to Make',
-    subtitle: 'Season roster grouped by flight',
+    subtitle: 'Season roster grouped by flight — sorted alphabetically',
     tournamentName: 'CGA 2026',
     tournamentDate: new Date().toISOString(),
     logo,
+    orientation: 'landscape',
   })
 
   const grouped = Object.fromEntries(flights.map(f => [f, []]))
@@ -404,71 +408,70 @@ export async function exportPtmPDF({ members, flights, logoUrl }) {
     else unassigned.push(m)
   })
 
-  // Build ordered list of non-empty flight groups
+  // Sort each flight alphabetically by Last, First
   const allGroups = [
     ...flights
       .filter(fl => grouped[fl].length > 0)
-      .map(fl => ({ label: fl, rows: grouped[fl].slice().sort((a, b) => a.name.localeCompare(b.name)) })),
+      .map(fl => ({ label: fl, rows: grouped[fl].slice().sort(compareByLastName) })),
     ...(unassigned.length
-      ? [{ label: 'Unassigned', rows: unassigned.slice().sort((a, b) => a.name.localeCompare(b.name)) }]
+      ? [{ label: 'Unassigned', rows: unassigned.slice().sort(compareByLastName) }]
       : []),
   ]
 
-  // 2-column layout: compute margins for each column
-  const pageW = doc.internal.pageSize.getWidth()
-  const ML = PDF_LAYOUT.marginX
-  const MR = PDF_LAYOUT.marginX
-  const COL_GAP = 5
-  const halfW = (pageW - ML - MR - COL_GAP) / 2
-  const leftMR  = pageW - ML - halfW   // right margin when drawing in left column
-  const rightML = ML + halfW + COL_GAP // left margin when drawing in right column
-
+  // Landscape letter usable width: 279.4 − 14 − 14 = 251.4 mm
+  // Player(90) + PTM(15) + Tee(12) + R1-R7(19.2 each = 134.4) = 251.4
+  const ROUND_W = 19.2
   const colStyles = {
-    0: { cellWidth: 57 },
-    1: { halign: 'center', cellWidth: 14, fontStyle: 'bold' },
-    2: { halign: 'center', cellWidth: 11 },
+    0: { cellWidth: 90 },
+    1: { halign: 'center', cellWidth: 15, fontStyle: 'bold' },
+    2: { halign: 'center', cellWidth: 12 },
+    3: { halign: 'center', cellWidth: ROUND_W },
+    4: { halign: 'center', cellWidth: ROUND_W },
+    5: { halign: 'center', cellWidth: ROUND_W },
+    6: { halign: 'center', cellWidth: ROUND_W },
+    7: { halign: 'center', cellWidth: ROUND_W },
+    8: { halign: 'center', cellWidth: ROUND_W },
+    9: { halign: 'center', cellWidth: ROUND_W },
   }
 
-  const drawFlightTable = (group, marginLeft, marginRight, startY) => {
+  const ML = PDF_LAYOUT.marginX
+  const MR = PDF_LAYOUT.marginX
+  // Landscape bottom safe area (page height 215.9 mm, leave 20 for footer)
+  const BOTTOM_SAFE = 196
+  const NEW_PAGE_TOP = 16
+
+  let y = cursorY
+
+  for (const group of allGroups) {
+    if (y + 30 > BOTTOM_SAFE) { doc.addPage(); y = NEW_PAGE_TOP }
+
     const sy = drawSectionCard(doc, {
-      x: marginLeft,
-      width: pageW - marginLeft - marginRight,
-      y: startY,
+      x: ML,
+      width: doc.internal.pageSize.getWidth() - ML - MR,
+      y,
       title: group.label,
       rows: [],
     })
     autoTable(doc, {
-      head: [['Player', 'PTM', 'T']],
-      body: group.rows.map(m => [
-        formatText(m.name, 'Not available'),
-        formatPTM(m.ptm),
-        formatValue(m.tee, 'text') || '—',
-      ]),
+      head: [['Player', 'PTM', 'T', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']],
+      body: group.rows.map(m => {
+        const hist = Array.isArray(m.history) ? m.history : []
+        return [
+          formatName(formatText(m.name, 'Not available')),
+          formatPTM(m.ptm),
+          formatValue(m.tee, 'text') || '—',
+          ...Array.from({ length: 7 }, (_, i) => hist[i] != null ? String(hist[i]) : ''),
+        ]
+      }),
       startY: sy - 2,
       theme: 'striped',
       headStyles: { fillColor: PDF_COLORS.blue, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 2 },
       alternateRowStyles: { fillColor: PDF_COLORS.rowAlt },
       styles: { fontSize: 8, cellPadding: 1.8, overflow: 'linebreak', textColor: PDF_COLORS.primaryText, lineColor: PDF_COLORS.border, lineWidth: 0.1 },
       columnStyles: colStyles,
-      margin: { left: marginLeft, right: marginRight, bottom: 20 },
+      margin: { left: ML, right: MR, bottom: 20 },
     })
-    return doc.lastAutoTable.finalY + 5
-  }
-
-  let y = cursorY
-
-  for (let i = 0; i < allGroups.length; i += 2) {
-    const left  = allGroups[i]
-    const right = allGroups[i + 1]
-
-    // Page break: need at least enough room for a header + a few rows
-    y = ensurePageSpace(doc, y, 30)
-    const rowStartY = y
-
-    const leftEnd  = drawFlightTable(left, ML, leftMR, rowStartY)
-    const rightEnd = right ? drawFlightTable(right, rightML, MR, rowStartY) : rowStartY
-
-    y = Math.max(leftEnd, rightEnd)
+    y = doc.lastAutoTable.finalY + 5
   }
 
   withFooter('CGA Points to Make')
