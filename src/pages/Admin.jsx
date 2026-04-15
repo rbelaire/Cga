@@ -4966,9 +4966,9 @@ function FlightManagementPanel({
           <button
             onClick={() => {
               const ws = XLSX.utils.aoa_to_sheet([
-                ['Name', 'Flight', 'Tee', 'Points to make', 'Credit on Books', 'Email'],
-                ['John Smith', '1st Flight', 'Back', 90, 0, 'john@example.com'],
-                ['Jane Doe', 'Championship', 'Senior', 105, 5, ''],
+                ['Name', 'Flight', 'Tee', 'Points to make', 'Credit on Books', 'Email', 'NEW', '2nd', '3rd', '4th', '5th', '6th', '7th'],
+                ['John Smith', '1st Flight', 'Back', 90, 0, 'john@example.com', 82, 88, 91, '', '', '', ''],
+                ['Jane Doe', 'Championship', 'Senior', 105, 5, '', 110, 104, 108, 101, 107, 99, 103],
               ])
               const wb = XLSX.utils.book_new()
               XLSX.utils.book_append_sheet(wb, ws, 'Roster')
