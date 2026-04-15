@@ -1225,12 +1225,16 @@ function AdminPanel({ currentUser }) {
     return names
   }, [data, tid])
 
-  // Effective members list (uses overrides for flight/ptm)
+  // Effective members list (uses overrides for flight/ptm/tee/name/active)
   const effectiveMembers = useMemo(() => {
     return membersData.map(m => ({
       ...m,
+      originalName: m.name,
+      name:   membersOverride[m.name]?.name   ?? m.name,
       flight: membersOverride[m.name]?.flight ?? m.flight,
       ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
+      tee:    membersOverride[m.name]?.tee    ?? m.tee,
+      active: membersOverride[m.name]?.active ?? m.active,
     }))
   }, [membersData, membersOverride])
 
@@ -1699,12 +1703,32 @@ function AdminPanel({ currentUser }) {
     }))
   }
 
+  function updateMemberName(originalName, newName) {
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === originalName) return
+    setMembersDirtyTouched(true)
+    setMembersOverride(prev => ({
+      ...prev,
+      [originalName]: { ...(prev[originalName] ?? {}), name: trimmed }
+    }))
+  }
+
+  function removeMember(originalName) {
+    setMembersDirtyTouched(true)
+    setMembersOverride(prev => ({
+      ...prev,
+      [originalName]: { ...(prev[originalName] ?? {}), active: false }
+    }))
+  }
+
   async function saveMembers() {
     const updated = membersData.map(m => ({
       ...m,
+      name:   membersOverride[m.name]?.name   ?? m.name,
       flight: membersOverride[m.name]?.flight ?? m.flight,
       ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
       tee:    membersOverride[m.name]?.tee    ?? m.tee,
+      active: membersOverride[m.name]?.active ?? m.active,
     }))
     if (blockOnValidation(validateMembers(updated))) return false
 
@@ -2890,6 +2914,9 @@ function AdminPanel({ currentUser }) {
               updateMemberFlight={updateMemberFlight}
               updateMemberPtm={updateMemberPtm}
               updateMemberTee={updateMemberTee}
+              updateMemberName={updateMemberName}
+              removeMember={removeMember}
+              openConfirm={openConfirm}
               applyCredit={applyCredit}
               savePlayerManagement={savePlayerManagement}
               playerManagementSaving={membersSaving || creditsSaving}
@@ -4742,7 +4769,8 @@ const TEE_OPTIONS = ['Back', 'Senior', 'Front']
 
 function FlightManagementPanel({
   effectiveMembers, membersData, credits, flightSearch, setFlightSearch,
-  updateMemberFlight, updateMemberPtm, updateMemberTee,
+  updateMemberFlight, updateMemberPtm, updateMemberTee, updateMemberName, removeMember,
+  openConfirm,
   applyCredit,
   savePlayerManagement, playerManagementSaving, playerManagementSaveStatus, flightTagStyles,
   fileInputRef, handleXlsxFile, importPreview, setImportPreview,
@@ -4773,6 +4801,7 @@ function FlightManagementPanel({
         const parsedCredit = Number(credits?.[member.name])
         return {
           id: member.id ?? member.name,
+          originalName: member.originalName ?? member.name,
           name: member.name,
           flight: (member.flight && ALL_SCORE_TABS.includes(member.flight)) ? member.flight : null,
           ptm: fmtPtmValue(member.ptm),
@@ -4805,10 +4834,10 @@ function FlightManagementPanel({
 
   const selectedCount = selectedRows.size
   const selectedVisibleNames = useMemo(
-    () => rows.filter(row => selectedRows.has(row.name)).map(row => row.name),
+    () => rows.filter(row => selectedRows.has(row.originalName)).map(row => row.originalName),
     [rows, selectedRows]
   )
-  const allVisibleSelected = rows.length > 0 && rows.every(row => selectedRows.has(row.name))
+  const allVisibleSelected = rows.length > 0 && rows.every(row => selectedRows.has(row.originalName))
   const hasVisibleRows = rows.length > 0
   const totalCreditOnBooks = useMemo(() => rows.reduce((sum, row) => sum + row.creditOnBooks, 0), [rows])
 
@@ -4831,10 +4860,11 @@ function FlightManagementPanel({
   }
 
   function startEditingRow(row) {
-    setEditingRows(prev => ({ ...prev, [row.name]: true }))
+    setEditingRows(prev => ({ ...prev, [row.originalName]: true }))
     setRowDrafts(prev => ({
       ...prev,
-      [row.name]: {
+      [row.originalName]: {
+        name: row.name,
         flight: row.flight ?? '',
         tee: row.tee ?? '',
         ptm: row.ptm ?? '',
@@ -4842,45 +4872,47 @@ function FlightManagementPanel({
     }))
   }
 
-  function cancelEditingRow(name) {
-    setEditingRows(prev => ({ ...prev, [name]: false }))
+  function cancelEditingRow(originalName) {
+    setEditingRows(prev => ({ ...prev, [originalName]: false }))
     setRowDrafts(prev => {
       const next = { ...prev }
-      delete next[name]
+      delete next[originalName]
       return next
     })
   }
 
-  function saveEditingRow(name) {
-    const draft = rowDrafts[name]
+  function saveEditingRow(originalName) {
+    const draft = rowDrafts[originalName]
     if (!draft) return
     const ptmRaw = String(draft.ptm ?? '').trim()
     const normalizedPtm = ptmRaw === '' ? null : Number(ptmRaw)
     if (ptmRaw !== '' && !Number.isFinite(normalizedPtm)) return
     if (draft.flight && !FLIGHT_OPTIONS.includes(draft.flight)) return
     if (draft.tee && !TEE_OPTIONS.includes(draft.tee)) return
-    updateMemberFlight(name, draft.flight || '')
-    updateMemberPtm(name, ptmRaw === '' ? '' : normalizedPtm)
-    updateMemberTee(name, draft.tee || '')
-    cancelEditingRow(name)
+    const newName = (draft.name ?? '').trim()
+    if (newName && newName !== originalName) updateMemberName(originalName, newName)
+    updateMemberFlight(originalName, draft.flight || '')
+    updateMemberPtm(originalName, ptmRaw === '' ? '' : normalizedPtm)
+    updateMemberTee(originalName, draft.tee || '')
+    cancelEditingRow(originalName)
   }
 
-  function applyRowCredit(name) {
-    const value = creditAdjustments[name]
+  function applyRowCredit(originalName) {
+    const value = creditAdjustments[originalName]
     if (value == null || value === '') return
     const parsed = Number(value)
     if (!Number.isFinite(parsed) || parsed === 0) return
-    applyCredit(name, parsed)
-    setCreditAdjustments(prev => ({ ...prev, [name]: '' }))
-    setCreditAppliedFlash(prev => ({ ...prev, [name]: true }))
-    setTimeout(() => setCreditAppliedFlash(prev => ({ ...prev, [name]: false })), 1500)
+    applyCredit(originalName, parsed)
+    setCreditAdjustments(prev => ({ ...prev, [originalName]: '' }))
+    setCreditAppliedFlash(prev => ({ ...prev, [originalName]: true }))
+    setTimeout(() => setCreditAppliedFlash(prev => ({ ...prev, [originalName]: false })), 1500)
   }
 
-  function toggleSelect(name) {
+  function toggleSelect(originalName) {
     setSelectedRows(prev => {
       const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
+      if (next.has(originalName)) next.delete(originalName)
+      else next.add(originalName)
       return next
     })
   }
@@ -4888,27 +4920,27 @@ function FlightManagementPanel({
   function toggleSelectVisible() {
     setSelectedRows(prev => {
       const next = new Set(prev)
-      if (allVisibleSelected) rows.forEach(row => next.delete(row.name))
-      else rows.forEach(row => next.add(row.name))
+      if (allVisibleSelected) rows.forEach(row => next.delete(row.originalName))
+      else rows.forEach(row => next.add(row.originalName))
       return next
     })
   }
 
   function applyBulkFlight() {
     if (!bulkFlight || !FLIGHT_OPTIONS.includes(bulkFlight) || selectedVisibleNames.length === 0) return
-    selectedVisibleNames.forEach(name => updateMemberFlight(name, bulkFlight))
+    selectedVisibleNames.forEach(originalName => updateMemberFlight(originalName, bulkFlight))
   }
 
   function applyBulkTee() {
     if (!bulkTee || !TEE_OPTIONS.includes(bulkTee) || selectedVisibleNames.length === 0) return
-    selectedVisibleNames.forEach(name => updateMemberTee(name, bulkTee))
+    selectedVisibleNames.forEach(originalName => updateMemberTee(originalName, bulkTee))
   }
 
   function applyBulkCredit(sign = 1) {
     if (selectedVisibleNames.length === 0) return
     const parsed = Number(bulkCredit)
     if (!Number.isFinite(parsed) || parsed <= 0) return
-    selectedVisibleNames.forEach(name => applyCredit(name, sign * parsed))
+    selectedVisibleNames.forEach(originalName => applyCredit(originalName, sign * parsed))
     setBulkCredit('')
   }
 
@@ -4931,6 +4963,24 @@ function FlightManagementPanel({
             onChange={handleXlsxFile}
             className="hidden"
           />
+          <button
+            onClick={() => {
+              const ws = XLSX.utils.aoa_to_sheet([
+                ['Name', 'Flight', 'Tee', 'Points to make', 'Credit on Books', 'Email'],
+                ['John Smith', '1st Flight', 'Back', 90, 0, 'john@example.com'],
+                ['Jane Doe', 'Championship', 'Senior', 105, 5, ''],
+              ])
+              const wb = XLSX.utils.book_new()
+              XLSX.utils.book_append_sheet(wb, ws, 'Roster')
+              XLSX.writeFile(wb, 'player-management-template.xlsx')
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-sans font-semibold rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Template
+          </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-sans font-semibold rounded-lg border border-forest text-forest hover:bg-forest hover:text-white transition-colors"
@@ -5116,28 +5166,39 @@ function FlightManagementPanel({
                 </tr>
               )}
               {visibleRows.map((row, idx) => {
-                const isEditing = !!editingRows[row.name]
-                const draft = rowDrafts[row.name] ?? { flight: row.flight ?? '', tee: row.tee ?? '', ptm: row.ptm ?? '' }
+                const isEditing = !!editingRows[row.originalName]
+                const draft = rowDrafts[row.originalName] ?? { name: row.name, flight: row.flight ?? '', tee: row.tee ?? '', ptm: row.ptm ?? '' }
+                const setDraft = (patch) => setRowDrafts(prev => ({ ...prev, [row.originalName]: { ...draft, ...patch } }))
                 return (
                   <tr
-                    key={row.name}
+                    key={row.originalName}
                     className={`border-b border-gray-100 last:border-0 transition-colors ${
                       (startIndex + idx) % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
                     } ${isEditing ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                     style={shouldVirtualize ? { height: `${rowHeight}px` } : undefined}
                   >
                     <td className="px-3 py-2.5 text-center sticky left-0 bg-inherit">
-                      <input type="checkbox" checked={selectedRows.has(row.name)} onChange={() => toggleSelect(row.name)} />
+                      <input type="checkbox" checked={selectedRows.has(row.originalName)} onChange={() => toggleSelect(row.originalName)} />
                     </td>
                     <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
-                      {formatName(row.name)}
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={draft.name ?? ''}
+                          onChange={e => setDraft({ name: e.target.value })}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-forest w-44"
+                          placeholder="Player name"
+                        />
+                      ) : (
+                        formatName(row.name)
+                      )}
                     </td>
 
                     <td className="px-4 py-2.5">
                       {isEditing ? (
                         <select
                           value={draft.flight}
-                          onChange={e => setRowDrafts(prev => ({ ...prev, [row.name]: { ...draft, flight: e.target.value } }))}
+                          onChange={e => setDraft({ flight: e.target.value })}
                           className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest w-full max-w-[180px]"
                         >
                           <option value="">— Unassigned —</option>
@@ -5159,7 +5220,7 @@ function FlightManagementPanel({
                         <input
                           type="number"
                           value={draft.ptm}
-                          onChange={e => setRowDrafts(prev => ({ ...prev, [row.name]: { ...draft, ptm: e.target.value } }))}
+                          onChange={e => setDraft({ ptm: e.target.value })}
                           className="w-16 border border-gray-300 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:ring-2 focus:ring-forest"
                         />
                       ) : (
@@ -5178,17 +5239,17 @@ function FlightManagementPanel({
                         <input
                           type="number"
                           step="0.01"
-                          value={creditAdjustments[row.name] ?? ''}
-                          onChange={e => setCreditAdjustments(prev => ({ ...prev, [row.name]: e.target.value }))}
-                          onKeyDown={e => e.key === 'Enter' && applyRowCredit(row.name)}
+                          value={creditAdjustments[row.originalName] ?? ''}
+                          onChange={e => setCreditAdjustments(prev => ({ ...prev, [row.originalName]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && applyRowCredit(row.originalName)}
                           placeholder="+ / - $"
                           className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                         />
                         <button
-                          onClick={() => applyRowCredit(row.name)}
-                          disabled={!creditAdjustments[row.name]}
+                          onClick={() => applyRowCredit(row.originalName)}
+                          disabled={!creditAdjustments[row.originalName]}
                           title="Apply adjustment"
-                          className={`w-7 h-7 flex items-center justify-center rounded text-sm font-bold disabled:opacity-30 transition-colors ${creditAppliedFlash[row.name] ? 'bg-green-600 text-white' : 'bg-forest text-white hover:bg-forest/80'}`}
+                          className={`w-7 h-7 flex items-center justify-center rounded text-sm font-bold disabled:opacity-30 transition-colors ${creditAppliedFlash[row.originalName] ? 'bg-green-600 text-white' : 'bg-forest text-white hover:bg-forest/80'}`}
                         >
                           ✓
                         </button>
@@ -5199,7 +5260,7 @@ function FlightManagementPanel({
                       {isEditing ? (
                         <select
                           value={draft.tee}
-                          onChange={e => setRowDrafts(prev => ({ ...prev, [row.name]: { ...draft, tee: e.target.value } }))}
+                          onChange={e => setDraft({ tee: e.target.value })}
                           className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
                         >
                           <option value="">—</option>
@@ -5216,16 +5277,27 @@ function FlightManagementPanel({
                     <td className="px-4 py-2 text-center">
                       {isEditing ? (
                         <div className="flex items-center justify-center gap-1.5">
-                          <button onClick={() => saveEditingRow(row.name)} className="px-2.5 py-1 text-xs rounded bg-forest text-white hover:bg-forest/80 font-sans font-semibold transition-colors">Save</button>
-                          <button onClick={() => cancelEditingRow(row.name)} className="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors">Cancel</button>
+                          <button onClick={() => saveEditingRow(row.originalName)} className="px-2.5 py-1 text-xs rounded bg-forest text-white hover:bg-forest/80 font-sans font-semibold transition-colors">Save</button>
+                          <button onClick={() => cancelEditingRow(row.originalName)} className="px-2.5 py-1 text-xs rounded border border-gray-300 text-gray-500 hover:text-red-500 hover:border-red-300 transition-colors">Cancel</button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => startEditingRow(row)}
-                          className="px-3 py-1 text-xs rounded border border-gray-200 text-gray-500 hover:text-forest hover:border-forest font-sans transition-colors"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => startEditingRow(row)}
+                            className="px-2.5 py-1 text-xs rounded border border-gray-200 text-gray-500 hover:text-forest hover:border-forest font-sans transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (await openConfirm(`Remove ${formatName(row.name)} from the roster? They will be marked inactive and hidden.`))
+                                removeMember(row.originalName)
+                            }}
+                            className="px-2.5 py-1 text-xs rounded border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 font-sans transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
