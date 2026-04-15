@@ -4613,39 +4613,82 @@ function PairingsPanel({
       {!manualPairings && unpairedPlayers.length > 0 && currentPairings.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex flex-wrap items-center gap-3">
           <span className="text-amber-700 font-sans text-xs font-semibold uppercase tracking-widest flex-shrink-0">
-            Not yet paired ({unpairedPlayers.length})
+            Not yet paired ({unpairedPlayers.length}) — drag into a group or click a player then click a group
           </span>
           <div className="flex flex-wrap gap-1.5">
             {unpairedPlayers.map(p => (
-              <span key={p.name} className={`text-xs border px-2 py-0.5 rounded-full font-sans ${flightTagStyles[p.flight] ?? flightTagStyles.Unassigned}`}>
+              <button
+                key={p.name}
+                draggable
+                onDragStart={(event) => handleDragStart(event, { type: 'unassigned', name: p.name })}
+                onDragEnd={handleDragEnd}
+                onClick={() => setSelectedUnpaired(prev => prev === p.name ? null : p.name)}
+                className={`text-xs border px-2 py-0.5 rounded-full font-sans cursor-grab active:cursor-grabbing transition-colors ${
+                  selectedUnpaired === p.name
+                    ? 'bg-gold/30 border-gold text-forest font-semibold'
+                    : flightTagStyles[p.flight] ?? flightTagStyles.Unassigned
+                } ${draggedPlayer?.name === p.name ? 'opacity-50' : ''}`}
+              >
                 {formatName(p.name)}
-              </span>
+              </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Pairing cards grid (auto mode) */}
+      {/* Pairing cards grid — always editable */}
       {!manualPairings && currentPairings.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {currentPairings.map((card) => (
+          {currentPairings.map((card, cardIdx) => (
             <div
               key={card.pairing}
-              className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+              className={`bg-white border rounded-lg overflow-hidden transition-colors ${
+                dropTarget?.type === 'group' && dropTarget.cardIdx === cardIdx
+                  ? 'border-emerald-400 bg-emerald-50/30'
+                  : 'border-gray-200'
+              }`}
+              onDragOver={(event) => {
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'move'
+                setDropTarget({ type: 'group', cardIdx })
+              }}
+              onDragLeave={() => setDropTarget(current => (
+                current?.type === 'group' && current.cardIdx === cardIdx ? null : current
+              ))}
+              onDrop={(event) => handleDropOnGroup(event, cardIdx)}
             >
               <div className="bg-forest px-4 py-2 flex items-center justify-between">
                 <span className="text-white font-sans text-xs font-semibold uppercase tracking-widest">
                   {card.pairing}
                 </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-white/50 font-mono text-xs">{card.players.length} players</span>
-                </div>
+                <span className="text-white/50 font-mono text-xs">{card.players.length}/4</span>
               </div>
               <ul className="divide-y divide-gray-100 min-h-[60px]">
-                {card.players.map((player) => (
+                {card.players.map((player, playerIdx) => (
                   <li
                     key={player.name}
-                    className="px-3 py-2.5 flex items-center justify-between gap-2"
+                    draggable
+                    onDragStart={(event) => handleDragStart(event, { type: 'group', cardIdx, playerIdx })}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      event.dataTransfer.dropEffect = 'move'
+                      setDropTarget({ type: 'player', cardIdx, playerIdx })
+                    }}
+                    onDragLeave={() => setDropTarget(current => (
+                      current?.type === 'player' && current.cardIdx === cardIdx && current.playerIdx === playerIdx ? null : current
+                    ))}
+                    onDrop={(event) => handleDropOnPlayer(event, cardIdx, playerIdx)}
+                    className={`px-3 py-2.5 flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing transition-colors group ${
+                      dropTarget?.type === 'player' && dropTarget.cardIdx === cardIdx && dropTarget.playerIdx === playerIdx
+                        ? 'bg-emerald-50 border-l-2 border-l-emerald-400'
+                        : ''
+                    } ${
+                      draggedPlayer?.type === 'group' && draggedPlayer.cardIdx === cardIdx && draggedPlayer.playerIdx === playerIdx
+                        ? 'opacity-50'
+                        : ''
+                    }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-sans text-sm text-darktext truncate">{formatName(player.name)}</span>
@@ -4654,6 +4697,11 @@ function PairingsPanel({
                       <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[player.flight] ?? flightTagStyles.Unassigned}`}>
                         {player.flight}
                       </span>
+                      <button
+                        onClick={() => removePairedPlayer(cardIdx, playerIdx)}
+                        className="text-gray-300 hover:text-red-400 text-base leading-none opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remove from pairing"
+                      >&times;</button>
                     </div>
                   </li>
                 ))}
@@ -4663,6 +4711,14 @@ function PairingsPanel({
                   </li>
                 )}
               </ul>
+              {selectedUnpaired && card.players.length < 4 && (
+                <button
+                  onClick={() => assignUnpairedToGroup(cardIdx)}
+                  className="w-full py-1.5 text-xs rounded-b bg-gold/10 text-amber-700 hover:bg-gold/20 font-sans font-semibold transition-colors border-t border-amber-100"
+                >
+                  Add {formatName(selectedUnpaired)}
+                </button>
+              )}
             </div>
           ))}
         </div>
