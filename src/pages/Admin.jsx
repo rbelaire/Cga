@@ -1711,6 +1711,14 @@ function AdminPanel({ currentUser }) {
       ...prev,
       [originalName]: { ...(prev[originalName] ?? {}), name: trimmed }
     }))
+    // Rekey credits from old name to new name so validation passes after rename
+    setCredits(prev => {
+      if (!(originalName in prev)) return prev
+      const next = { ...prev }
+      next[trimmed] = next[originalName]
+      delete next[originalName]
+      return next
+    })
   }
 
   function removeMember(originalName) {
@@ -1753,7 +1761,7 @@ function AdminPanel({ currentUser }) {
   }
 
   async function saveCredits() {
-    const errors = validateCredits(credits, membersData.map(m => m.name))
+    const errors = validateCredits(credits, effectiveMembers.map(m => m.name))
     if (blockOnValidation(errors)) return false
 
     const ok = await withSaveState(setCreditsSaving, setCreditsSaveStatus, async () => {
