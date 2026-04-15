@@ -47,6 +47,7 @@ import {
 import { compareFlights, FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
 import { AdminPaymentsPanel } from './admin/AdminPaymentsPanel'
 import { AdminBulkImportPanel } from './admin/AdminBulkImportPanel'
+import { AdminFlightCalculatorPanel } from './admin/AdminFlightCalculatorPanel'
 
 const FLIGHTS          = FLIGHT_ORDER
 const ALL_SCORE_TABS   = [...FLIGHTS, NEW_PLAYERS_FLIGHT]
@@ -126,6 +127,12 @@ const ArchiveIcon = ({ className }) => (
 const ClockListIcon = ({ className }) => (
   <AdminActionIcon className={className}>
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </AdminActionIcon>
+)
+
+const LayersIcon = ({ className }) => (
+  <AdminActionIcon className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
   </AdminActionIcon>
 )
 
@@ -1041,6 +1048,8 @@ function AdminPanel({ currentUser }) {
   const [pairingsSaveStatus, setPairingsSaveStatus] = useState(null)
   const [membersSaving,  setMembersSaving]  = useState(false)
   const [membersSaveStatus, setMembersSaveStatus] = useState(null)
+  const [flightsSaving,  setFlightsSaving]  = useState(false)
+  const [flightsSaveStatus, setFlightsSaveStatus] = useState(null)
   const [creditsSaving,  setCreditsSaving]  = useState(false)
   const [creditsSaveStatus, setCreditsSaveStatus] = useState(null)
   const [paymentsSaving,  setPaymentsSaving]  = useState(false)
@@ -1253,6 +1262,15 @@ function AdminPanel({ currentUser }) {
   const ptmLookup = useMemo(
     () => Object.fromEntries(effectiveMembers.map(m => [m.name, m.ptm])),
     [effectiveMembers]
+  )
+
+  // Players entered (paid) in the current tournament — used by the flight calculator
+  const enteredPlayers = useMemo(() =>
+    effectiveMembers
+      .filter(m => m.active !== false && (payments[tid] ?? {})[m.name])
+      .slice()
+      .sort((a, b) => (b.ptm ?? 0) - (a.ptm ?? 0)),
+    [effectiveMembers, payments, tid]
   )
 
   const memberFlightLookup = useMemo(
@@ -1765,6 +1783,51 @@ function AdminPanel({ currentUser }) {
     return ok
   }
 
+  // ── Flight assignment (calculator → save → navigate to pairings) ──────────────
+  async function saveFlights(assignments) {
+    // Build a flat { [name]: flightName } lookup from the assignments
+    const flightMap = {}
+    Object.entries(assignments).forEach(([flight, names]) => {
+      names.forEach(name => { flightMap[name] = flight })
+    })
+
+    // Batch-update the override so the rest of the UI stays consistent
+    setMembersOverride(prev => {
+      const next = { ...prev }
+      Object.entries(flightMap).forEach(([name, flight]) => {
+        next[name] = { ...(next[name] ?? {}), flight }
+      })
+      return next
+    })
+
+    // Build the persisted member list — use flightMap for any assigned player,
+    // fall through to existing override/base data for everyone else
+    const updated = membersData.map(m => {
+      const raw = {
+        ...m,
+        name:   membersOverride[m.name]?.name   ?? m.name,
+        flight: flightMap[m.name] ?? membersOverride[m.name]?.flight ?? m.flight,
+        ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
+        tee:    membersOverride[m.name]?.tee    ?? m.tee,
+        active: membersOverride[m.name]?.active ?? m.active,
+      }
+      return Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined))
+    })
+
+    const totalAssigned = Object.values(assignments).flat().length
+    const ok = await withSaveState(setFlightsSaving, setFlightsSaveStatus, async () => {
+      await saveSnapshot('members', membersData, `Before flight assignment (${tournament?.name ?? tid})`)
+      await DB.saveMembers(updated)
+    }, setAdminError)
+
+    if (ok) {
+      setMembersDirtyTouched(false)
+      logChange('Flights assigned', `${totalAssigned} players for ${tournament?.name ?? tid}`)
+      setAdminMode('pairings')
+    }
+    return ok
+  }
+
   // ── Credit mutations ──────────────────────────────────────────────────────────
   function applyCredit(name, amount) {
     const n = parseFloat(amount)
@@ -2188,6 +2251,7 @@ function AdminPanel({ currentUser }) {
   const primaryActions = [
     { key: 'overview',           label: 'Overview',           Icon: DashboardIcon, onClick: () => setAdminMode('dashboard'),  active: adminMode === 'dashboard' },
     { key: 'entries',            label: 'Entries',            Icon: ReceiptIcon,   onClick: () => setAdminMode('payments'),   active: adminMode === 'payments' },
+    { key: 'flights',            label: 'Flights',            Icon: LayersIcon,    onClick: () => setAdminMode('flights'),    active: adminMode === 'flights' },
     { key: 'pairings',           label: 'Pairings',           Icon: UsersIcon,     onClick: () => setAdminMode('pairings'),   active: adminMode === 'pairings' },
     { key: 'scores',             label: 'Scores',             Icon: GolfFlagIcon,  onClick: () => setAdminMode('scores'),     active: adminMode === 'scores' },
     { key: 'exports',            label: 'Exports',            Icon: ExportIcon,    onClick: () => setAdminMode('exports'),    active: adminMode === 'exports' },
@@ -3054,10 +3118,21 @@ function AdminPanel({ currentUser }) {
           onMarkAllPaid={(names) => markAllPaid(tid, names)}
           onTogglePayment={(name) => togglePayment(tid, name)}
           onMarkPaidWithCredit={(name, creditInput) => markPaidWithCredit(tid, name, creditInput)}
-          flightTagStyles={flightTagStyles}
           SaveBtn={SaveBtn}
           PdfBtn={PdfBtn}
           XlsxBtn={XlsxBtn}
+        />
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          FLIGHTS MODE
+      ════════════════════════════════════════════════════════════════════════ */}
+      {adminMode === 'flights' && (
+        <AdminFlightCalculatorPanel
+          enteredPlayers={enteredPlayers}
+          flightTagStyles={flightTagStyles}
+          onSaveFlights={saveFlights}
+          saving={flightsSaving}
         />
       )}
 

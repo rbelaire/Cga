@@ -27,7 +27,6 @@ export function AdminPaymentsPanel({
   onMarkAllPaid,
   onTogglePayment,
   onMarkPaidWithCredit,
-  flightTagStyles,
   SaveBtn,
   PdfBtn,
   XlsxBtn,
@@ -95,12 +94,11 @@ export function AdminPaymentsPanel({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[440px]">
+          <table className="w-full text-sm min-w-[380px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="table-header text-gray-400 w-24 text-center">Paid</th>
                 <th className="table-header text-gray-400 text-left">Player</th>
-                <th className="table-header text-gray-400 text-left">Flight</th>
                 <th className="table-header text-gray-400 text-right">Credit Available</th>
                 <th className="table-header text-gray-400 text-right">Credit Applied</th>
               </tr>
@@ -108,7 +106,7 @@ export function AdminPaymentsPanel({
             <tbody>
               {paymentRoster.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
+                  <td colSpan={4} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
                     No members match your search.
                   </td>
                 </tr>
@@ -145,11 +143,6 @@ export function AdminPaymentsPanel({
                       <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
                         {formatName(m.name)}
                       </td>
-                      <td className="px-3 py-2.5">
-                        <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[m.flight] ?? flightTagStyles.Unassigned}`}>
-                          {m.flight ?? 'Unassigned'}
-                        </span>
-                      </td>
                       <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-600">
                         ${balance.toFixed(2)}
                       </td>
@@ -184,7 +177,7 @@ export function AdminPaymentsPanel({
                       </svg>
                     </span>
                   </td>
-                  <td colSpan={4} className="px-4 py-2.5 font-sans text-xs font-semibold uppercase tracking-widest text-green-700">
+                  <td colSpan={3} className="px-4 py-2.5 font-sans text-xs font-semibold uppercase tracking-widest text-green-700">
                     {paymentPaidCount} member{paymentPaidCount !== 1 ? 's' : ''} paid
                   </td>
                 </tr>
