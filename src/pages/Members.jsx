@@ -5,14 +5,12 @@ import SearchBar from '../components/ui/SearchBar'
 import { compareByLastName } from '../utils/formatName'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
-import { FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
+import { FLIGHT_ORDER } from '../utils/flightOrder'
 
 const FLIGHTS = FLIGHT_ORDER
-const TABS = ['All', ...FLIGHTS, NEW_PLAYERS_FLIGHT]
 
 export default function Members() {
   useEffect(() => { document.title = 'Members | CGA 2026' }, [])
-  const [tab, setTab] = useState('All')
   const [query, setQuery] = useState('')
 
   // Live member roster from Firestore
@@ -63,44 +61,16 @@ export default function Members() {
     [liveMembers, eventsFromStandings, roundsFromPtm]
   )
 
-  const byFlight = useMemo(() =>
-    Object.fromEntries(
-      FLIGHTS.map((flight) => {
-        const players = enrichedMembers
-          .filter((m) => m.flight === flight)
-          .sort(compareByLastName)
-        return [flight, players]
-      })
-    ),
+  const allSorted = useMemo(
+    () => [...enrichedMembers].sort(compareByLastName),
     [enrichedMembers]
   )
-
-  const unassigned = useMemo(
-    () => enrichedMembers.filter((m) => !m.flight).sort(compareByLastName),
-    [enrichedMembers]
-  )
-
-  const newPlayers = useMemo(
-    () => enrichedMembers.filter((m) => m.memberSince === 2026).sort(compareByLastName),
-    [enrichedMembers]
-  )
-
-  function switchTab(label) {
-    setTab(label)
-    setQuery('')
-  }
-
-  const baseList = useMemo(() => {
-    if (tab === 'All') return [...enrichedMembers].sort(compareByLastName)
-    if (tab === NEW_PLAYERS_FLIGHT) return newPlayers
-    return byFlight[tab] ?? []
-  }, [tab, enrichedMembers, byFlight, newPlayers])
 
   const filtered = useMemo(
     () => query
-      ? baseList.filter((m) => m.name.toLowerCase().includes(query.toLowerCase()))
-      : baseList,
-    [baseList, query]
+      ? allSorted.filter((m) => m.name.toLowerCase().includes(query.toLowerCase()))
+      : allSorted,
+    [allSorted, query]
   )
 
   return (
@@ -114,103 +84,19 @@ export default function Members() {
         <SearchBar value={query} onChange={setQuery} placeholder="Search members…" />
       </div>
 
-      <div className="mb-6 -mx-1 px-1 overflow-x-auto">
-        <div className="flex gap-2 w-max min-w-full whitespace-nowrap">
-          {TABS.map((label) => (
-            <button
-              key={label}
-              onClick={() => switchTab(label)}
-              className={`px-4 py-2 text-sm font-sans font-medium rounded-lg transition-colors ${
-                tab === label
-                  ? 'bg-gold text-forest'
-                  : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-gold'
-              }`}
-            >
-              {label}
-              {label !== 'All' && (
-                <span className="ml-1.5 text-xs opacity-70">
-                  ({label === NEW_PLAYERS_FLIGHT ? newPlayers.length : (byFlight[label] ?? []).length})
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <p className="text-gray-500 font-sans text-sm mb-4">
-        {filtered.length} {filtered.length === 1 ? 'member' : 'members'}{tab !== 'All' ? ` · sorted by last name` : ''}
+        {filtered.length} {filtered.length === 1 ? 'member' : 'members'}
       </p>
 
-      {tab === 'All' && !query ? (
-        <div key="all" className="animate-tab-in space-y-8">
-          {FLIGHTS.map((flight) => {
-            const players = byFlight[flight] ?? []
-            if (players.length === 0) return null
-            return (
-              <div key={flight}>
-                <div className="flex items-center gap-3 mb-3">
-                  <h2 className="font-sans font-semibold text-forest text-sm uppercase tracking-widest">
-                    {flight}
-                  </h2>
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <span className="text-xs text-gray-400 font-sans">{players.length} members</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {players.map((m) => (
-                    <MemberCard key={m.name} member={m} />
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-          {newPlayers.length > 0 && (
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <h2 className="font-sans font-semibold text-gold text-sm uppercase tracking-widest">
-                  New Players
-                </h2>
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-xs text-gray-400 font-sans">{newPlayers.length} members</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {newPlayers.map((m) => (
-                  <MemberCard key={m.name} member={m} />
-                ))}
-              </div>
-            </div>
-          )}
-          {unassigned.length > 0 && (
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <h2 className="font-sans font-semibold text-gray-400 text-sm uppercase tracking-widest">
-                  Unassigned
-                </h2>
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-xs text-gray-400 font-sans">{unassigned.length} members</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {unassigned.map((m) => (
-                  <MemberCard key={m.name} member={m} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div key={tab + query} className="animate-tab-in">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filtered.map((m) => (
-              <MemberCard key={m.name} member={m} />
-            ))}
-          </div>
-          {filtered.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-gray-500 font-sans text-sm">No members match "{query}".</p>
-              <p className="text-gray-400 font-sans text-xs mt-1">
-                Try a different name or{tab !== 'All' ? ' switch to the All tab to search across all flights.' : ' check your spelling.'}
-              </p>
-            </div>
-          )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {filtered.map((m) => (
+          <MemberCard key={m.name} member={m} />
+        ))}
+      </div>
+      {filtered.length === 0 && query && (
+        <div className="text-center py-16">
+          <p className="text-gray-500 font-sans text-sm">No members match "{query}".</p>
+          <p className="text-gray-400 font-sans text-xs mt-1">Check your spelling.</p>
         </div>
       )}
     </PageWrapper>

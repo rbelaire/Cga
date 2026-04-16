@@ -5207,7 +5207,6 @@ function FlightManagementPanel({
               <thead>
                 <tr className="bg-amber-100 text-amber-700">
                   <th className="px-2 py-2 text-left font-semibold">Player</th>
-                  <th className="px-2 py-2 text-center font-semibold">Flight</th>
                   <th className="px-2 py-2 text-center font-semibold">Tee</th>
                   <th className="px-2 py-2 text-center font-semibold">PTM</th>
                   <th className="px-2 py-2 text-center font-semibold">Credits</th>
@@ -5219,7 +5218,6 @@ function FlightManagementPanel({
                 {importPreview.matched.slice(0, 8).map((row, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-amber-50/40'}>
                     <td className="px-2 py-1.5 text-darktext font-medium">{formatName(row.memberName)}</td>
-                    <td className="px-2 py-1.5 text-center text-gray-600">{row.flight ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center"><TeeTag tee={row.tee} /></td>
                     <td className="px-2 py-1.5 text-center font-mono text-gray-600">{roundPtm(row.ptm) ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center font-mono text-gray-600">{row.creditOnBooks ?? '—'}</td>
@@ -5229,7 +5227,7 @@ function FlightManagementPanel({
                 ))}
                 {importPreview.matched.length > 8 && (
                   <tr>
-                    <td colSpan={7} className="px-2 py-2 text-center text-amber-600 italic">
+                    <td colSpan={6} className="px-2 py-2 text-center text-amber-600 italic">
                       …and {importPreview.matched.length - 8} more
                     </td>
                   </tr>

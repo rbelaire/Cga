@@ -125,7 +125,7 @@ function MostImprovedMobileCard({ row, isLeader }) {
   )
 }
 
-function MostImprovedTab({ allRows, selectedFlight }) {
+function MostImprovedTab({ allRows }) {
   const [subMode, setSubMode] = useState('most')
   const [search, setSearch] = useState('')
 
@@ -139,13 +139,12 @@ function MostImprovedTab({ allRows, selectedFlight }) {
 
   const filtered = useMemo(() => {
     let rows = sortedWithRank
-    if (selectedFlight !== 'All') rows = rows.filter(r => r.flight === selectedFlight)
     if (search.trim()) {
       const q = search.toLowerCase()
       rows = rows.filter(r => r.name?.toLowerCase().includes(q))
     }
     return rows
-  }, [sortedWithRank, selectedFlight, search])
+  }, [sortedWithRank, search])
 
   const leaderName = filtered.find(r => r.qualified)?.name ?? null
   const hasData = (allRows?.length ?? 0) > 0
@@ -567,7 +566,6 @@ function PtmTab({ ptmList, liveMembers, ptmDeltaLookup }) {
 export default function Standings() {
   useEffect(() => { document.title = 'Standings | CGA 2026' }, [])
   const [mode, setMode] = useState('ptm')
-  const [selectedFlight, setSelectedFlight] = useState('All')
 
   const { data: standings } = useFireData(DB.listenStandings, { flights: {} })
   const { data: ptmList } = useFireData(DB.listenPtm, [])
@@ -610,10 +608,6 @@ export default function Standings() {
     [standings, roundsFromPtm]
   )
 
-  const filteredFlightData = useMemo(
-    () => selectedFlight === 'All' ? flightData : flightData.filter(row => row.flight === selectedFlight),
-    [flightData, selectedFlight]
-  )
 
   const latestCompletedTournament = useMemo(() => {
     return Object.values(allResults ?? {})
@@ -658,24 +652,6 @@ export default function Standings() {
     [allResults, liveMemberFlightLookup, latestScoreLookup, standingsByName]
   )
 
-  const filteredScratchData = useMemo(
-    () => selectedFlight === 'All' ? scratchData : scratchData.filter(row => row.flight === selectedFlight),
-    [scratchData, selectedFlight]
-  )
-
-  const filteredPtmList = useMemo(
-    () => selectedFlight === 'All'
-      ? ptmList
-      : (ptmList ?? []).filter(player => liveMemberFlightLookup[player.name] === selectedFlight),
-    [ptmList, selectedFlight, liveMemberFlightLookup]
-  )
-
-  const filteredLiveMembers = useMemo(
-    () => selectedFlight === 'All'
-      ? liveMembers
-      : (liveMembers ?? []).filter(member => member.flight === selectedFlight),
-    [liveMembers, selectedFlight]
-  )
 
   const latestTournament = filteredFlightData.find(p => p.latestTournament)?.latestTournament ?? null
 
@@ -726,44 +702,27 @@ export default function Standings() {
         </div>
       </div>
 
-      <div className="mb-6 flex items-center gap-3">
-        <label htmlFor="standings-flight-filter" className="text-sm font-sans font-medium text-gray-600">
-          Flight:
-        </label>
-        <select
-          id="standings-flight-filter"
-          value={selectedFlight}
-          onChange={(e) => setSelectedFlight(e.target.value)}
-          className="px-3 py-2 text-sm font-sans rounded-lg border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold"
-        >
-          <option value="All">All</option>
-          {FLIGHTS.map((flight) => (
-            <option key={flight} value={flight}>{flight}</option>
-          ))}
-        </select>
-      </div>
-
       {mode === 'hdcp' && (
         <div className="animate-tab-in">
-          <StandingsTable data={filteredFlightData} columns={buildStandingsColumns('hdcp')} highlightTop={3} />
+          <StandingsTable data={flightData} columns={buildStandingsColumns('hdcp')} highlightTop={3} />
         </div>
       )}
 
       {mode === 'scratch' && (
         <div className="animate-tab-in">
-          <StandingsTable data={filteredScratchData} columns={buildStandingsColumns('scratch')} highlightTop={3} showBubble={false} />
+          <StandingsTable data={scratchData} columns={buildStandingsColumns('scratch')} highlightTop={3} showBubble={false} />
         </div>
       )}
 
       {mode === 'ptm' && (
         <div className="animate-tab-in">
-          <PtmTab ptmList={filteredPtmList} liveMembers={filteredLiveMembers} ptmDeltaLookup={ptmDeltaLookup} />
+          <PtmTab ptmList={ptmList} liveMembers={liveMembers} ptmDeltaLookup={ptmDeltaLookup} />
         </div>
       )}
 
       {mode === 'most-improved' && (
         <div className="animate-tab-in">
-          <MostImprovedTab allRows={mostImprovedRows} selectedFlight={selectedFlight} />
+          <MostImprovedTab allRows={mostImprovedRows} />
         </div>
       )}
     </PageWrapper>

@@ -103,11 +103,6 @@ function CellValue({ col, row, idx, highlightTop, showBubble }) {
       {TREND_ICONS[row.trend]}
     </span>
   ) : null
-  if (col.key === 'flight') return (
-    <span className="text-xs text-forest font-sans bg-blue-50 border border-blue-100 px-2 py-0.5 rounded whitespace-nowrap">
-      {row.flight}
-    </span>
-  )
   return <span className="text-darktext font-sans">{row[col.key]}</span>
 }
 

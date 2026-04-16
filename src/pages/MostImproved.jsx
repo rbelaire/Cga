@@ -4,7 +4,6 @@ import TeeTag from '../components/ui/TeeTag'
 import { formatName } from '../utils/formatName'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
-import { FLIGHT_ORDER } from '../utils/flightOrder'
 import { roundPtm } from '../utils/roundPtm'
 
 // ── Computation ──────────────────────────────────────────────────────────────
@@ -135,7 +134,6 @@ export default function MostImproved() {
   useEffect(() => { document.title = 'Most/Least Improved | CGA 2026' }, [])
 
   const [mode, setMode] = useState('most')
-  const [selectedFlight, setSelectedFlight] = useState('All')
   const [search, setSearch] = useState('')
 
   const { data: ptmList }          = useFireData(DB.listenPtm, [])
@@ -167,13 +165,12 @@ export default function MostImproved() {
 
   const filtered = useMemo(() => {
     let rows = sortedWithRank
-    if (selectedFlight !== 'All') rows = rows.filter(r => r.flight === selectedFlight)
     if (search.trim()) {
       const q = search.toLowerCase()
       rows = rows.filter(r => r.name?.toLowerCase().includes(q))
     }
     return rows
-  }, [sortedWithRank, selectedFlight, search])
+  }, [sortedWithRank, search])
 
   // The leader is the first qualified player in the visible filtered list
   const leaderName = filtered.find(r => r.qualified)?.name ?? null
@@ -214,18 +211,6 @@ export default function MostImproved() {
 
       {/* Controls */}
       <div className="mb-6 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-        <div className="flex items-center gap-3">
-          <label htmlFor="mi-flight" className="text-sm font-sans font-medium text-gray-600">Flight:</label>
-          <select
-            id="mi-flight"
-            value={selectedFlight}
-            onChange={e => setSelectedFlight(e.target.value)}
-            className="px-3 py-2 text-sm font-sans rounded-lg border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold"
-          >
-            <option value="All">All</option>
-            {FLIGHT_ORDER.map(f => <option key={f} value={f}>{f}</option>)}
-          </select>
-        </div>
         <div className="relative flex-1 max-w-sm">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
