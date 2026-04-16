@@ -23,7 +23,7 @@ export function buildPublishPayload({
       name: p.name,
       poy: p.poy ?? 0,
       points: Number(p.score) || 0,
-      ptm: Number(p.ptm) || 0,
+      ptm: Math.round(Number(p.ptm)) || 0,
       plusMinus: p.plusMinus ?? 0,
     }))
 
@@ -39,7 +39,7 @@ export function buildPublishPayload({
       name: p.name,
       poy: 0,
       points: Number(p.score) || 0,
-      ptm: Number(p.ptm) || 0,
+      ptm: Math.round(Number(p.ptm)) || 0,
       plusMinus: (p.ptm != null && p.ptm !== '' && p.score != null && p.score !== '')
         ? Number(p.score) - Number(p.ptm)
         : 0,
@@ -84,7 +84,10 @@ export function buildPublishPayload({
     const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
 
     newStandings.flights[fl] = sorted.map((p, i) => {
-      const newPtm = ptmLookup[p.name] ?? (Number(p.ptm) || null)
+      const newPtm = (() => {
+        const raw = ptmLookup[p.name] ?? (Number(p.ptm) || null)
+        return raw != null ? Math.round(raw) : null
+      })()
       const oldPtm = prevPtmLookup[p.name] ?? null
       const hasComparablePtm = newPtm != null && oldPtm != null
       const ptmDelta = hasComparablePtm ? +(newPtm - oldPtm).toFixed(2) : null

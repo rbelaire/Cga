@@ -45,6 +45,7 @@ import {
   exportTournamentInfoPDF as exportTournamentInfoPdfV2,
 } from '../exports/pdfExports'
 import { compareFlights, FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
+import { calcPtmFromHistory, roundPtm } from '../utils/roundPtm'
 import { AdminPaymentsPanel } from './admin/AdminPaymentsPanel'
 import { AdminBulkImportPanel } from './admin/AdminBulkImportPanel'
 import { AdminFlightCalculatorPanel } from './admin/AdminFlightCalculatorPanel'
@@ -207,7 +208,7 @@ const fmtCurrency = value => {
 }
 const fmtPtmValue = value => {
   const ptm = Number(value)
-  return Number.isFinite(ptm) ? ptm : null
+  return Number.isFinite(ptm) ? Math.round(ptm) : null
 }
 
 function sanitizeResultsData(flightData = {}) {
@@ -2569,22 +2570,58 @@ function AdminPanel({ currentUser }) {
   }
 
   // ── Publish tournament results to Firestore ───────────────────────────────────
-  function buildPublishPayloadForTournament(targetTid = tid) {
+
+  // Computes updated member records after a tournament is published:
+  // - prepends the new score to each player's history (capped at 7)
+  // - recalculates PTM from the updated history using the league formula
+  function computePublishMemberUpdates(targetTid) {
+    const allFlights = [...FLIGHTS, NEW_PLAYERS_FLIGHT]
+    const scoreLookup = {}
+    for (const fl of allFlights) {
+      for (const entry of (data[targetTid]?.[fl] ?? [])) {
+        const score = Number(entry.score)
+        if (entry.name && Number.isFinite(score)) {
+          scoreLookup[entry.name] = score
+        }
+      }
+    }
+
+    return membersData.map(m => {
+      const newScore = scoreLookup[m.name]
+      if (newScore == null) return m
+
+      const prevHistory = Array.isArray(m.history)
+        ? m.history.filter(v => typeof v === 'number' && Number.isFinite(v))
+        : []
+      const newHistory = [newScore, ...prevHistory].slice(0, 7)
+      const newPtm = calcPtmFromHistory(newHistory) ?? m.ptm
+
+      return { ...m, history: newHistory, rounds: newHistory.length, ptm: newPtm }
+    })
+  }
+
+  function buildPublishPayloadForTournament(targetTid = tid, updatedMembers = null) {
+    const members = updatedMembers ?? computePublishMemberUpdates(targetTid)
+    const computedPtmLookup = Object.fromEntries(members.map(m => [m.name, m.ptm]))
     return buildPublishPayload({
       targetTid,
       schedule,
       flights: FLIGHTS,
       scoreData: data,
       currentStandings,
-      ptmLookup,
+      ptmLookup: computedPtmLookup,
       calcFlightPOY,
     })
   }
 
   async function publishTournament(payloadOrTid = tid) {
-    const payload = typeof payloadOrTid === 'string'
-      ? buildPublishPayloadForTournament(payloadOrTid)
-      : payloadOrTid
+    const targetTid = typeof payloadOrTid === 'string'
+      ? payloadOrTid
+      : (payloadOrTid?.targetTid ?? tid)
+
+    // Always recompute from current scores so publish is consistent with preview
+    const updatedMembers = computePublishMemberUpdates(targetTid)
+    const payload = buildPublishPayloadForTournament(targetTid, updatedMembers)
     if (!payload?.resultDoc) return false
 
     const publishErrors = [
@@ -2600,13 +2637,37 @@ function AdminPanel({ currentUser }) {
         saveSnapshot('standings', currentStandings, `Before publish ${payload.targetTid}`, payload.targetTid),
         saveSnapshot('poy', currentPoy, `Before publish ${payload.targetTid}`, payload.targetTid),
       ])
-      await DB.batchPublish(payload.targetTid, {
-        resultDoc: payload.resultDoc,
-        newPoy: payload.newPoy,
-        newStandings: payload.newStandings,
-      })
+      await Promise.all([
+        DB.batchPublish(payload.targetTid, {
+          resultDoc: payload.resultDoc,
+          newPoy: payload.newPoy,
+          newStandings: payload.newStandings,
+        }),
+        DB.saveMembers(updatedMembers),
+      ])
     }, setAdminError)
+
     if (ok) {
+      // Clear any stale PTM overrides so the fresh Firestore values take over
+      const scoredNames = new Set(updatedMembers
+        .filter(m => {
+          const orig = membersData.find(o => o.name === m.name)
+          return orig && m.ptm !== orig.ptm
+        })
+        .map(m => m.name)
+      )
+      if (scoredNames.size > 0) {
+        setMembersOverride(prev => {
+          const next = { ...prev }
+          for (const name of scoredNames) {
+            if (!next[name]) continue
+            const { ptm: _p, history: _h, rounds: _r, ...rest } = next[name]
+            if (Object.keys(rest).length === 0) delete next[name]
+            else next[name] = rest
+          }
+          return next
+        })
+      }
       const t = schedule.find(s => s.id === payload.targetTid)
       logChange('Results published', t?.name ?? payload.targetTid)
     }
@@ -4226,7 +4287,7 @@ function MemberPool({
                             </span>
                           )}
                           {m.ptm != null && (
-                            <span className="text-[10px] font-mono text-gray-400">PTM {m.ptm}</span>
+                            <span className="text-[10px] font-mono text-gray-400">PTM {roundPtm(m.ptm)}</span>
                           )}
                         </div>
                       </li>
@@ -5160,7 +5221,7 @@ function FlightManagementPanel({
                     <td className="px-2 py-1.5 text-darktext font-medium">{formatName(row.memberName)}</td>
                     <td className="px-2 py-1.5 text-center text-gray-600">{row.flight ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center"><TeeTag tee={row.tee} /></td>
-                    <td className="px-2 py-1.5 text-center font-mono text-gray-600">{row.ptm ?? '—'}</td>
+                    <td className="px-2 py-1.5 text-center font-mono text-gray-600">{roundPtm(row.ptm) ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center font-mono text-gray-600">{row.creditOnBooks ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center text-gray-500 truncate text-xs">{row.email ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center text-gray-500 truncate text-xs">{row.cellPhone ?? '—'}</td>
@@ -5338,7 +5399,7 @@ function FlightManagementPanel({
                         />
                       ) : (
                         <span className="stat-number text-xs text-gray-600">
-                          {row.ptm ?? '—'}
+                          {roundPtm(row.ptm) ?? '—'}
                         </span>
                       )}
                     </td>
