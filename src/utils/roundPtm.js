@@ -37,5 +37,5 @@ export function calcPtmFromHistory(history) {
     // n = 3, 4, 5, or 6
     raw = (sum - Math.min(...scores)) / (n - 1)
   }
-  return Math.max(6, +raw.toFixed(2))
+  return Math.max(6, Math.round(raw))
 }

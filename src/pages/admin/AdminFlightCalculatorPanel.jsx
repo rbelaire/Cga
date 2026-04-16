@@ -169,7 +169,7 @@ export function AdminFlightCalculatorPanel({
                       }`}
                     >
                       <div className="font-medium text-darktext leading-tight">{formatName(name)}</div>
-                      <div className="text-gray-400 font-mono text-[10px] mt-0.5">PTM {player?.ptm ?? '—'}</div>
+                      <div className="text-gray-400 font-mono text-[10px] mt-0.5">PTM {player?.ptm != null ? Math.round(player.ptm) : '—'}</div>
                     </li>
                   )
                 })}

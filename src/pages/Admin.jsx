@@ -45,7 +45,7 @@ import {
   exportTournamentInfoPDF as exportTournamentInfoPdfV2,
 } from '../exports/pdfExports'
 import { compareFlights, FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
-import { calcPtmFromHistory } from '../utils/roundPtm'
+import { calcPtmFromHistory, roundPtm } from '../utils/roundPtm'
 import { AdminPaymentsPanel } from './admin/AdminPaymentsPanel'
 import { AdminBulkImportPanel } from './admin/AdminBulkImportPanel'
 import { AdminFlightCalculatorPanel } from './admin/AdminFlightCalculatorPanel'
@@ -208,7 +208,7 @@ const fmtCurrency = value => {
 }
 const fmtPtmValue = value => {
   const ptm = Number(value)
-  return Number.isFinite(ptm) ? ptm : null
+  return Number.isFinite(ptm) ? Math.round(ptm) : null
 }
 
 function sanitizeResultsData(flightData = {}) {
@@ -4287,7 +4287,7 @@ function MemberPool({
                             </span>
                           )}
                           {m.ptm != null && (
-                            <span className="text-[10px] font-mono text-gray-400">PTM {m.ptm}</span>
+                            <span className="text-[10px] font-mono text-gray-400">PTM {roundPtm(m.ptm)}</span>
                           )}
                         </div>
                       </li>
@@ -5221,7 +5221,7 @@ function FlightManagementPanel({
                     <td className="px-2 py-1.5 text-darktext font-medium">{formatName(row.memberName)}</td>
                     <td className="px-2 py-1.5 text-center text-gray-600">{row.flight ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center"><TeeTag tee={row.tee} /></td>
-                    <td className="px-2 py-1.5 text-center font-mono text-gray-600">{row.ptm ?? '—'}</td>
+                    <td className="px-2 py-1.5 text-center font-mono text-gray-600">{roundPtm(row.ptm) ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center font-mono text-gray-600">{row.creditOnBooks ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center text-gray-500 truncate text-xs">{row.email ?? '—'}</td>
                     <td className="px-2 py-1.5 text-center text-gray-500 truncate text-xs">{row.cellPhone ?? '—'}</td>
@@ -5399,7 +5399,7 @@ function FlightManagementPanel({
                         />
                       ) : (
                         <span className="stat-number text-xs text-gray-600">
-                          {row.ptm ?? '—'}
+                          {roundPtm(row.ptm) ?? '—'}
                         </span>
                       )}
                     </td>
