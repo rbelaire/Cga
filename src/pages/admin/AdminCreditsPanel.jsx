@@ -16,7 +16,6 @@ export function AdminCreditsPanel({
   setCreditInputs,
   applyCredit,
   clearCredit,
-  flightTagStyles,
   SaveBtn,
   PdfBtn,
   CheckIcon,
@@ -61,11 +60,10 @@ export function AdminCreditsPanel({
           <span className="text-white/50 font-sans text-xs">{creditRoster.length} members</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[540px]">
+          <table className="w-full text-sm min-w-[440px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="table-header text-gray-400 text-left">Player</th>
-                <th className="table-header text-gray-400 text-left">Flight</th>
                 <th className="table-header text-gray-400 text-right">Balance</th>
                 <th className="table-header text-gray-400 text-center">Add / Subtract</th>
                 <th className="table-header text-gray-400 w-8"></th>
@@ -74,7 +72,7 @@ export function AdminCreditsPanel({
             <tbody>
               {creditRoster.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
+                  <td colSpan={4} className="px-4 py-10 text-center text-gray-400 font-sans text-sm">
                     No members match your search.
                   </td>
                 </tr>
@@ -91,11 +89,6 @@ export function AdminCreditsPanel({
                     >
                       <td className="px-4 py-2.5 font-sans text-sm text-darktext whitespace-nowrap">
                         {formatName(m.name)}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span className={`text-xs border px-1.5 py-0.5 rounded-full font-sans whitespace-nowrap ${flightTagStyles[m.flight] ?? flightTagStyles.Unassigned}`}>
-                          {m.flight ?? 'Unassigned'}
-                        </span>
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         <span className={`stat-number text-sm font-bold ${
