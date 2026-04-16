@@ -5381,9 +5381,7 @@ function FlightManagementPanel({
                           ))}
                         </select>
                       ) : (
-                        <span className={`text-xs border px-2 py-0.5 rounded-full font-sans ${
-                          row.flight ? (flightTagStyles[row.flight] ?? flightTagStyles.Unassigned) : flightTagStyles.Unassigned
-                        }`}>
+                        <span className="text-xs font-sans text-gray-600">
                           {row.flight ?? 'Unassigned'}
                         </span>
                       )}
