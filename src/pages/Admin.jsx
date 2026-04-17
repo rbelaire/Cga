@@ -2981,7 +2981,18 @@ function AdminPanel({ currentUser }) {
             </select>
             <button
               type="button"
-              onClick={() => setShowPastTournaments(prev => !prev)}
+              onClick={() => {
+                const next = !showPastTournaments
+                setShowPastTournaments(next)
+                if (next) {
+                  const alreadyPast = pastTournaments.some(t => t.id === tid) || archivedTournaments.some(t => t.id === tid)
+                  if (!alreadyPast && pastTournaments.length > 0) {
+                    setTid(pastTournaments[0].id)
+                    setPoolSearch('')
+                    setSelectedPool(new Set())
+                  }
+                }
+              }}
               className="text-xs font-sans font-semibold px-3 py-2 rounded-md border border-gray-300 text-gray-700 hover:border-forest hover:text-forest"
             >
               {showPastTournaments ? 'Hide Past Tournaments' : 'Past Tournaments'}
