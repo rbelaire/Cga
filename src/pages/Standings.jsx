@@ -653,7 +653,7 @@ export default function Standings() {
   )
 
 
-  const latestTournament = filteredFlightData.find(p => p.latestTournament)?.latestTournament ?? null
+  const latestTournament = latestCompletedTournament?.name ?? null
 
   const mostImprovedRows = useMemo(
     () => buildMostImprovedRows(ptmList, beginningPtmList, allResults, liveMemberFlightLookup),
