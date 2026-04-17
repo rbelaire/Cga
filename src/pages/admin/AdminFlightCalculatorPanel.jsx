@@ -1,19 +1,23 @@
 import { useState, useEffect, useRef } from 'react'
 import { formatName } from '../../utils/formatName'
+import { NEW_PLAYERS_FLIGHT } from '../../utils/flightOrder'
 
-const FLIGHT_NAMES = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+const FLIGHT_NAMES = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight', NEW_PLAYERS_FLIGHT]
+
+const SCORED_FLIGHT_NAMES = FLIGHT_NAMES.slice(0, -1) // excludes New Players from auto-assign
 
 function autoAssignFlights(players) {
   // Sort by PTM descending — highest PTM = best golfer = Championship
   const sorted = [...players].sort((a, b) => (b.ptm ?? 0) - (a.ptm ?? 0))
   const N = sorted.length
-  // Each of the first 5 flights gets up to 14 players; last flight absorbs the rest
-  const perFlight = N < 6 ? 1 : Math.min(14, Math.floor(N / 6))
+  const numFlights = SCORED_FLIGHT_NAMES.length
+  // Each of the first (numFlights-1) flights gets up to 14 players; last absorbs the rest
+  const perFlight = N < numFlights ? 1 : Math.min(14, Math.floor(N / numFlights))
   const groups = Object.fromEntries(FLIGHT_NAMES.map(f => [f, []]))
 
   sorted.forEach((player, i) => {
-    const flightIdx = perFlight > 0 && i < perFlight * 5 ? Math.floor(i / perFlight) : 5
-    groups[FLIGHT_NAMES[flightIdx]].push(player.name)
+    const flightIdx = perFlight > 0 && i < perFlight * (numFlights - 1) ? Math.floor(i / perFlight) : numFlights - 1
+    groups[SCORED_FLIGHT_NAMES[flightIdx]].push(player.name)
   })
 
   return groups
@@ -125,7 +129,7 @@ export function AdminFlightCalculatorPanel({
       )}
 
       {/* Flight columns */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
         {FLIGHT_NAMES.map(flight => {
           const players = groups[flight] ?? []
           const count = players.length

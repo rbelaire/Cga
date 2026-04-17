@@ -4948,7 +4948,7 @@ function FlightManagementPanel({
   fileInputRef, handleXlsxFile, importPreview, setImportPreview,
   confirmImport, importSaving, importStatus, importError, setImportError,
 }) {
-  const FLIGHT_OPTIONS = FLIGHT_ORDER
+  const FLIGHT_OPTIONS = ALL_SCORE_TABS
   const SORTABLE_COLUMNS = ['name', 'ptm', 'creditOnBooks', 'tee']
   const [sortBy, setSortBy] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
