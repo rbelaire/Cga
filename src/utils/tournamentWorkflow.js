@@ -117,8 +117,11 @@ export function computeTournamentWorkflowState({
   const memoStatus = memoSent ? 'complete' : 'not_started'
   const memoLabel = memoSent ? 'Tournament memo sent' : 'Tournament memo not sent'
 
-  const fieldStatus = paidCount >= FIELD_CAP ? 'complete' : paidCount > 0 ? 'partial' : 'not_started'
-  const fieldLabel = `${paidCount} / ${FIELD_CAP} paid and entered`
+  const fieldFinalized = Boolean(lifecycle.fieldFinalizedAt)
+  const fieldStatus = fieldFinalized || paidCount >= FIELD_CAP ? 'complete' : paidCount > 0 ? 'partial' : 'not_started'
+  const fieldLabel = fieldFinalized
+    ? `Field finalized — ${paidCount} entered`
+    : `${paidCount} / ${FIELD_CAP} paid and entered`
 
   const birdiePoolExported = Boolean(lifecycle.birdiePoolExportedAt)
   const birdieStatus = !pairingsPosted
@@ -154,6 +157,7 @@ export function computeTournamentWorkflowState({
       scoredCount,
       resultsPublished,
       fieldCap: FIELD_CAP,
+      fieldFinalized,
       tournamentName: tournament?.name ?? null,
       tournamentDate: tournament?.date ?? null,
     },
