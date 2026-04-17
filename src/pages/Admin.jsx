@@ -1800,6 +1800,31 @@ function AdminPanel({ currentUser }) {
       return next
     })
 
+    // Move already-entered players into their newly assigned flight tabs so
+    // pairings generation sees the correct flight for each player.
+    setData(prev => {
+      const current = { ...(prev[tid] ?? {}) }
+      // Snapshot existing entries for players being reassigned
+      const playerEntries = {}
+      for (const fl of ALL_SCORE_TABS) {
+        for (const p of current[fl] ?? []) {
+          if (p.name in flightMap) playerEntries[p.name] = { ...p }
+        }
+      }
+      // Remove them from their current tabs
+      for (const fl of ALL_SCORE_TABS) {
+        current[fl] = (current[fl] ?? []).filter(p => !(p.name in flightMap))
+      }
+      // Place them in their new tabs (preserving score/ptm/eligible)
+      for (const [name, newFlight] of Object.entries(flightMap)) {
+        const entry = playerEntries[name]
+        if (!entry) continue
+        const target = ALL_SCORE_TABS.includes(newFlight) ? newFlight : NEW_PLAYERS_FLIGHT
+        current[target] = [...(current[target] ?? []), entry]
+      }
+      return { ...prev, [tid]: current }
+    })
+
     // Build the persisted member list — use flightMap for any assigned player,
     // fall through to existing override/base data for everyone else
     const updated = membersData.map(m => {
