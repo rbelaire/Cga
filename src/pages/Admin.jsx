@@ -2872,7 +2872,7 @@ function AdminPanel({ currentUser }) {
               onChange={e => { setTid(e.target.value); setPoolSearch(''); setSelectedPool(new Set()) }}
               className="border border-gray-300 rounded-md px-3 py-2.5 text-sm font-sans w-full lg:min-w-[320px] focus:outline-none focus:ring-2 focus:ring-forest"
             >
-              {currentTournaments.length > 0 && (
+              {!showPastTournaments && currentTournaments.length > 0 && (
                 <optgroup label="Current & Upcoming">
                   {currentTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
                 </optgroup>
@@ -2882,11 +2882,6 @@ function AdminPanel({ currentUser }) {
                   {pastTournaments.filter(t => t.id === tid).map(t => (
                     <option key={t.id} value={t.id}>{t.name} — {t.date}</option>
                   ))}
-                </optgroup>
-              )}
-              {currentTournaments.length === 0 && pastTournaments[0] && (
-                <optgroup label="Most Recent">
-                  <option value={pastTournaments[0].id}>{pastTournaments[0].name} — {pastTournaments[0].date}</option>
                 </optgroup>
               )}
               {showPastTournaments && pastTournaments.length > 0 && (
