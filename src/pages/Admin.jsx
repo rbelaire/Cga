@@ -475,6 +475,7 @@ function sanitizeMembersForCompare(members = [], overrides = {}) {
       flight: local.flight ?? member.flight ?? null,
       ptm: local.ptm ?? member.ptm ?? null,
       tee: local.tee ?? member.tee ?? null,
+      cell: local.cell ?? member.cell ?? null,
     }
   })
   return next
@@ -1256,6 +1257,7 @@ function AdminPanel({ currentUser }) {
       ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
       tee:    membersOverride[m.name]?.tee    ?? m.tee,
       active: membersOverride[m.name]?.active ?? m.active,
+      cell:   membersOverride[m.name]?.cell   ?? m.cell,
     }))
   }, [membersData, membersOverride])
 
@@ -1733,6 +1735,14 @@ function AdminPanel({ currentUser }) {
     }))
   }
 
+  function updateMemberCell(name, newCell) {
+    setMembersDirtyTouched(true)
+    setMembersOverride(prev => ({
+      ...prev,
+      [name]: { ...(prev[name] ?? {}), cell: newCell || null }
+    }))
+  }
+
   function updateMemberName(originalName, newName) {
     const trimmed = newName.trim()
     if (!trimmed || trimmed === originalName) return
@@ -1768,6 +1778,7 @@ function AdminPanel({ currentUser }) {
         ptm:    membersOverride[m.name]?.ptm    ?? m.ptm,
         tee:    membersOverride[m.name]?.tee    ?? m.tee,
         active: membersOverride[m.name]?.active ?? m.active,
+        cell:   membersOverride[m.name]?.cell   ?? m.cell,
       }
       // Firestore rejects undefined field values; strip them before writing
       return Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined))
@@ -5062,6 +5073,7 @@ function FlightManagementPanel({
         name: row.name,
         tee: row.tee ?? '',
         ptm: row.ptm ?? '',
+        cell: row.cell ?? '',
       },
     }))
   }
@@ -5086,6 +5098,7 @@ function FlightManagementPanel({
     if (newName && newName !== originalName) updateMemberName(originalName, newName)
     updateMemberPtm(originalName, ptmRaw === '' ? '' : normalizedPtm)
     updateMemberTee(originalName, draft.tee || '')
+    updateMemberCell(originalName, draft.cell || '')
     cancelEditingRow(originalName)
   }
 
@@ -5337,18 +5350,19 @@ function FlightManagementPanel({
                 <th onClick={() => updateSort('creditOnBooks')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-right cursor-pointer">Credit on Books</th>
                 <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center">Adjust Credit</th>
                 <th onClick={() => updateSort('tee')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center cursor-pointer">Tee</th>
+                <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center">Phone</th>
                 <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {shouldVirtualize && topSpacerHeight > 0 && (
                 <tr>
-                  <td colSpan={7} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }} />
+                  <td colSpan={8} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }} />
                 </tr>
               )}
               {visibleRows.map((row, idx) => {
                 const isEditing = !!editingRows[row.originalName]
-                const draft = rowDrafts[row.originalName] ?? { name: row.name, flight: row.flight ?? '', tee: row.tee ?? '', ptm: row.ptm ?? '' }
+                const draft = rowDrafts[row.originalName] ?? { name: row.name, flight: row.flight ?? '', tee: row.tee ?? '', ptm: row.ptm ?? '', cell: row.cell ?? '' }
                 const setDraft = (patch) => setRowDrafts(prev => ({ ...prev, [row.originalName]: { ...draft, ...patch } }))
                 return (
                   <tr
@@ -5433,6 +5447,20 @@ function FlightManagementPanel({
                       )}
                     </td>
 
+                    <td className="px-4 py-2.5 text-center">
+                      {isEditing ? (
+                        <input
+                          type="tel"
+                          value={draft.cell ?? ''}
+                          onChange={e => setDraft({ cell: e.target.value })}
+                          className="w-32 border border-gray-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-forest"
+                          placeholder="555-123-4567"
+                        />
+                      ) : (
+                        <span className="text-xs font-mono text-gray-500">{row.cell || '—'}</span>
+                      )}
+                    </td>
+
                     {/* Actions */}
                     <td className="px-4 py-2 text-center">
                       {isEditing ? (
@@ -5465,12 +5493,12 @@ function FlightManagementPanel({
               })}
               {shouldVirtualize && bottomSpacerHeight > 0 && (
                 <tr>
-                  <td colSpan={7} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }} />
+                  <td colSpan={8} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }} />
                 </tr>
               )}
               {!rows.length && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400 font-sans text-sm">
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400 font-sans text-sm">
                     No players match your filters.
                   </td>
                 </tr>
@@ -5480,7 +5508,7 @@ function FlightManagementPanel({
               <tr className="bg-forest/5 border-t border-forest/20">
                 <td colSpan={3} className="px-4 py-2 text-xs font-sans text-forest font-semibold uppercase tracking-widest">Visible Credit Total</td>
                 <td className="px-4 py-2 text-right font-mono text-xs text-forest font-semibold">{fmtCurrency(totalCreditOnBooks)}</td>
-                <td colSpan={3} />
+                <td colSpan={4} />
               </tr>
             </tfoot>
           </table>
