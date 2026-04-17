@@ -693,7 +693,7 @@ function exportResultsXLSX(tournament, flightData) {
   XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.xlsx`)
 }
 
-function exportBirdiePoolXLSX(tournament, flightData) {
+function exportBirdiePoolXLSX(tournament, flightData, allFlights) {
   if (!tournament) return
   const SITE_BLUE = 'FF0B2E6D'
   const HEADER_NEUTRAL = 'FFEFF3F8'
@@ -721,7 +721,7 @@ function exportBirdiePoolXLSX(tournament, flightData) {
   }
 
   const uniqueNames = [...new Set(
-    ALL_SCORE_TABS.flatMap(flight => (flightData?.[flight] ?? []).map(player => player?.name).filter(Boolean))
+    allFlights.flatMap(flight => (flightData?.[flight] ?? []).map(player => player?.name).filter(Boolean))
   )].sort((a, b) => compareByLastName({ name: a }, { name: b }))
   const headers = ['#', 'Last', 'First', ...Array.from({ length: 18 }, (_, idx) => String(idx + 1))]
   const wsData = [
@@ -2808,7 +2808,7 @@ function AdminPanel({ currentUser }) {
   async function generateBirdieExport(targetTid = tid) {
     const targetTournament = schedule.find(t => t.id === targetTid) ?? archivedTournaments.find(t => t.id === targetTid)
     if (!targetTournament) return
-    exportBirdiePoolXLSX(targetTournament, data[targetTid] ?? {})
+    exportBirdiePoolXLSX(targetTournament, data[targetTid] ?? {}, ALL_SCORE_TABS)
     const nextLifecycle = {
       ...tournamentLifecycle,
       [targetTid]: {
@@ -3216,6 +3216,7 @@ function AdminPanel({ currentUser }) {
               importStatus={importStatus}
               importError={importError}
               setImportError={setImportError}
+              allFlights={ALL_SCORE_TABS}
             />
           </section>
 
@@ -3342,7 +3343,7 @@ function AdminPanel({ currentUser }) {
           onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData)}
           onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
           onExportCreditsXLSX={() => exportCreditsXLSX(credits, membersData)}
-          onExportBirdiePoolXLSX={() => exportBirdiePoolXLSX(tournament, data[tid] ?? {})}
+          onExportBirdiePoolXLSX={() => exportBirdiePoolXLSX(tournament, data[tid] ?? {}, ALL_SCORE_TABS)}
         />
       )}
 
@@ -5253,8 +5254,9 @@ function FlightManagementPanel({
   savePlayerManagement, playerManagementSaving, playerManagementSaveStatus, flightTagStyles,
   fileInputRef, handleXlsxFile, importPreview, setImportPreview,
   confirmImport, importSaving, importStatus, importError, setImportError,
+  allFlights,
 }) {
-  const FLIGHT_OPTIONS = ALL_SCORE_TABS
+  const FLIGHT_OPTIONS = allFlights
   const SORTABLE_COLUMNS = ['name', 'ptm', 'creditOnBooks', 'tee']
   const [sortBy, setSortBy] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
@@ -5280,7 +5282,7 @@ function FlightManagementPanel({
           id: member.id ?? member.name,
           originalName: member.originalName ?? member.name,
           name: member.name,
-          flight: (member.flight && ALL_SCORE_TABS.includes(member.flight)) ? member.flight : null,
+          flight: (member.flight && allFlights.includes(member.flight)) ? member.flight : null,
           ptm: fmtPtmValue(member.ptm),
           tee: member.tee ?? null,
           creditOnBooks: Number.isFinite(parsedCredit) ? parsedCredit : 0,
