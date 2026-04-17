@@ -582,9 +582,15 @@ async function exportPairingsPDF(tournament, pairings) {
 }
 
 // ── PDF: Points to Make ────────────────────────────────────────────────────────
-async function exportPtmPDF(membersList) {
+async function exportPtmPDF(membersList, ptmList = []) {
+  const ptmByName = Object.fromEntries((ptmList || []).map(p => [p.name, p]))
+  const enriched = membersList.map(m => {
+    const p = ptmByName[m.name]
+    if (!p) return m
+    return { ...m, history: p.history ?? m.history }
+  })
   await exportPtmPdfV2({
-    members: membersList,
+    members: enriched,
     flights: FLIGHTS,
     logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
   })
@@ -824,7 +830,13 @@ function exportPaymentsXLSX(tournament, paymentMap, membersList) {
 }
 
 // ── Excel: Points to Make ─────────────────────────────────────────────────────
-function exportPtmXLSX(membersList) {
+function exportPtmXLSX(membersList, ptmList = []) {
+  const ptmByName = Object.fromEntries((ptmList || []).map(p => [p.name, p]))
+  const enriched = membersList.map(m => {
+    const p = ptmByName[m.name]
+    return p ? { ...m, history: p.history ?? m.history } : m
+  })
+  membersList = enriched
   const roundLabels = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']
   const memberRow = m => {
     const hist = Array.isArray(m.history) ? m.history : []
@@ -3250,8 +3262,8 @@ function AdminPanel({ currentUser }) {
           paymentPaidCount={paymentPaidCount}
           credits={credits}
           onOpenTournamentInfoEditor={() => setShowTournamentInfoEditor(true)}
-          onExportPtmPDF={() => exportPtmPDF(membersData)}
-          onExportPtmXLSX={() => exportPtmXLSX(membersData)}
+          onExportPtmPDF={() => exportPtmPDF(membersData, livePtmData)}
+          onExportPtmXLSX={() => exportPtmXLSX(membersData, livePtmData)}
           onExportResultsPDF={() => exportResultsPDF(tournament, effectiveFlightData)}
           onExportResultsXLSX={() => exportResultsXLSX(tournament, effectiveFlightData)}
           onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}

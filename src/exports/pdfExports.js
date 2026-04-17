@@ -9,8 +9,10 @@ import { formatCurrency, formatDate, formatPTM, formatScore, formatText, formatT
 import { sanitizeTournamentData } from './utils/sanitize'
 import { formatName, compareByLastName } from '../utils/formatName'
 
-function safeFilename(id, suffix) {
-  return `${formatText(id, 'tournament').replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${suffix}.pdf`
+function safeFilename(id, suffix, name) {
+  const idSlug = formatText(id, 'tournament').replace(/[^a-z0-9]/gi, '-').toLowerCase()
+  const nameSlug = name ? `-${name.replace(/[^a-z0-9]/gi, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '')}` : ''
+  return `${idSlug}${nameSlug}-${suffix}.pdf`
 }
 
 async function loadAssetBase64(url) {
@@ -87,7 +89,7 @@ export async function exportTournamentInfoPDF({ tournament, venmoImageUrl, logoU
   }
 
   withFooter('CGA Tournament Information')
-  doc.save(safeFilename(clean.id, 'tournament-info'))
+  doc.save(safeFilename(clean.id, 'tournament-info', clean.name))
 }
 
 // Draw pairings as a compact 3-column card grid
@@ -187,7 +189,7 @@ export async function exportPairingsPDF({ tournament, pairings, logoUrl }) {
   drawPairingCards(doc, { groups, startY: y })
 
   withFooter('CGA Pairings Sheet')
-  doc.save(safeFilename(clean.id, 'pairings'))
+  doc.save(safeFilename(clean.id, 'pairings', clean.name))
 }
 
 export async function exportFieldRosterPDF({ tournament, paymentMap, members, flights = [], logoUrl }) {
@@ -250,7 +252,7 @@ export async function exportFieldRosterPDF({ tournament, paymentMap, members, fl
   if (allGroups.length === 0) {
     drawEmptyState(doc, { message: 'No players in field for this tournament', startY: y })
     withFooter('CGA Field Roster')
-    doc.save(safeFilename(clean.id, 'field-roster'))
+    doc.save(safeFilename(clean.id, 'field-roster', clean.name))
     return
   }
 
@@ -318,7 +320,7 @@ export async function exportFieldRosterPDF({ tournament, paymentMap, members, fl
   }
 
   withFooter('CGA Field Roster')
-  doc.save(safeFilename(clean.id, 'field-roster'))
+  doc.save(safeFilename(clean.id, 'field-roster', clean.name))
 }
 
 export async function exportResultsPDF({ tournament, flightData, flights, calcFlightPOY, logoUrl }) {
@@ -338,7 +340,7 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
   if (!hasScores) {
     y = drawEmptyState(doc, { startY: y, message: 'Results pending — scores not yet posted' })
     withFooter('CGA Tournament Results')
-    doc.save(safeFilename(clean.id, 'results'))
+    doc.save(safeFilename(clean.id, 'results', clean.name))
     return y
   }
 
@@ -384,7 +386,7 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
   }
 
   withFooter('CGA Tournament Results')
-  doc.save(safeFilename(clean.id, 'results'))
+  doc.save(safeFilename(clean.id, 'results', clean.name))
   return y
 }
 
@@ -466,9 +468,9 @@ export async function exportPtmPDF({ members, flights, logoUrl }) {
       }),
       startY: sy - 2,
       theme: 'striped',
-      headStyles: { fillColor: PDF_COLORS.blue, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: PDF_COLORS.blue, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, cellPadding: 1.2 },
       alternateRowStyles: { fillColor: PDF_COLORS.rowAlt },
-      styles: { fontSize: 8, cellPadding: 1.8, overflow: 'linebreak', textColor: PDF_COLORS.primaryText, lineColor: PDF_COLORS.border, lineWidth: 0.1 },
+      styles: { fontSize: 7, cellPadding: 1, overflow: 'linebreak', textColor: PDF_COLORS.primaryText, lineColor: PDF_COLORS.border, lineWidth: 0.1 },
       columnStyles: colStyles,
       margin: { left: ML, right: MR, bottom: 20 },
     })
