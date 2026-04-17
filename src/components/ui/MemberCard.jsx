@@ -1,17 +1,11 @@
 import { formatName } from '../../utils/formatName'
 import TeeTag from './TeeTag'
 
-function isBubble(rounds) {
-  return typeof rounds === 'number' && rounds >= 1 && rounds < 4
-}
-
 export default function MemberCard({ member }) {
-  const { name, ptm, memberSince, email, cell, homePhone, tee, flight, events, rounds } = member
+  const { name, ptm, memberSince, email, cell, homePhone, tee, flight } = member
   const hasData = ptm !== null && flight != null
   const phone = cell || homePhone
   const displayName = formatName(name)
-  const bubbleRounds = typeof rounds === 'number' ? rounds : events
-  const bubble = isBubble(bubbleRounds)
   const initials = name
     .split(' ')
     .map((n) => n[0])
@@ -35,11 +29,6 @@ export default function MemberCard({ member }) {
             {displayName}
           </p>
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {bubble && (
-              <span className="text-xs font-sans font-semibold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200">
-                Bubble
-              </span>
-            )}
             <TeeTag tee={tee} />
             {memberSince && (
               <span className="text-xs text-gray-400 font-sans">'{String(memberSince).slice(-2)}</span>
