@@ -699,7 +699,7 @@ function exportResultsXLSX(tournament, flightData) {
   XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-results.xlsx`)
 }
 
-function exportBirdiePoolXLSX(tournament, flightData) {
+function exportBirdiePoolXLSX(tournament, flightData, allFlights) {
   if (!tournament) return
   const SITE_BLUE = 'FF0B2E6D'
   const HEADER_NEUTRAL = 'FFEFF3F8'
@@ -727,7 +727,7 @@ function exportBirdiePoolXLSX(tournament, flightData) {
   }
 
   const uniqueNames = [...new Set(
-    ALL_SCORE_TABS.flatMap(flight => (flightData?.[flight] ?? []).map(player => player?.name).filter(Boolean))
+    allFlights.flatMap(flight => (flightData?.[flight] ?? []).map(player => player?.name).filter(Boolean))
   )].sort((a, b) => compareByLastName({ name: a }, { name: b }))
   const headers = ['#', 'Last', 'First', ...Array.from({ length: 18 }, (_, idx) => String(idx + 1))]
   const wsData = [
@@ -1314,14 +1314,36 @@ function AdminPanel({ currentUser }) {
     if (!exists) setTid(defaultTournamentId)
   }, [tid, defaultTournamentId, archivedTournaments])
 
+  // Track last Firestore snapshots so we only overwrite local state when the user
+  // hasn't made edits on top of the previous cloud value.
+  const prevCloudUsersRef = useRef(undefined)
+  const prevCloudLifecycleRef = useRef(undefined)
+  const prevCloudPaymentMetaRef = useRef(undefined)
+
   useEffect(() => {
-    setUsersDraft(cloudUsers)
+    setUsersDraft(prev => {
+      const prevCloud = prevCloudUsersRef.current
+      prevCloudUsersRef.current = cloudUsers
+      // First snapshot or local still matches previous cloud → safe to update
+      if (prevCloud === undefined || stableSerialize(prev) === stableSerialize(prevCloud)) return cloudUsers
+      return prev // local edits exist; preserve them
+    })
   }, [cloudUsers])
   useEffect(() => {
-    setTournamentLifecycle(cloudTournamentLifecycle)
+    setTournamentLifecycle(prev => {
+      const prevCloud = prevCloudLifecycleRef.current
+      prevCloudLifecycleRef.current = cloudTournamentLifecycle
+      if (prevCloud === undefined || stableSerialize(prev) === stableSerialize(prevCloud)) return cloudTournamentLifecycle
+      return prev
+    })
   }, [cloudTournamentLifecycle])
   useEffect(() => {
-    setPaymentMeta(cloudPaymentMeta)
+    setPaymentMeta(prev => {
+      const prevCloud = prevCloudPaymentMetaRef.current
+      prevCloudPaymentMetaRef.current = cloudPaymentMeta
+      if (prevCloud === undefined || stableSerialize(prev) === stableSerialize(prevCloud)) return cloudPaymentMeta
+      return prev
+    })
   }, [cloudPaymentMeta])
 
   const paymentMap = payments[tid] ?? {}
@@ -2820,7 +2842,7 @@ function AdminPanel({ currentUser }) {
   async function generateBirdieExport(targetTid = tid) {
     const targetTournament = schedule.find(t => t.id === targetTid) ?? archivedTournaments.find(t => t.id === targetTid)
     if (!targetTournament) return
-    exportBirdiePoolXLSX(targetTournament, data[targetTid] ?? {})
+    exportBirdiePoolXLSX(targetTournament, data[targetTid] ?? {}, ALL_SCORE_TABS)
     const nextLifecycle = {
       ...tournamentLifecycle,
       [targetTid]: {
@@ -3210,6 +3232,7 @@ function AdminPanel({ currentUser }) {
               updateMemberPtm={updateMemberPtm}
               updateMemberTee={updateMemberTee}
               updateMemberName={updateMemberName}
+              updateMemberCell={updateMemberCell}
               removeMember={removeMember}
               openConfirm={openConfirm}
               applyCredit={applyCredit}
@@ -3228,6 +3251,7 @@ function AdminPanel({ currentUser }) {
               importStatus={importStatus}
               importError={importError}
               setImportError={setImportError}
+              allFlights={ALL_SCORE_TABS}
             />
           </section>
 
@@ -3354,7 +3378,7 @@ function AdminPanel({ currentUser }) {
           onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData)}
           onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
           onExportCreditsXLSX={() => exportCreditsXLSX(credits, membersData)}
-          onExportBirdiePoolXLSX={() => exportBirdiePoolXLSX(tournament, data[tid] ?? {})}
+          onExportBirdiePoolXLSX={() => exportBirdiePoolXLSX(tournament, data[tid] ?? {}, ALL_SCORE_TABS)}
         />
       )}
 
@@ -5259,14 +5283,15 @@ const TEE_OPTIONS = ['Back', 'Senior', 'Front']
 
 function FlightManagementPanel({
   effectiveMembers, membersData, credits, flightSearch, setFlightSearch,
-  updateMemberFlight, updateMemberPtm, updateMemberTee, updateMemberName, removeMember,
+  updateMemberFlight, updateMemberPtm, updateMemberTee, updateMemberName, updateMemberCell, removeMember,
   openConfirm,
   applyCredit,
   savePlayerManagement, playerManagementSaving, playerManagementSaveStatus, flightTagStyles,
   fileInputRef, handleXlsxFile, importPreview, setImportPreview,
   confirmImport, importSaving, importStatus, importError, setImportError,
+  allFlights,
 }) {
-  const FLIGHT_OPTIONS = ALL_SCORE_TABS
+  const FLIGHT_OPTIONS = allFlights
   const SORTABLE_COLUMNS = ['name', 'ptm', 'creditOnBooks', 'tee']
   const [sortBy, setSortBy] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
@@ -5292,7 +5317,7 @@ function FlightManagementPanel({
           id: member.id ?? member.name,
           originalName: member.originalName ?? member.name,
           name: member.name,
-          flight: (member.flight && ALL_SCORE_TABS.includes(member.flight)) ? member.flight : null,
+          flight: (member.flight && allFlights.includes(member.flight)) ? member.flight : null,
           ptm: fmtPtmValue(member.ptm),
           tee: member.tee ?? null,
           creditOnBooks: Number.isFinite(parsedCredit) ? parsedCredit : 0,
