@@ -1,6 +1,6 @@
 const CREDIT_COLUMNS = ['member', 'amount', 'date', 'note', 'reference']
 const TOURNAMENT_COLUMNS = ['tournamentId', 'title', 'date', 'course', 'format', 'entryFee']
-const RESULT_COLUMNS = ['flight', 'member', 'score', 'position', 'notes']
+const RESULT_COLUMNS = ['flight', 'member', 'score', 'notes']
 
 function toCsv(columns, rows) {
   const escape = (value) => {
@@ -52,16 +52,17 @@ export const BULK_IMPORT_DEFINITIONS = {
   results: {
     label: 'Results',
     requiredColumns: ['flight', 'member', 'score'],
-    optionalColumns: ['position', 'notes'],
+    optionalColumns: ['notes'],
     description: 'Imports player results into tournament leaderboards. Select the target tournament from the dropdown — no tournamentId column needed in the file.',
     usageNotes: [
       'Select the target tournament from the dropdown before uploading.',
       'Duplicate detection uses tournament + normalized flight + member.',
       'Rows are blocked if member is unknown or score is not numeric.',
+      'Position/rank is computed automatically from scores.',
     ],
     sampleRows: [
-      { flight: 'Championship', member: 'Jane Doe', score: 38, position: 1, notes: 'Imported historical scorecard' },
-      { flight: '1st Flight', member: 'John Smith', score: 32, position: 2, notes: '' },
+      { flight: 'Championship', member: 'Jane Doe', score: 38, notes: 'Imported historical scorecard' },
+      { flight: '1st Flight', member: 'John Smith', score: 32, notes: '' },
     ],
     columns: RESULT_COLUMNS,
   },

@@ -50,8 +50,7 @@ import { AdminPaymentsPanel } from './admin/AdminPaymentsPanel'
 import { AdminBulkImportPanel } from './admin/AdminBulkImportPanel'
 import { AdminFlightCalculatorPanel } from './admin/AdminFlightCalculatorPanel'
 
-const FLIGHTS          = FLIGHT_ORDER
-const ALL_SCORE_TABS   = [...FLIGHTS, NEW_PLAYERS_FLIGHT]
+const FLIGHTS              = FLIGHT_ORDER
 const DEFAULT_PAIRING_ROWS = 15
 const STORAGE_KEY  = 'cga_admin_v1'
 const PAIRINGS_KEY = 'cga_pairings_v1'
@@ -63,6 +62,7 @@ const TOURNAMENT_INFO_KEY = 'cga_tournament_info_v1'
 const TOURNAMENT_LIFECYCLE_KEY = 'cga_tournament_lifecycle_v1'
 const PAYMENT_META_KEY = 'cga_payment_meta_v1'
 const PAIRING_RULES_KEY = 'cga_pairing_rules_v1'
+const EXTRA_FLIGHTS_KEY = 'cga_extra_flights_v1'
 const MAX_RECENT_ACTIONS = 5
 
 const PDF_NAVY = [27,  59,  111]
@@ -1015,6 +1015,16 @@ function AdminPanel({ currentUser }) {
     try { return JSON.parse(localStorage.getItem(PAIRING_RULES_KEY)) || [] } catch { return [] }
   })
 
+  // Extra custom flights (beyond FLIGHT_ORDER), always rendered before New Players
+  const [extraFlights, setExtraFlights] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(EXTRA_FLIGHTS_KEY)) || [] } catch { return [] }
+  })
+
+  const ALL_SCORE_TABS = useMemo(
+    () => [...FLIGHTS, ...extraFlights.filter(f => f && f !== NEW_PLAYERS_FLIGHT && !FLIGHTS.includes(f)), NEW_PLAYERS_FLIGHT],
+    [extraFlights]
+  )
+
   const currentTournaments = useMemo(() => getCurrentTournaments(schedule), [])
   const pastTournaments = useMemo(() => getPastTournaments(schedule), [])
   const defaultTournamentId = currentTournaments[0]?.id ?? pastTournaments[0]?.id ?? schedule[0]?.id ?? ''
@@ -1220,6 +1230,7 @@ function AdminPanel({ currentUser }) {
   useEffect(() => { localStorage.setItem(TOURNAMENT_LIFECYCLE_KEY, JSON.stringify(tournamentLifecycle)) }, [tournamentLifecycle])
   useEffect(() => { localStorage.setItem(PAYMENT_META_KEY, JSON.stringify(paymentMeta)) }, [paymentMeta])
   useEffect(() => { localStorage.setItem(PAIRING_RULES_KEY, JSON.stringify(pairingRules)) }, [pairingRules])
+  useEffect(() => { localStorage.setItem(EXTRA_FLIGHTS_KEY, JSON.stringify(extraFlights)) }, [extraFlights])
   useEffect(() => {
     if (!actionFeedback) return
     const timer = setTimeout(() => setActionFeedback(null), 3500)
@@ -1287,9 +1298,9 @@ function AdminPanel({ currentUser }) {
       setTid(defaultTournamentId)
       return
     }
-    const exists = schedule.some(t => t.id === tid)
+    const exists = schedule.some(t => t.id === tid) || archivedTournaments.some(t => t.id === tid)
     if (!exists) setTid(defaultTournamentId)
-  }, [tid, defaultTournamentId])
+  }, [tid, defaultTournamentId, archivedTournaments])
 
   useEffect(() => {
     setUsersDraft(cloudUsers)
@@ -1378,10 +1389,12 @@ function AdminPanel({ currentUser }) {
       const td = { ...(prev[tid] ?? {}) }
       names.forEach(name => {
         const memberFlight = memberFlightLookup[name]
-        const targetFlight = FLIGHTS.includes(memberFlight) ? memberFlight : 'New Players'
+        const memberPtm = ptmLookup[name]
+        const isNewPlayer = memberPtm == null || memberPtm === '' || Number(memberPtm) === 0
+        const targetFlight = (!isNewPlayer && FLIGHTS.includes(memberFlight)) ? memberFlight : 'New Players'
         const entry = {
           name,
-          ptm: ptmLookup[name] ?? '',
+          ptm: memberPtm ?? '',
           score: '',
           eligible: true,
         }
@@ -1527,6 +1540,23 @@ function AdminPanel({ currentUser }) {
     const newPairings = groups
       .filter(g => g.length > 0)
       .map((ps, i) => ({ pairing: `Pairing ${i + 1}`, players: ps }))
+    setPairingsDirtyTouched(true)
+    setPairingsData(prev => ({ ...prev, [tid]: newPairings }))
+    patchTournamentLifecycle(tid, { pairingsState: 'draft' })
+    setManualPairings(false)
+    setSelectedUnpaired(null)
+  }
+
+  function importPairingsFromGroups(groups) {
+    if (!groups?.length) return
+    const flightByName = {}
+    for (const fl of ALL_SCORE_TABS) {
+      for (const p of (data[tid]?.[fl] ?? [])) flightByName[p.name] = fl
+    }
+    const newPairings = groups.map((g, i) => ({
+      pairing: g.label ?? `Pairing ${i + 1}`,
+      players: (g.players ?? []).map(name => ({ name, flight: flightByName[name] ?? NEW_PLAYERS_FLIGHT })),
+    }))
     setPairingsDirtyTouched(true)
     setPairingsData(prev => ({ ...prev, [tid]: newPairings }))
     patchTournamentLifecycle(tid, { pairingsState: 'draft' })
@@ -1912,8 +1942,10 @@ function AdminPanel({ currentUser }) {
     )
     if (alreadyAdded) return
     const memberFlight = memberFlightLookup[name]
-    const targetFlight = FLIGHTS.includes(memberFlight) ? memberFlight : 'New Players'
-    const entry = { name, ptm: ptmLookup[name] ?? '', score: '', eligible: true }
+    const memberPtm = ptmLookup[name]
+    const isNewPlayer = memberPtm == null || memberPtm === '' || Number(memberPtm) === 0
+    const targetFlight = (!isNewPlayer && FLIGHTS.includes(memberFlight)) ? memberFlight : 'New Players'
+    const entry = { name, ptm: memberPtm ?? '', score: '', eligible: true }
     setData(prev => {
       const td = { ...(prev[tournamentId] ?? {}) }
       td[targetFlight] = [...(td[targetFlight] ?? []), entry]
@@ -2636,9 +2668,11 @@ function AdminPanel({ currentUser }) {
   function buildPublishPayloadForTournament(targetTid = tid, updatedMembers = null) {
     const members = updatedMembers ?? computePublishMemberUpdates(targetTid)
     const computedPtmLookup = Object.fromEntries(members.map(m => [m.name, m.ptm]))
+    // Include archived tournaments so publish works for prior-season entries
+    const combinedSchedule = [...schedule, ...archivedTournaments]
     return buildPublishPayload({
       targetTid,
-      schedule,
+      schedule: combinedSchedule,
       flights: FLIGHTS,
       scoreData: data,
       currentStandings,
@@ -2657,8 +2691,9 @@ function AdminPanel({ currentUser }) {
     const payload = buildPublishPayloadForTournament(targetTid, updatedMembers)
     if (!payload?.resultDoc) return false
 
+    const combinedSchedule = [...schedule, ...archivedTournaments]
     const publishErrors = [
-      ...validateTournamentId(payload.targetTid, schedule),
+      ...validateTournamentId(payload.targetTid, combinedSchedule),
       ...validateScoresForTournament({ tournamentId: payload.targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
       ...validatePublishPayload(payload, { members: membersData, scoreFlights: FLIGHTS }),
     ]
@@ -2710,8 +2745,10 @@ function AdminPanel({ currentUser }) {
   function openPublishPreview(targetTid = tid) {
     const payload = buildPublishPayloadForTournament(targetTid)
     if (!payload) return
+    // Accept archived tournaments (in Firestore but not schedule.json) as valid
+    const combinedSchedule = [...schedule, ...archivedTournaments]
     const publishErrors = [
-      ...validateTournamentId(targetTid, schedule),
+      ...validateTournamentId(targetTid, combinedSchedule),
       ...validateScoresForTournament({ tournamentId: targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
       ...validatePublishPayload(payload, { members: membersData, scoreFlights: FLIGHTS }),
     ]
@@ -2728,23 +2765,48 @@ function AdminPanel({ currentUser }) {
     }
   }
 
-  function markMemoSent(targetTid = tid) {
+  async function markMemoSent(targetTid = tid) {
     if (!targetTid) return
-    patchTournamentLifecycle(targetTid, { memoSentAt: nextLifecycleStamp() })
+    const next = {
+      ...tournamentLifecycle,
+      [targetTid]: { ...(tournamentLifecycle[targetTid] ?? {}), memoSentAt: nextLifecycleStamp() },
+    }
+    setTournamentLifecycle(next)
+    await DB.saveTournamentLifecycle(next).catch(err => console.warn('[CGA] Failed to save lifecycle:', err))
   }
 
-  function finalizeField(targetTid = tid) {
+  async function unmarkMemoSent(targetTid = tid) {
     if (!targetTid) return
-    patchTournamentLifecycle(targetTid, { fieldFinalizedAt: nextLifecycleStamp() })
+    const next = {
+      ...tournamentLifecycle,
+      [targetTid]: { ...(tournamentLifecycle[targetTid] ?? {}), memoSentAt: null },
+    }
+    setTournamentLifecycle(next)
+    await DB.saveTournamentLifecycle(next).catch(err => console.warn('[CGA] Failed to save lifecycle:', err))
   }
 
-  function unfinalizeField(targetTid = tid) {
+  async function finalizeField(targetTid = tid) {
     if (!targetTid) return
-    patchTournamentLifecycle(targetTid, { fieldFinalizedAt: null })
+    const next = {
+      ...tournamentLifecycle,
+      [targetTid]: { ...(tournamentLifecycle[targetTid] ?? {}), fieldFinalizedAt: nextLifecycleStamp() },
+    }
+    setTournamentLifecycle(next)
+    await DB.saveTournamentLifecycle(next).catch(err => console.warn('[CGA] Failed to save lifecycle:', err))
+  }
+
+  async function unfinalizeField(targetTid = tid) {
+    if (!targetTid) return
+    const next = {
+      ...tournamentLifecycle,
+      [targetTid]: { ...(tournamentLifecycle[targetTid] ?? {}), fieldFinalizedAt: null },
+    }
+    setTournamentLifecycle(next)
+    await DB.saveTournamentLifecycle(next).catch(err => console.warn('[CGA] Failed to save lifecycle:', err))
   }
 
   async function generateBirdieExport(targetTid = tid) {
-    const targetTournament = schedule.find(t => t.id === targetTid)
+    const targetTournament = schedule.find(t => t.id === targetTid) ?? archivedTournaments.find(t => t.id === targetTid)
     if (!targetTournament) return
     exportBirdiePoolXLSX(targetTournament, data[targetTid] ?? {})
     const nextLifecycle = {
@@ -2759,7 +2821,7 @@ function AdminPanel({ currentUser }) {
   }
 
   async function generatePayoutDocument(targetTid = tid) {
-    const targetTournament = schedule.find(t => t.id === targetTid)
+    const targetTournament = schedule.find(t => t.id === targetTid) ?? archivedTournaments.find(t => t.id === targetTid)
     const resultDoc = allResults?.[targetTid]
     if (!targetTournament || !resultDoc) return
     const exported = exportPayoutDocXLSX(targetTournament, resultDoc)
@@ -3025,6 +3087,13 @@ function AdminPanel({ currentUser }) {
           onExportResultsPDF={() => exportResultsPDF(tournament, effectiveFlightData)}
           pairingsPosted={pairingsPosted}
           onGoToPairings={() => setAdminMode('pairings')}
+          extraFlights={extraFlights}
+          onAddExtraFlight={(name) => {
+            const trimmed = name.trim()
+            if (!trimmed || FLIGHTS.includes(trimmed) || trimmed === NEW_PLAYERS_FLIGHT || extraFlights.includes(trimmed)) return
+            setExtraFlights(prev => [...prev, trimmed])
+          }}
+          onRemoveExtraFlight={(name) => setExtraFlights(prev => prev.filter(f => f !== name))}
         />
       )}
 
@@ -3046,6 +3115,7 @@ function AdminPanel({ currentUser }) {
           onGoToPayments={() => setAdminMode('payments')}
           onGoToPairings={() => setAdminMode('pairings')}
           onMarkMemoSent={() => markMemoSent(dashboardTid)}
+          onUndoMemoSent={() => unmarkMemoSent(dashboardTid)}
           onFinalizeField={() => finalizeField(dashboardTid)}
           onUnfinalizeField={() => unfinalizeField(dashboardTid)}
           onExportBirdiePool={() => generateBirdieExport(dashboardTid)}
@@ -3095,6 +3165,8 @@ function AdminPanel({ currentUser }) {
           flightTagStyles={flightTagStyles}
           pairingRules={pairingRules}
           setPairingRules={setPairingRules}
+          onImportPairings={importPairingsFromGroups}
+          allEnteredPlayerNames={new Set(ALL_SCORE_TABS.flatMap(fl => (data[tid]?.[fl] ?? []).map(p => p.name)))}
         />
       )}
 
@@ -3384,12 +3456,15 @@ function AdminPanel({ currentUser }) {
 function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
-  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onFinalizeField, onUnfinalizeField, onExportBirdiePool, onGeneratePayout,
+  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onUndoMemoSent, onFinalizeField, onUnfinalizeField, onExportBirdiePool, onGeneratePayout,
   tournamentCompletionOverrides, onMarkComplete, onUnmarkComplete,
 }) {
   const fieldFinalized = workflow.counts.fieldFinalized
+  const memoSent = workflow.lifecycleSteps.find(s => s.key === 'memo')?.status === 'complete'
   const lifecycleActions = {
-    memo: { label: 'Mark Sent', action: onMarkMemoSent },
+    memo: memoSent
+      ? { label: 'Mark Sent', action: onMarkMemoSent, secondary: { label: 'Undo Sent', action: onUndoMemoSent } }
+      : { label: 'Mark Sent', action: onMarkMemoSent },
     field: fieldFinalized
       ? { label: 'Undo Finalize', action: onUnfinalizeField }
       : { label: 'Finalize Field', action: onFinalizeField, secondary: { label: 'Review Entries', action: onGoToPayments } },
@@ -4164,7 +4239,9 @@ function ScoreEntryPanel({
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
   pairingsPosted, onGoToPairings,
+  extraFlights, onAddExtraFlight, onRemoveExtraFlight,
 }) {
+  const [newFlightName, setNewFlightName] = useState('')
   const hasAnyPlayers = allFlights.some(f => (tournamentData[f]?.length ?? 0) > 0)
 
   return (
@@ -4223,7 +4300,8 @@ function ScoreEntryPanel({
             <div className="space-y-4">
               {allFlights.map(f => {
                 const rawFlightPlayers = tournamentData[f] ?? []
-                if (rawFlightPlayers.length === 0) return null
+                const isNewPlayersTab = f === NEW_PLAYERS_FLIGHT
+                if (rawFlightPlayers.length === 0 && !isNewPlayersTab) return null
                 const flightPlayers = calcFlightPOY(rawFlightPlayers)
                 return (
                   <FlightScoreSection
@@ -4243,6 +4321,51 @@ function ScoreEntryPanel({
           )}
         </div>
       </div>
+
+      {/* Custom Flights */}
+      {onAddExtraFlight && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Custom Flights</p>
+          <p className="text-xs font-sans text-gray-500 mb-3">
+            Add flights beyond the default six. New Players flight is always present.
+          </p>
+          {extraFlights?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {extraFlights.map(f => (
+                <span key={f} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-forest/10 text-forest text-xs font-sans font-semibold">
+                  {f}
+                  <button
+                    type="button"
+                    onClick={() => onRemoveExtraFlight(f)}
+                    className="ml-0.5 text-forest/60 hover:text-red-500 transition-colors leading-none"
+                    aria-label={`Remove ${f} flight`}
+                  >×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newFlightName}
+              onChange={e => setNewFlightName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { onAddExtraFlight(newFlightName); setNewFlightName('') }
+              }}
+              placeholder="e.g. Senior Flight"
+              className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
+            />
+            <button
+              type="button"
+              onClick={() => { onAddExtraFlight(newFlightName); setNewFlightName('') }}
+              disabled={!newFlightName.trim()}
+              className="px-3 py-1.5 rounded-md bg-forest text-white text-xs font-sans font-semibold disabled:opacity-50"
+            >
+              Add Flight
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Save & Publish */}
       <div className="bg-white border border-gray-200 rounded-lg p-5">
@@ -4574,11 +4697,70 @@ function PairingsPanel({
   generatePairings, startManualPairings, addGroupManual, removeGroupManual,
   assignUnpairedToGroup, movePlayerManual, clearPairings, removePairedPlayer, savePairings,
   pairingsSaving, pairingsSaveStatus, pairingsState, onExportPairingsPDF, tournament,
-  flightTagStyles, pairingRules, setPairingRules,
+  flightTagStyles, pairingRules, setPairingRules, onImportPairings, allEnteredPlayerNames,
 }) {
   const [draggedPlayer, setDraggedPlayer] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)
-  const [activeTab, setActiveTab] = useState('pairings')  // 'pairings' | 'rules'
+  const [activeTab, setActiveTab] = useState('pairings')  // 'pairings' | 'rules' | 'import'
+  const [importCsvError, setImportCsvError] = useState(null)
+  const [importCsvWarning, setImportCsvWarning] = useState(null)
+  const importFileRef = useRef(null)
+
+  function parsePairingsCsv(text) {
+    const lines = text.trim().split(/\r?\n/)
+    if (lines.length < 2) return { error: 'File is empty or has only a header row.' }
+    const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase())
+    const groupIdx = rawHeaders.indexOf('group')
+    const playerIdx = rawHeaders.findIndex(h => h === 'player' || h === 'name')
+    if (groupIdx === -1 || playerIdx === -1) {
+      return { error: 'CSV must have "group" and "player" (or "name") columns.' }
+    }
+    const groups = new Map()
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (!line) continue
+      const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      const group = cols[groupIdx] ?? ''
+      const player = cols[playerIdx] ?? ''
+      if (!group || !player) continue
+      if (!groups.has(group)) groups.set(group, [])
+      groups.get(group).push(player)
+    }
+    if (groups.size === 0) return { error: 'No valid rows found in the file.' }
+    const unknown = []
+    for (const players of groups.values()) {
+      for (const name of players) {
+        if (allEnteredPlayerNames && !allEnteredPlayerNames.has(name)) unknown.push(name)
+      }
+    }
+    const result = [...groups.entries()].map(([label, players], i) => ({ label: `Pairing ${i + 1}`, players }))
+    return { groups: result, unknown }
+  }
+
+  function handleImportFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target.result
+      const parsed = parsePairingsCsv(text)
+      if (parsed.error) {
+        setImportCsvError(parsed.error)
+        setImportCsvWarning(null)
+      } else {
+        setImportCsvError(null)
+        onImportPairings(parsed.groups)
+        if (parsed.unknown?.length) {
+          setImportCsvWarning(`${parsed.unknown.length} player(s) not in score entry: ${parsed.unknown.slice(0, 3).join(', ')}${parsed.unknown.length > 3 ? '…' : ''}`)
+        } else {
+          setImportCsvWarning(null)
+        }
+        setActiveTab('pairings')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
 
   function encodeDragPayload(payload) {
     return JSON.stringify(payload)
@@ -4655,7 +4837,61 @@ function PairingsPanel({
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('import')}
+          className={`px-4 py-2 text-xs font-sans font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
+            activeTab === 'import'
+              ? 'border-forest text-forest'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          Import CSV
+        </button>
       </div>
+
+      {/* Import panel */}
+      {activeTab === 'import' && (
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+          <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-1">Import Pairings from CSV</p>
+          <p className="text-xs font-sans text-gray-500 mb-4">
+            Upload a CSV with <span className="font-mono font-semibold">group</span> and <span className="font-mono font-semibold">player</span> columns.
+            Each row is one player; rows with the same group value form one pairing card.
+          </p>
+          <div className="mb-3 rounded-md bg-gray-50 border border-gray-200 p-3 text-xs font-mono text-gray-600">
+            group,player<br />
+            1,John Smith<br />
+            1,Jane Doe<br />
+            1,Bob Jones<br />
+            1,Alice Brown<br />
+            2,Mike Johnson<br />
+            2,Sarah Wilson
+          </div>
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".csv,.txt"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            type="button"
+            onClick={() => importFileRef.current?.click()}
+            className="px-4 py-2 rounded-md bg-forest text-white text-xs font-sans font-semibold hover:bg-forest/90"
+          >
+            Choose CSV File…
+          </button>
+          {importCsvError && (
+            <p className="mt-3 text-xs font-sans text-red-600 font-semibold">{importCsvError}</p>
+          )}
+          {importCsvWarning && (
+            <p className="mt-3 text-xs font-sans text-amber-600">{importCsvWarning}</p>
+          )}
+          <p className="mt-4 text-[11px] font-sans text-gray-400">
+            Importing replaces current draft pairings. You can still edit them after import.
+            Player names must exactly match the names in score entry.
+          </p>
+        </div>
+      )}
 
       {/* Rules panel */}
       {activeTab === 'rules' && (
