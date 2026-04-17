@@ -2942,14 +2942,15 @@ function AdminPanel({ currentUser }) {
               key={action.key}
               type="button"
               onClick={action.onClick}
-              className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-sans font-semibold transition-colors ${
+              title={action.label}
+            className={`inline-flex min-h-10 sm:min-h-12 items-center justify-center gap-1.5 rounded-lg border px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-sans font-semibold transition-colors ${
                 action.active
                   ? 'border-forest bg-forest text-white shadow-sm'
                   : 'border-forest/30 bg-white text-forest hover:bg-forest/10'
               }`}
             >
-              <action.Icon className="w-4 h-4" />
-              <span>{action.label}</span>
+              <action.Icon className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline truncate">{action.label}</span>
             </button>
           ))}
         </div>
@@ -5261,10 +5262,12 @@ function FlightManagementPanel({
       )}
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-forest px-4 py-3 flex items-center gap-3">
-          <span className="text-white font-sans text-sm font-semibold">Player Roster</span>
-          <span className="text-white/50 font-mono text-xs">{effectiveMembers.length} members</span>
-          <div className="ml-auto flex items-center gap-2">
+        <div className="bg-forest px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex items-center gap-3">
+            <span className="text-white font-sans text-sm font-semibold">Player Roster</span>
+            <span className="text-white/50 font-mono text-xs">{effectiveMembers.length} members</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <select
               value={filterFlight}
               onChange={e => setFilterFlight(e.target.value)}
@@ -5292,7 +5295,7 @@ function FlightManagementPanel({
               value={flightSearch}
               onChange={e => setFlightSearch(e.target.value)}
               placeholder="Search…"
-              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-gold w-40"
+              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-gold w-32 sm:w-40"
             />
           </div>
         </div>

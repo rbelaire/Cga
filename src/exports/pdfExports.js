@@ -254,73 +254,68 @@ export async function exportFieldRosterPDF({ tournament, paymentMap, members, fl
     return
   }
 
-  // ── 3-column greedy balancer ──────────────────────────────────────────────
-  // Distribute flights to the shortest column so heights stay balanced.
-  // Uses manual drawing (no autoTable) so page breaks never happen mid-column.
+  // ── Flowing 3-column layout with multi-page support ───────────────────────
+  // Groups flow left→right across 3 columns; when a column is full a new
+  // column starts, and when all 3 are full a new page is added.
+  // Fixed readable font sizes — no auto-scaling to tiny text.
   const ML = PDF_LAYOUT.marginX
   const COL_GAP = 4
-  const COL_W = (pageW - ML * 2 - COL_GAP * 2) / 3  // ≈59.97 mm exactly fits
+  const COL_W = (pageW - ML * 2 - COL_GAP * 2) / 3
+  const HEADER_H = 7
+  const ROW_H = 5
+  const F_GAP = 3
+  const FONT_HEADER = 7.5
+  const FONT_ROW = 7
 
-  const HEADER_H_BASE = 6
-  const ROW_H_BASE = 4
-  const FLIGHT_GAP = 2
+  let col = 0               // current column index (0–2)
+  let pageTopY = y + 2      // top Y for columns on the current page
+  let curY = pageTopY       // current drawing cursor within the column
 
-  // Measure unscaled column heights
-  const colGroups = [[], [], []]
-  const colHeights = [0, 0, 0]
-  allGroups.forEach(group => {
-    const h = HEADER_H_BASE + group.names.length * ROW_H_BASE + FLIGHT_GAP
-    const minIdx = colHeights.indexOf(Math.min(...colHeights))
-    colGroups[minIdx].push(group)
-    colHeights[minIdx] += h
-  })
+  const colX = (c) => ML + c * (COL_W + COL_GAP)
 
-  // Auto-scale so tallest column fits between stats bottom and footer safe line
-  const AVAILABLE_H = (doc.internal.pageSize.getHeight() - 20) - y - 2
-  const maxH = Math.max(...colHeights)
-  const scale = maxH > AVAILABLE_H ? AVAILABLE_H / maxH : 1
-  const HEADER_H = Math.max(HEADER_H_BASE * scale, 4.5)
-  const ROW_H    = Math.max(ROW_H_BASE    * scale, 3.2)
-  const F_GAP    = FLIGHT_GAP * scale
-  const FONT_HEADER = Math.min(7.5, HEADER_H * 0.9)
-  const FONT_ROW    = Math.min(7,   ROW_H    * 0.75)
+  for (const group of allGroups) {
+    const groupH = HEADER_H + group.names.length * ROW_H + F_GAP
 
-  // Draw each column independently — no page breaks possible
-  colGroups.forEach((groups, colIdx) => {
-    if (!groups.length) return
-    const x = ML + colIdx * (COL_W + COL_GAP)
-    let colY = y + 2
+    // If group doesn't fit in current column, advance to the next column/page
+    if (curY + groupH > PDF_LAYOUT.bottomSafeY) {
+      col++
+      if (col >= 3) {
+        doc.addPage()
+        col = 0
+        pageTopY = PDF_LAYOUT.newPageTopY
+      }
+      curY = pageTopY
+    }
 
-    groups.forEach(group => {
-      // Flight header bar
-      doc.setFillColor(...PDF_COLORS.blue)
-      doc.rect(x, colY, COL_W, HEADER_H, 'F')
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(FONT_HEADER)
-      doc.setTextColor(255, 255, 255)
-      doc.text(`${group.label}  (${group.names.length})`, x + 2.5, colY + HEADER_H * 0.72)
-      colY += HEADER_H
+    const x = colX(col)
 
-      // Player rows
-      const maxNameW = COL_W - 5
-      group.names.forEach((name, idx) => {
-        // Alternating row background + border
-        doc.setFillColor(...(idx % 2 === 1 ? PDF_COLORS.rowAlt : [255, 255, 255]))
-        doc.rect(x, colY, COL_W, ROW_H, 'F')
-        doc.setDrawColor(...PDF_COLORS.border)
-        doc.setLineWidth(0.1)
-        doc.rect(x, colY, COL_W, ROW_H, 'S')
+    // Flight header bar
+    doc.setFillColor(...PDF_COLORS.blue)
+    doc.rect(x, curY, COL_W, HEADER_H, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(FONT_HEADER)
+    doc.setTextColor(255, 255, 255)
+    doc.text(`${group.label}  (${group.names.length})`, x + 2.5, curY + HEADER_H * 0.72)
+    curY += HEADER_H
 
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(FONT_ROW)
-        doc.setTextColor(...PDF_COLORS.primaryText)
-        doc.text(doc.splitTextToSize(name, maxNameW)[0], x + 2.5, colY + ROW_H * 0.72)
-        colY += ROW_H
-      })
+    // Player rows
+    const maxNameW = COL_W - 5
+    group.names.forEach((name, idx) => {
+      doc.setFillColor(...(idx % 2 === 1 ? PDF_COLORS.rowAlt : [255, 255, 255]))
+      doc.rect(x, curY, COL_W, ROW_H, 'F')
+      doc.setDrawColor(...PDF_COLORS.border)
+      doc.setLineWidth(0.1)
+      doc.rect(x, curY, COL_W, ROW_H, 'S')
 
-      colY += F_GAP
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(FONT_ROW)
+      doc.setTextColor(...PDF_COLORS.primaryText)
+      doc.text(doc.splitTextToSize(name, maxNameW)[0], x + 2.5, curY + ROW_H * 0.72)
+      curY += ROW_H
     })
-  })
+
+    curY += F_GAP
+  }
 
   withFooter('CGA Field Roster')
   doc.save(safeFilename(clean.id, 'field-roster'))
@@ -347,15 +342,21 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
     return y
   }
 
-  // Column widths must sum exactly to pageWidth − marginLeft − marginRight = 187.9mm
-  // Rank=14 + PTM=14 + Score=17 + +/-=14 + POY=17 + Player=111.9 = 187.9mm
+  // Column widths sum exactly to pageWidth − marginLeft − marginRight = 187.9mm
+  // Rank=14 + Player=80 + PTM=20 + Score=24 + +/-=20 + POY=29.9 = 187.9mm
   const resultsColumnStyles = {
     0: { halign: 'center', cellWidth: 14, fontStyle: 'bold' },
-    1: { cellWidth: 111.9 },
-    2: { halign: 'center', cellWidth: 14 },
-    3: { halign: 'center', cellWidth: 17, fontStyle: 'bold' },
-    4: { halign: 'center', cellWidth: 14 },
-    5: { halign: 'center', cellWidth: 17 },
+    1: { cellWidth: 80 },
+    2: { halign: 'center', cellWidth: 20 },
+    3: { halign: 'center', cellWidth: 24, fontStyle: 'bold' },
+    4: { halign: 'center', cellWidth: 20 },
+    5: { halign: 'center', cellWidth: 29.9 },
+  }
+
+  const fmtResultPoy = (p) => {
+    if (p.eligible === false) return 'NE'
+    if (p.poy == null) return '—'
+    return p.poy % 1 === 0 ? String(Math.round(p.poy)) : p.poy.toFixed(1)
   }
 
   for (const fl of flights) {
@@ -373,7 +374,7 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
         formatPTM(p.ptm),
         formatScore(p.score),
         formatTrend(p.plusMinus),
-        p.poy == null ? '—' : String(p.poy),
+        fmtResultPoy(p),
       ]),
       columnStyles: resultsColumnStyles,
       fontSize: 7.5,
