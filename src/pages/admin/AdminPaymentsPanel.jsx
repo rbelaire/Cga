@@ -27,12 +27,29 @@ export function AdminPaymentsPanel({
   onMarkAllPaid,
   onTogglePayment,
   onMarkPaidWithCredit,
+  fieldFinalized,
+  onFinalizeField,
+  onUnfinalizeField,
   SaveBtn,
   PdfBtn,
   XlsxBtn,
 }) {
   return (
     <div>
+      {fieldFinalized && (
+        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
+            <span className="text-sm font-sans font-semibold text-green-800">Field finalized — {paymentPaidCount} players entered</span>
+          </div>
+          <button
+            onClick={onUnfinalizeField}
+            className="px-3 py-1.5 text-xs font-sans font-semibold rounded border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors whitespace-nowrap"
+          >
+            Undo Finalize
+          </button>
+        </div>
+      )}
       <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4">
         <div className="flex flex-wrap gap-2">
           <input
@@ -56,6 +73,14 @@ export function AdminPaymentsPanel({
             <XlsxBtn onClick={onExportPaymentsXLSX} disabled={!tournament || paymentPaidCount === 0}>
               Excel
             </XlsxBtn>
+            {!fieldFinalized && paymentPaidCount > 0 && (
+              <button
+                onClick={onFinalizeField}
+                className="px-3 py-1.5 text-xs font-sans font-semibold rounded bg-forest text-white hover:bg-forest/90 transition-colors whitespace-nowrap"
+              >
+                Finalize Field
+              </button>
+            )}
             {paymentPaidCount > 0 && (
               <button
                 onClick={onClearAllPayments}

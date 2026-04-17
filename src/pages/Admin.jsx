@@ -2733,6 +2733,16 @@ function AdminPanel({ currentUser }) {
     patchTournamentLifecycle(targetTid, { memoSentAt: nextLifecycleStamp() })
   }
 
+  function finalizeField(targetTid = tid) {
+    if (!targetTid) return
+    patchTournamentLifecycle(targetTid, { fieldFinalizedAt: nextLifecycleStamp() })
+  }
+
+  function unfinalizeField(targetTid = tid) {
+    if (!targetTid) return
+    patchTournamentLifecycle(targetTid, { fieldFinalizedAt: null })
+  }
+
   async function generateBirdieExport(targetTid = tid) {
     const targetTournament = schedule.find(t => t.id === targetTid)
     if (!targetTournament) return
@@ -2872,7 +2882,7 @@ function AdminPanel({ currentUser }) {
               onChange={e => { setTid(e.target.value); setPoolSearch(''); setSelectedPool(new Set()) }}
               className="border border-gray-300 rounded-md px-3 py-2.5 text-sm font-sans w-full lg:min-w-[320px] focus:outline-none focus:ring-2 focus:ring-forest"
             >
-              {currentTournaments.length > 0 && (
+              {!showPastTournaments && currentTournaments.length > 0 && (
                 <optgroup label="Current & Upcoming">
                   {currentTournaments.map(t => <option key={t.id} value={t.id}>{t.name} — {t.date}</option>)}
                 </optgroup>
@@ -2882,11 +2892,6 @@ function AdminPanel({ currentUser }) {
                   {pastTournaments.filter(t => t.id === tid).map(t => (
                     <option key={t.id} value={t.id}>{t.name} — {t.date}</option>
                   ))}
-                </optgroup>
-              )}
-              {currentTournaments.length === 0 && pastTournaments[0] && (
-                <optgroup label="Most Recent">
-                  <option value={pastTournaments[0].id}>{pastTournaments[0].name} — {pastTournaments[0].date}</option>
                 </optgroup>
               )}
               {showPastTournaments && pastTournaments.length > 0 && (
@@ -3041,6 +3046,8 @@ function AdminPanel({ currentUser }) {
           onGoToPayments={() => setAdminMode('payments')}
           onGoToPairings={() => setAdminMode('pairings')}
           onMarkMemoSent={() => markMemoSent(dashboardTid)}
+          onFinalizeField={() => finalizeField(dashboardTid)}
+          onUnfinalizeField={() => unfinalizeField(dashboardTid)}
           onExportBirdiePool={() => generateBirdieExport(dashboardTid)}
           onGeneratePayout={() => generatePayoutDocument(dashboardTid)}
           tournamentCompletionOverrides={liveTournamentStatus?.completed ?? {}}
@@ -3213,6 +3220,9 @@ function AdminPanel({ currentUser }) {
           onMarkAllPaid={(names) => markAllPaid(tid, names)}
           onTogglePayment={(name) => togglePayment(tid, name)}
           onMarkPaidWithCredit={(name, creditInput) => markPaidWithCredit(tid, name, creditInput)}
+          fieldFinalized={Boolean(tournamentLifecycle[tid]?.fieldFinalizedAt)}
+          onFinalizeField={() => finalizeField(tid)}
+          onUnfinalizeField={() => unfinalizeField(tid)}
           SaveBtn={SaveBtn}
           PdfBtn={PdfBtn}
           XlsxBtn={XlsxBtn}
@@ -3374,12 +3384,15 @@ function AdminPanel({ currentUser }) {
 function DashboardPanel({
   nextTournament, selectedTournament, workflow,
   lastPublishedTournament, hasUnsavedDrafts, unsavedDrafts, onRepublish, publishSaving,
-  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onExportBirdiePool, onGeneratePayout,
+  onGoToScores, onGoToPayments, onGoToPairings, onMarkMemoSent, onFinalizeField, onUnfinalizeField, onExportBirdiePool, onGeneratePayout,
   tournamentCompletionOverrides, onMarkComplete, onUnmarkComplete,
 }) {
+  const fieldFinalized = workflow.counts.fieldFinalized
   const lifecycleActions = {
     memo: { label: 'Mark Sent', action: onMarkMemoSent },
-    field: { label: 'Review Entries', action: onGoToPayments },
+    field: fieldFinalized
+      ? { label: 'Undo Finalize', action: onUnfinalizeField }
+      : { label: 'Finalize Field', action: onFinalizeField, secondary: { label: 'Review Entries', action: onGoToPayments } },
     pairingsLifecycle: { label: workflow.counts.pairingsState === 'published' ? 'Edit Pairings' : 'Generate Pairings', action: onGoToPairings },
     birdie: { label: 'Export', action: onExportBirdiePool },
     scoresLifecycle: { label: workflow.counts.resultsPublished ? 'View Results' : 'Enter Scores', action: onGoToScores },
@@ -3569,12 +3582,22 @@ function TournamentWorkflowTracker({ workflow, actions = {} }) {
               <p className={`text-xs font-sans font-semibold leading-snug ${style.title}`}>{step.title}</p>
               <p className={`text-xs font-sans mt-1 ${style.text}`}>{step.label}</p>
               {actionMeta?.action && (
-                <button
-                  onClick={actionMeta.action}
-                  className="mt-2 px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-forest/30 text-forest hover:bg-forest/5"
-                >
-                  {actionMeta.label}
-                </button>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <button
+                    onClick={actionMeta.action}
+                    className="px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-forest/30 text-forest hover:bg-forest/5"
+                  >
+                    {actionMeta.label}
+                  </button>
+                  {actionMeta.secondary?.action && (
+                    <button
+                      onClick={actionMeta.secondary.action}
+                      className="px-2.5 py-1 text-[11px] font-sans font-semibold rounded border border-gray-200 text-gray-500 hover:bg-gray-50"
+                    >
+                      {actionMeta.secondary.label}
+                    </button>
+                  )}
+                </div>
               )}
             </li>
           )

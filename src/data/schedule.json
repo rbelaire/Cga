@@ -1,18 +1,5 @@
 [
   {
-    "id": "2026-00",
-    "name": "Slabworx and Post Tension of Louisiana Fun Tournament",
-    "date": "2026-02-21",
-    "dueDate": "2026-02-18",
-    "course": "Lafayette Municipal Golf Course",
-    "teeTime": "12:30 PM",
-    "format": "2-Man Scramble",
-    "entryFee": "30 MEM / 55 REG",
-    "flights": [],
-    "status": "completed",
-    "notes": "Fun Tournament"
-  },
-  {
     "id": "2026-01",
     "name": "Flow Control Companies Open",
     "date": "2026-03-15",
