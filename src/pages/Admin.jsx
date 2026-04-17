@@ -2933,21 +2933,21 @@ function AdminPanel({ currentUser }) {
       </section>
 
       <section className="mb-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11">
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
           {primaryActions.map(action => (
             <button
               key={action.key}
               type="button"
               onClick={action.onClick}
               title={action.label}
-            className={`inline-flex min-h-10 sm:min-h-12 items-center justify-center gap-1.5 rounded-lg border px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-sans font-semibold transition-colors ${
+              className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs sm:text-sm font-sans font-semibold whitespace-nowrap transition-colors ${
                 action.active
                   ? 'border-forest bg-forest text-white shadow-sm'
                   : 'border-forest/30 bg-white text-forest hover:bg-forest/10'
               }`}
             >
               <action.Icon className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline truncate">{action.label}</span>
+              {action.label}
             </button>
           ))}
         </div>
