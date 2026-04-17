@@ -274,7 +274,6 @@ function planResultsImport(rows, context, mode) {
     const flight = normalizeFlight(row.flight)
     const member = toText(row.member)
     const score = toNumber(row.score)
-    const position = toNumber(row.position)
     const notes = toText(row.notes)
 
     if (!tournamentId || !flight || !member || score == null) {
@@ -315,7 +314,7 @@ function planResultsImport(rows, context, mode) {
       flight,
       row: {
         name: canonicalMember,
-        rank: position ?? null,
+        rank: null,
         points: score,
         score,
         ptm: context.memberPtmLookup[canonicalMember] ?? null,
