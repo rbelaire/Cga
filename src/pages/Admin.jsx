@@ -345,11 +345,10 @@ function parseRosterXlsx(buffer, membersList) {
 
     const tee             = normalizeTee(row['Tees'] ?? row['Tee'] ?? null)
     const ptm             = row['Points to make'] ?? row['PTM'] ?? null
-    const flight          = row['Flight'] ?? null
     const creditOnBooks   = row['Credit on Books'] !== null ? Number(row['Credit on Books']) : null
     const email           = row['Email Address'] ?? row['Email'] ?? null
     const homePhone       = row['Home Phone'] ?? null
-    const cellPhone       = row['Cell/Work'] ?? row['Cell'] ?? row['Work'] ?? null
+    const cellPhone       = row['Cell/Work'] ?? row['Cell'] ?? row['Work'] ?? row['Phone'] ?? null
     const history = [
       row['NEW'] ?? row['1st'] ?? null,
       row['2nd'] ?? null,
@@ -364,7 +363,7 @@ function parseRosterXlsx(buffer, membersList) {
     const memberName = findMember(rawName)
     const entry = {
       rawName: String(rawName),
-      tee, ptm, flight, creditOnBooks, email, homePhone, cellPhone,
+      tee, ptm, creditOnBooks, email, homePhone, cellPhone,
       history, rounds, memberName
     }
 
@@ -2370,7 +2369,6 @@ function AdminPanel({ currentUser }) {
             name:              row.memberName,
             ...(row.tee            !== null ? { tee:           row.tee                } : {}),
             ...(row.ptm            !== null ? { ptm:           Number(row.ptm)        } : {}),
-            ...(row.flight         !== null ? { flight:        row.flight             } : {}),
             ...(row.creditOnBooks  !== null ? { creditOnBooks: row.creditOnBooks      } : {}),
             ...(row.email          !== null ? { email:         row.email              } : {}),
             ...(row.homePhone      !== null ? { homePhone:     row.homePhone          } : {}),
@@ -2390,7 +2388,6 @@ function AdminPanel({ currentUser }) {
         updatedMembers = membersData.map(m => ({
           ...m,
           ...(overrideMap[m.name] ?? {}),
-          flight: membersOverride[m.name]?.flight ?? overrideMap[m.name]?.flight ?? m.flight,
         }))
       }
 
@@ -2936,21 +2933,21 @@ function AdminPanel({ currentUser }) {
       </section>
 
       <section className="mb-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11">
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
           {primaryActions.map(action => (
             <button
               key={action.key}
               type="button"
               onClick={action.onClick}
               title={action.label}
-            className={`inline-flex min-h-10 sm:min-h-12 items-center justify-center gap-1.5 rounded-lg border px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-sans font-semibold transition-colors ${
+              className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs sm:text-sm font-sans font-semibold whitespace-nowrap transition-colors ${
                 action.active
                   ? 'border-forest bg-forest text-white shadow-sm'
                   : 'border-forest/30 bg-white text-forest hover:bg-forest/10'
               }`}
             >
               <action.Icon className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline truncate">{action.label}</span>
+              {action.label}
             </button>
           ))}
         </div>
@@ -4952,7 +4949,7 @@ function FlightManagementPanel({
   confirmImport, importSaving, importStatus, importError, setImportError,
 }) {
   const FLIGHT_OPTIONS = FLIGHT_ORDER
-  const SORTABLE_COLUMNS = ['name', 'flight', 'ptm', 'creditOnBooks', 'tee']
+  const SORTABLE_COLUMNS = ['name', 'ptm', 'creditOnBooks', 'tee']
   const [sortBy, setSortBy] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
   const [editingRows, setEditingRows] = useState({})
@@ -4960,7 +4957,6 @@ function FlightManagementPanel({
   const [creditAdjustments, setCreditAdjustments] = useState({})
   const [creditAppliedFlash, setCreditAppliedFlash] = useState({})
   const [selectedRows, setSelectedRows] = useState(new Set())
-  const [bulkFlight, setBulkFlight] = useState('')
   const [bulkTee, setBulkTee] = useState('')
   const [bulkCredit, setBulkCredit] = useState('')
   const [filterFlight, setFilterFlight] = useState('all')
@@ -5002,7 +4998,6 @@ function FlightManagementPanel({
         if (sortBy === 'name') return compareByLastName(a, b) * direction
         if (sortBy === 'ptm') return ((a.ptm ?? Number.NEGATIVE_INFINITY) - (b.ptm ?? Number.NEGATIVE_INFINITY)) * direction
         if (sortBy === 'creditOnBooks') return (a.creditOnBooks - b.creditOnBooks) * direction
-        if (sortBy === 'flight') return compareFlights(a.flight, b.flight, { includeNewPlayers: false }) * direction
         return String(a[sortBy] ?? '').localeCompare(String(b[sortBy] ?? '')) * direction
       })
   }, [credits, effectiveMembers, filterFlight, filterTee, flightSearch, onlyCredits, sortBy, sortDir])
@@ -5040,7 +5035,6 @@ function FlightManagementPanel({
       ...prev,
       [row.originalName]: {
         name: row.name,
-        flight: row.flight ?? '',
         tee: row.tee ?? '',
         ptm: row.ptm ?? '',
       },
@@ -5062,11 +5056,9 @@ function FlightManagementPanel({
     const ptmRaw = String(draft.ptm ?? '').trim()
     const normalizedPtm = ptmRaw === '' ? null : Number(ptmRaw)
     if (ptmRaw !== '' && !Number.isFinite(normalizedPtm)) return
-    if (draft.flight && !FLIGHT_OPTIONS.includes(draft.flight)) return
     if (draft.tee && !TEE_OPTIONS.includes(draft.tee)) return
     const newName = (draft.name ?? '').trim()
     if (newName && newName !== originalName) updateMemberName(originalName, newName)
-    updateMemberFlight(originalName, draft.flight || '')
     updateMemberPtm(originalName, ptmRaw === '' ? '' : normalizedPtm)
     updateMemberTee(originalName, draft.tee || '')
     cancelEditingRow(originalName)
@@ -5099,11 +5091,6 @@ function FlightManagementPanel({
       else rows.forEach(row => next.add(row.originalName))
       return next
     })
-  }
-
-  function applyBulkFlight() {
-    if (!bulkFlight || !FLIGHT_OPTIONS.includes(bulkFlight) || selectedVisibleNames.length === 0) return
-    selectedVisibleNames.forEach(originalName => updateMemberFlight(originalName, bulkFlight))
   }
 
   function applyBulkTee() {
@@ -5141,9 +5128,9 @@ function FlightManagementPanel({
           <button
             onClick={() => {
               const ws = XLSX.utils.aoa_to_sheet([
-                ['Name', 'Flight', 'Tee', 'Points to make', 'Credit on Books', 'Email', 'NEW', '2nd', '3rd', '4th', '5th', '6th', '7th'],
-                ['John Smith', '1st Flight', 'Back', 90, 0, 'john@example.com', 82, 88, 91, '', '', '', ''],
-                ['Jane Doe', 'Championship', 'Senior', 105, 5, '', 110, 104, 108, 101, 107, 99, 103],
+                ['Name', 'Tee', 'Points to make', 'Credit on Books', 'Email', 'Phone', 'NEW', '2nd', '3rd', '4th', '5th', '6th', '7th'],
+                ['John Smith', 'Back', 90, 0, 'john@example.com', '555-123-4567', 82, 88, 91, '', '', '', ''],
+                ['Jane Doe', 'Senior', 105, 5, '', '555-987-6543', 110, 104, 108, 101, 107, 99, 103],
               ])
               const wb = XLSX.utils.book_new()
               XLSX.utils.book_append_sheet(wb, ws, 'Roster')
@@ -5192,7 +5179,7 @@ function FlightManagementPanel({
               <p className="text-xs font-sans text-amber-700 mt-0.5">
                 {membersData.length === 0
                   ? 'Bootstrapping roster: all unmatched rows will be added as new members.'
-                  : 'This will update member info (flight, tee, PTM, contact, credits).'}
+                  : 'This will update member info (tee, PTM, contact, credits).'}
                 {' '}Review below then confirm.
               </p>
             </div>
@@ -5302,11 +5289,6 @@ function FlightManagementPanel({
 
         <div className="border-b border-gray-200 px-4 py-2.5 flex flex-wrap gap-2 items-center bg-gray-50/70">
           <span className="text-xs font-sans text-gray-600">Selected: <strong className="text-forest">{selectedVisibleNames.length}</strong></span>
-          <select value={bulkFlight} onChange={e => setBulkFlight(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans">
-            <option value="">Bulk Set Flight</option>
-            {FLIGHT_OPTIONS.map(flight => <option key={flight} value={flight}>{flight}</option>)}
-          </select>
-          <button onClick={applyBulkFlight} disabled={!bulkFlight || selectedVisibleNames.length === 0} className="px-2.5 py-1 text-xs rounded border border-gray-300 disabled:opacity-40">Apply Flight</button>
           <select value={bulkTee} onChange={e => setBulkTee(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs font-sans">
             <option value="">Bulk Set Tee</option>
             {TEE_OPTIONS.map(tee => <option key={tee} value={tee}>{tee}</option>)}
@@ -5319,14 +5301,13 @@ function FlightManagementPanel({
         </div>
 
         <div className="max-h-[560px] overflow-auto" onScroll={e => setScrollTop(e.currentTarget.scrollTop)}>
-          <table className="w-full text-sm min-w-[1100px]">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center w-12">
                   <input type="checkbox" checked={allVisibleSelected && hasVisibleRows} onChange={toggleSelectVisible} />
                 </th>
                 <th onClick={() => updateSort('name')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-left cursor-pointer">Player</th>
-                <th onClick={() => updateSort('flight')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-left cursor-pointer">Flight</th>
                 <th onClick={() => updateSort('ptm')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center cursor-pointer">PTM</th>
                 <th onClick={() => updateSort('creditOnBooks')} className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-right cursor-pointer">Credit on Books</th>
                 <th className="table-header sticky top-0 z-20 bg-gray-50 text-gray-500 text-center">Adjust Credit</th>
@@ -5337,7 +5318,7 @@ function FlightManagementPanel({
             <tbody>
               {shouldVirtualize && topSpacerHeight > 0 && (
                 <tr>
-                  <td colSpan={8} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }} />
+                  <td colSpan={7} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }} />
                 </tr>
               )}
               {visibleRows.map((row, idx) => {
@@ -5366,25 +5347,6 @@ function FlightManagementPanel({
                         />
                       ) : (
                         formatName(row.name)
-                      )}
-                    </td>
-
-                    <td className="px-4 py-2.5">
-                      {isEditing ? (
-                        <select
-                          value={draft.flight}
-                          onChange={e => setDraft({ flight: e.target.value })}
-                          className="border border-gray-300 rounded px-2 py-1 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest w-full max-w-[180px]"
-                        >
-                          <option value="">— Unassigned —</option>
-                          {FLIGHT_OPTIONS.map(f => (
-                            <option key={f} value={f}>{f}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-xs font-sans text-gray-600">
-                          {row.flight ?? 'Unassigned'}
-                        </span>
                       )}
                     </td>
 
@@ -5478,12 +5440,12 @@ function FlightManagementPanel({
               })}
               {shouldVirtualize && bottomSpacerHeight > 0 && (
                 <tr>
-                  <td colSpan={8} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }} />
+                  <td colSpan={7} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }} />
                 </tr>
               )}
               {!rows.length && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400 font-sans text-sm">
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400 font-sans text-sm">
                     No players match your filters.
                   </td>
                 </tr>
@@ -5491,7 +5453,7 @@ function FlightManagementPanel({
             </tbody>
             <tfoot>
               <tr className="bg-forest/5 border-t border-forest/20">
-                <td colSpan={4} className="px-4 py-2 text-xs font-sans text-forest font-semibold uppercase tracking-widest">Visible Credit Total</td>
+                <td colSpan={3} className="px-4 py-2 text-xs font-sans text-forest font-semibold uppercase tracking-widest">Visible Credit Total</td>
                 <td className="px-4 py-2 text-right font-mono text-xs text-forest font-semibold">{fmtCurrency(totalCreditOnBooks)}</td>
                 <td colSpan={3} />
               </tr>
