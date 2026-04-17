@@ -1302,14 +1302,36 @@ function AdminPanel({ currentUser }) {
     if (!exists) setTid(defaultTournamentId)
   }, [tid, defaultTournamentId, archivedTournaments])
 
+  // Track last Firestore snapshots so we only overwrite local state when the user
+  // hasn't made edits on top of the previous cloud value.
+  const prevCloudUsersRef = useRef(undefined)
+  const prevCloudLifecycleRef = useRef(undefined)
+  const prevCloudPaymentMetaRef = useRef(undefined)
+
   useEffect(() => {
-    setUsersDraft(cloudUsers)
+    setUsersDraft(prev => {
+      const prevCloud = prevCloudUsersRef.current
+      prevCloudUsersRef.current = cloudUsers
+      // First snapshot or local still matches previous cloud → safe to update
+      if (prevCloud === undefined || stableSerialize(prev) === stableSerialize(prevCloud)) return cloudUsers
+      return prev // local edits exist; preserve them
+    })
   }, [cloudUsers])
   useEffect(() => {
-    setTournamentLifecycle(cloudTournamentLifecycle)
+    setTournamentLifecycle(prev => {
+      const prevCloud = prevCloudLifecycleRef.current
+      prevCloudLifecycleRef.current = cloudTournamentLifecycle
+      if (prevCloud === undefined || stableSerialize(prev) === stableSerialize(prevCloud)) return cloudTournamentLifecycle
+      return prev
+    })
   }, [cloudTournamentLifecycle])
   useEffect(() => {
-    setPaymentMeta(cloudPaymentMeta)
+    setPaymentMeta(prev => {
+      const prevCloud = prevCloudPaymentMetaRef.current
+      prevCloudPaymentMetaRef.current = cloudPaymentMeta
+      if (prevCloud === undefined || stableSerialize(prev) === stableSerialize(prevCloud)) return cloudPaymentMeta
+      return prev
+    })
   }, [cloudPaymentMeta])
 
   const paymentMap = payments[tid] ?? {}
@@ -3198,6 +3220,7 @@ function AdminPanel({ currentUser }) {
               updateMemberPtm={updateMemberPtm}
               updateMemberTee={updateMemberTee}
               updateMemberName={updateMemberName}
+              updateMemberCell={updateMemberCell}
               removeMember={removeMember}
               openConfirm={openConfirm}
               applyCredit={applyCredit}
@@ -5248,7 +5271,7 @@ const TEE_OPTIONS = ['Back', 'Senior', 'Front']
 
 function FlightManagementPanel({
   effectiveMembers, membersData, credits, flightSearch, setFlightSearch,
-  updateMemberFlight, updateMemberPtm, updateMemberTee, updateMemberName, removeMember,
+  updateMemberFlight, updateMemberPtm, updateMemberTee, updateMemberName, updateMemberCell, removeMember,
   openConfirm,
   applyCredit,
   savePlayerManagement, playerManagementSaving, playerManagementSaveStatus, flightTagStyles,
