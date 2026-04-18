@@ -223,8 +223,9 @@ export async function exportFieldRosterPDF({ tournament, paymentMap, members, fl
     .filter(m => m.name && m.name !== 'Not available' && Boolean(clean.paymentMap[m.name]))
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(m => {
-      if (grouped[m.flight]) grouped[m.flight].push(m.name)
-      else unassigned.push(m.name)
+      const entry = { name: m.name, ptm: m.ptm }
+      if (grouped[m.flight]) grouped[m.flight].push(entry)
+      else unassigned.push(entry)
     })
 
   const allGroups = [
@@ -301,18 +302,23 @@ export async function exportFieldRosterPDF({ tournament, paymentMap, members, fl
     curY += HEADER_H
 
     // Player rows
-    const maxNameW = COL_W - 5
-    group.names.forEach((name, idx) => {
+    const PTM_W = 12
+    const maxNameW = COL_W - PTM_W - 5
+    group.names.forEach((player, idx) => {
       doc.setFillColor(...(idx % 2 === 1 ? PDF_COLORS.rowAlt : [255, 255, 255]))
       doc.rect(x, curY, COL_W, ROW_H, 'F')
       doc.setDrawColor(...PDF_COLORS.border)
       doc.setLineWidth(0.1)
       doc.rect(x, curY, COL_W, ROW_H, 'S')
 
+      const rowY = curY + ROW_H * 0.72
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(FONT_ROW)
       doc.setTextColor(...PDF_COLORS.primaryText)
-      doc.text(doc.splitTextToSize(name, maxNameW)[0], x + 2.5, curY + ROW_H * 0.72)
+      doc.text(doc.splitTextToSize(player.name, maxNameW)[0], x + 2.5, rowY)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...PDF_COLORS.mutedText)
+      doc.text(formatPTM(player.ptm), x + COL_W - 2.5, rowY, { align: 'right' })
       curY += ROW_H
     })
 
@@ -363,6 +369,13 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
 
   for (const fl of flights) {
     const rows = calcFlightPOY(flightData?.[fl] ?? [])
+      .slice()
+      .sort((a, b) => {
+        if (a.rank == null && b.rank == null) return 0
+        if (a.rank == null) return 1
+        if (b.rank == null) return -1
+        return a.rank - b.rank
+      })
     if (!rows.length) continue
     y = ensurePageSpace(doc, y, 24)
     y = drawSectionCard(doc, { y, title: fl, rows: [] })
@@ -390,36 +403,24 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
   return y
 }
 
-export async function exportPtmPDF({ members, flights, logoUrl }) {
+export async function exportPtmPDF({ members, logoUrl }) {
   const clean = sanitizeTournamentData({ members })
   const logo = await loadAssetBase64(logoUrl)
 
   // Landscape letter: 279.4 × 215.9 mm — wide enough for 10 columns
   const { doc, cursorY, withFooter } = createExportPage({
     title: 'Points to Make',
-    subtitle: 'Season roster grouped by flight — sorted alphabetically',
+    subtitle: 'Season roster sorted alphabetically',
     tournamentName: 'CGA 2026',
     tournamentDate: new Date().toISOString(),
     logo,
     orientation: 'landscape',
   })
 
-  const grouped = Object.fromEntries(flights.map(f => [f, []]))
-  const unassigned = []
-  clean.members.filter(m => m.active !== false).forEach(m => {
-    if (grouped[m.flight]) grouped[m.flight].push(m)
-    else unassigned.push(m)
-  })
-
-  // Sort each flight alphabetically by Last, First
-  const allGroups = [
-    ...flights
-      .filter(fl => grouped[fl].length > 0)
-      .map(fl => ({ label: fl, rows: grouped[fl].slice().sort(compareByLastName) })),
-    ...(unassigned.length
-      ? [{ label: 'Unassigned', rows: unassigned.slice().sort(compareByLastName) }]
-      : []),
-  ]
+  const sortedMembers = clean.members
+    .filter(m => m.active !== false)
+    .slice()
+    .sort(compareByLastName)
 
   // Landscape letter usable width: 279.4 − 14 − 14 = 251.4 mm
   // Player(90) + PTM(15) + Tee(12) + R1-R7(19.2 each = 134.4) = 251.4
@@ -439,43 +440,26 @@ export async function exportPtmPDF({ members, flights, logoUrl }) {
 
   const ML = PDF_LAYOUT.marginX
   const MR = PDF_LAYOUT.marginX
-  // Landscape bottom safe area (page height 215.9 mm, leave 20 for footer)
-  const BOTTOM_SAFE = 196
-  const NEW_PAGE_TOP = 16
 
-  let y = cursorY
-
-  for (const group of allGroups) {
-    if (y + 30 > BOTTOM_SAFE) { doc.addPage(); y = NEW_PAGE_TOP }
-
-    const sy = drawSectionCard(doc, {
-      x: ML,
-      width: doc.internal.pageSize.getWidth() - ML - MR,
-      y,
-      title: group.label,
-      rows: [],
-    })
-    autoTable(doc, {
-      head: [['Player', 'PTM', 'T', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']],
-      body: group.rows.map(m => {
-        const hist = Array.isArray(m.history) ? m.history : []
-        return [
-          formatName(formatText(m.name, 'Not available')),
-          formatPTM(m.ptm),
-          formatValue(m.tee, 'text') || '—',
-          ...Array.from({ length: 7 }, (_, i) => hist[i] != null ? String(hist[i]) : ''),
-        ]
-      }),
-      startY: sy - 2,
-      theme: 'striped',
-      headStyles: { fillColor: PDF_COLORS.blue, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, cellPadding: 1.2 },
-      alternateRowStyles: { fillColor: PDF_COLORS.rowAlt },
-      styles: { fontSize: 7, cellPadding: 1, overflow: 'linebreak', textColor: PDF_COLORS.primaryText, lineColor: PDF_COLORS.border, lineWidth: 0.1 },
-      columnStyles: colStyles,
-      margin: { left: ML, right: MR, bottom: 20 },
-    })
-    y = doc.lastAutoTable.finalY + 5
-  }
+  autoTable(doc, {
+    head: [['Player', 'PTM', 'T', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']],
+    body: sortedMembers.map(m => {
+      const hist = Array.isArray(m.history) ? m.history : []
+      return [
+        formatName(formatText(m.name, 'Not available')),
+        formatPTM(m.ptm),
+        formatValue(m.tee, 'text') || '—',
+        ...Array.from({ length: 7 }, (_, i) => hist[i] != null ? String(hist[i]) : ''),
+      ]
+    }),
+    startY: cursorY,
+    theme: 'striped',
+    headStyles: { fillColor: PDF_COLORS.blue, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, cellPadding: 1.2 },
+    alternateRowStyles: { fillColor: PDF_COLORS.rowAlt },
+    styles: { fontSize: 7, cellPadding: 1, overflow: 'linebreak', textColor: PDF_COLORS.primaryText, lineColor: PDF_COLORS.border, lineWidth: 0.1 },
+    columnStyles: colStyles,
+    margin: { left: ML, right: MR, bottom: 20 },
+  })
 
   withFooter('CGA Points to Make')
   doc.save('cga-2026-points-to-make.pdf')
