@@ -2778,7 +2778,11 @@ function AdminPanel({ currentUser }) {
 
   function openPublishPreview(targetTid = tid) {
     const payload = buildPublishPayloadForTournament(targetTid)
-    if (!payload) return
+    if (!payload) {
+      setAdminError('Cannot publish: tournament not found. Select a valid tournament and try again.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
     // Accept archived tournaments (in Firestore but not schedule.json) as valid
     const combinedSchedule = [...schedule, ...archivedTournaments]
     const publishErrors = [
@@ -2786,7 +2790,10 @@ function AdminPanel({ currentUser }) {
       ...validateScoresForTournament({ tournamentId: targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
       ...validatePublishPayload(payload, { members: membersData, scoreFlights: FLIGHTS }),
     ]
-    if (blockOnValidation(publishErrors)) return
+    if (blockOnValidation(publishErrors)) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
     setPublishPreview(payload)
   }
 
