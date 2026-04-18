@@ -21,6 +21,8 @@ function sanitizePlayer(player = {}) {
     eligible: player.eligible !== false,
     method: formatText(player.method, ''),
     active: player.active !== false,
+    history: sanitizeArray(player.history),
+    rounds: sanitizeNumber(player.rounds, null),
   }
 }
 

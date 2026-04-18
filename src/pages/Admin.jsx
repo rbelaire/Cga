@@ -591,7 +591,6 @@ async function exportPtmPDF(membersList, ptmList = []) {
   })
   await exportPtmPdfV2({
     members: enriched,
-    flights: FLIGHTS,
     logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
   })
 }
