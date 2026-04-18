@@ -1350,7 +1350,14 @@ function AdminPanel({ currentUser }) {
     setData(prev => {
       const prevCloud = prevCloudScoresRef.current
       prevCloudScoresRef.current = cloudScores
-      if (prevCloud === undefined || stableSerialize(prev) === stableSerialize(prevCloud)) return cloudScores
+      // First snapshot: preserve any local data; only adopt cloud when local is empty
+      if (prevCloud === undefined) {
+        const hasLocal = Object.values(prev).some(t =>
+          Object.values(t || {}).some(f => Array.isArray(f) && f.length > 0)
+        )
+        return hasLocal ? prev : cloudScores
+      }
+      if (stableSerialize(prev) === stableSerialize(prevCloud)) return cloudScores
       return prev
     })
   }, [cloudScores])
@@ -2786,24 +2793,30 @@ function AdminPanel({ currentUser }) {
   }
 
   function openPublishPreview(targetTid = tid) {
-    const payload = buildPublishPayloadForTournament(targetTid)
-    if (!payload) {
-      setAdminError('Cannot publish: tournament not found. Select a valid tournament and try again.')
+    try {
+      const payload = buildPublishPayloadForTournament(targetTid)
+      if (!payload) {
+        setAdminError('Cannot publish: tournament not found. Select a valid tournament and try again.')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+      // Accept archived tournaments (in Firestore but not schedule.json) as valid
+      const combinedSchedule = [...schedule, ...archivedTournaments]
+      const publishErrors = [
+        ...validateTournamentId(targetTid, combinedSchedule),
+        ...validateScoresForTournament({ tournamentId: targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
+        ...validatePublishPayload(payload, { scoreFlights: FLIGHTS }),
+      ]
+      if (blockOnValidation(publishErrors)) {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+      setPublishPreview(payload)
+    } catch (err) {
+      console.error('[CGA] openPublishPreview error:', err)
+      setAdminError(`Publish error: ${err?.message || String(err)}`)
       window.scrollTo({ top: 0, behavior: 'smooth' })
-      return
     }
-    // Accept archived tournaments (in Firestore but not schedule.json) as valid
-    const combinedSchedule = [...schedule, ...archivedTournaments]
-    const publishErrors = [
-      ...validateTournamentId(targetTid, combinedSchedule),
-      ...validateScoresForTournament({ tournamentId: targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
-      ...validatePublishPayload(payload, { scoreFlights: FLIGHTS }),
-    ]
-    if (blockOnValidation(publishErrors)) {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      return
-    }
-    setPublishPreview(payload)
   }
 
   async function confirmPublishPreview() {
