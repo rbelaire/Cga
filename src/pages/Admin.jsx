@@ -1343,16 +1343,17 @@ function AdminPanel({ currentUser }) {
       !allAddedNames.has(m.name) &&
       (search === '' || m.name.toLowerCase().includes(search) || formatName(m.name).toLowerCase().includes(search))
     )
+    const knownFlights = [...FLIGHTS, NEW_PLAYERS_FLIGHT, ...extraFlights]
     const groups = {}
-    for (const f of [...FLIGHTS, null]) {
+    for (const f of [...knownFlights, null]) {
       const key = f ?? '__unassigned__'
       groups[key] = filtered
-        .filter(m => f === null ? m.flight == null : m.flight === f)
+        .filter(m => f === null ? !knownFlights.includes(m.flight) : m.flight === f)
         .map(m => ({ ...m, isPaid: !!payments[tid]?.[m.name] }))
         .sort(compareByLastName)
     }
     return groups
-  }, [allAddedNames, poolSearch, effectiveMembers, payments, tid])
+  }, [allAddedNames, poolSearch, effectiveMembers, extraFlights, payments, tid])
 
   const poolTotalCount = useMemo(
     () => Object.values(poolMembersGrouped).reduce((s, g) => s + g.length, 0),
@@ -3120,7 +3121,6 @@ function AdminPanel({ currentUser }) {
           onExportResultsPDF={() => exportResultsPDF(tournament, effectiveFlightData)}
           pairingsPosted={pairingsPosted}
           onGoToPairings={() => setAdminMode('pairings')}
-          extraFlights={extraFlights}
           onAddExtraFlight={(name) => {
             const trimmed = name.trim()
             if (!trimmed || FLIGHTS.includes(trimmed) || trimmed === NEW_PLAYERS_FLIGHT || extraFlights.includes(trimmed)) return
@@ -3996,7 +3996,7 @@ function PublishConfirmModal({ preview, publishSaving, publishSaveStatus, onCanc
 }
 
 // ── Flight Score Section ──────────────────────────────────────────────────────
-function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdate, onClear, fmtPM, fmtPOY }) {
+function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdate, onClear, onRemoveFlight, fmtPM, fmtPOY }) {
   const scoreInputRefs = useRef({ mobile: [], desktop: [] })
 
   const setScoreInputRef = (layout, idx, el) => {
@@ -4035,6 +4035,11 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
           {rawPlayers.length > 0 && (
             <button onClick={onClear} className="text-gray-300 hover:text-red-300 text-xs font-sans transition-colors">
               Clear All
+            </button>
+          )}
+          {onRemoveFlight && (
+            <button onClick={onRemoveFlight} className="text-gray-300 hover:text-red-300 text-xs font-sans transition-colors">
+              Remove Flight
             </button>
           )}
         </div>
@@ -4264,6 +4269,57 @@ function ExportRow({ title, description, children }) {
   )
 }
 
+// ── Add Flight Row ────────────────────────────────────────────────────────────
+function AddFlightRow({ onAdd }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const inputRef = useRef(null)
+
+  function confirm() {
+    if (!name.trim()) return
+    onAdd(name)
+    setName('')
+    setOpen(false)
+  }
+
+  return open ? (
+    <div className="flex items-center gap-2">
+      <input
+        ref={inputRef}
+        autoFocus
+        type="text"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') confirm()
+          if (e.key === 'Escape') { setOpen(false); setName('') }
+        }}
+        placeholder="Flight name…"
+        className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
+      />
+      <button
+        type="button"
+        onClick={confirm}
+        disabled={!name.trim()}
+        className="px-3 py-1.5 rounded-md bg-forest text-white text-xs font-sans font-semibold disabled:opacity-50"
+      >Add</button>
+      <button
+        type="button"
+        onClick={() => { setOpen(false); setName('') }}
+        className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 text-xs font-sans"
+      >Cancel</button>
+    </div>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className="flex items-center gap-1.5 text-xs font-sans text-gray-400 hover:text-forest transition-colors py-1"
+    >
+      <span className="text-base leading-none">+</span> Add Flight
+    </button>
+  )
+}
+
 // ── Tournament Setup Panel (Score Entry) ──────────────────────────────────────
 function ScoreEntryPanel({
   allFlights, tournamentData,
@@ -4274,9 +4330,8 @@ function ScoreEntryPanel({
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
   pairingsPosted, onGoToPairings,
-  extraFlights, onAddExtraFlight, onRemoveExtraFlight,
+  onAddExtraFlight, onRemoveExtraFlight,
 }) {
-  const [newFlightName, setNewFlightName] = useState('')
   const hasAnyPlayers = allFlights.some(f => (tournamentData[f]?.length ?? 0) > 0)
 
   return (
@@ -4336,6 +4391,7 @@ function ScoreEntryPanel({
               {allFlights.map(f => {
                 const rawFlightPlayers = tournamentData[f] ?? []
                 const isNewPlayersTab = f === NEW_PLAYERS_FLIGHT
+                const isCustomFlight = !FLIGHTS.includes(f) && !isNewPlayersTab
                 if (rawFlightPlayers.length === 0 && !isNewPlayersTab) return null
                 const flightPlayers = calcFlightPOY(rawFlightPlayers)
                 return (
@@ -4347,60 +4403,19 @@ function ScoreEntryPanel({
                     onUpdate={(idx, field, val) => updatePlayerInFlight(f, idx, field, val)}
                     onRemove={idx => removePlayerFromFlight(f, idx)}
                     onClear={() => clearFlightByName(f)}
+                    onRemoveFlight={isCustomFlight ? () => onRemoveExtraFlight(f) : undefined}
                     fmtPM={fmtPM}
                     fmtPOY={fmtPOY}
                   />
                 )
               })}
+              {/* Add custom flight inline */}
+              <AddFlightRow onAdd={onAddExtraFlight} />
             </div>
           )}
         </div>
       </div>
 
-      {/* Custom Flights */}
-      {onAddExtraFlight && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-          <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Custom Flights</p>
-          <p className="text-xs font-sans text-gray-500 mb-3">
-            Add flights beyond the default six. New Players flight is always present.
-          </p>
-          {extraFlights?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {extraFlights.map(f => (
-                <span key={f} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-forest/10 text-forest text-xs font-sans font-semibold">
-                  {f}
-                  <button
-                    type="button"
-                    onClick={() => onRemoveExtraFlight(f)}
-                    className="ml-0.5 text-forest/60 hover:text-red-500 transition-colors leading-none"
-                    aria-label={`Remove ${f} flight`}
-                  >×</button>
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newFlightName}
-              onChange={e => setNewFlightName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') { onAddExtraFlight(newFlightName); setNewFlightName('') }
-              }}
-              placeholder="e.g. Senior Flight"
-              className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
-            />
-            <button
-              type="button"
-              onClick={() => { onAddExtraFlight(newFlightName); setNewFlightName('') }}
-              disabled={!newFlightName.trim()}
-              className="px-3 py-1.5 rounded-md bg-forest text-white text-xs font-sans font-semibold disabled:opacity-50"
-            >
-              Add Flight
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Save & Publish */}
       <div className="bg-white border border-gray-200 rounded-lg p-5">
