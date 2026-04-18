@@ -1318,6 +1318,7 @@ function AdminPanel({ currentUser }) {
   const prevCloudUsersRef = useRef(undefined)
   const prevCloudLifecycleRef = useRef(undefined)
   const prevCloudPaymentMetaRef = useRef(undefined)
+  const prevCloudScoresRef = useRef(undefined)
 
   useEffect(() => {
     setUsersDraft(prev => {
@@ -1344,6 +1345,14 @@ function AdminPanel({ currentUser }) {
       return prev
     })
   }, [cloudPaymentMeta])
+  useEffect(() => {
+    setData(prev => {
+      const prevCloud = prevCloudScoresRef.current
+      prevCloudScoresRef.current = cloudScores
+      if (prevCloud === undefined || stableSerialize(prev) === stableSerialize(prevCloud)) return cloudScores
+      return prev
+    })
+  }, [cloudScores])
 
   const paymentMap = payments[tid] ?? {}
 
@@ -2728,7 +2737,7 @@ function AdminPanel({ currentUser }) {
     const publishErrors = [
       ...validateTournamentId(payload.targetTid, combinedSchedule),
       ...validateScoresForTournament({ tournamentId: payload.targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
-      ...validatePublishPayload(payload, { members: membersData, scoreFlights: FLIGHTS }),
+      ...validatePublishPayload(payload, { scoreFlights: FLIGHTS }),
     ]
     if (blockOnValidation(publishErrors)) return false
 
@@ -2787,7 +2796,7 @@ function AdminPanel({ currentUser }) {
     const publishErrors = [
       ...validateTournamentId(targetTid, combinedSchedule),
       ...validateScoresForTournament({ tournamentId: targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
-      ...validatePublishPayload(payload, { members: membersData, scoreFlights: FLIGHTS }),
+      ...validatePublishPayload(payload, { scoreFlights: FLIGHTS }),
     ]
     if (blockOnValidation(publishErrors)) {
       window.scrollTo({ top: 0, behavior: 'smooth' })

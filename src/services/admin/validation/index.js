@@ -147,14 +147,14 @@ export function validatePairingsForTournament({ tournamentId, pairingsByTourname
   return errors
 }
 
-export function validatePublishPayload(payload, { members = [], scoreFlights = SCORE_FLIGHTS_DEFAULT } = {}) {
+export function validatePublishPayload(payload, { members = null, scoreFlights = SCORE_FLIGHTS_DEFAULT } = {}) {
   const errors = []
   if (!payload?.targetTid) errors.push('Missing tournament ID for publish.')
   if (!payload?.resultDoc) errors.push('Publish payload is missing result document.')
   if (!payload?.newStandings?.flights) errors.push('Publish payload is missing standings.')
   if (!payload?.newPoy?.flights) errors.push('Publish payload is missing POY standings.')
 
-  const memberSet = new Set((members || []).map(m => normalizeName(m.name)))
+  const memberSet = members != null ? new Set(members.map(m => normalizeName(m.name))) : null
 
   for (const flight of scoreFlights.filter(f => f !== 'New Players')) {
     const rows = payload?.resultDoc?.leaderboard?.[flight] ?? []
@@ -162,7 +162,7 @@ export function validatePublishPayload(payload, { members = [], scoreFlights = S
       if (!hasText(row?.name)) errors.push(`${flight} leaderboard row ${idx + 1} is missing name.`)
       if (!isFiniteNumber(row?.points)) errors.push(`Invalid score points for ${row?.name || `${flight} row ${idx + 1}`}.`)
       if (!isFiniteNumber(row?.ptm)) errors.push(`Invalid PTM for ${row?.name || `${flight} row ${idx + 1}`}.`)
-      if (!memberSet.has(normalizeName(row?.name))) errors.push(`Publish references unknown member: ${row?.name || `${flight} row ${idx + 1}`}.`)
+      if (memberSet && !memberSet.has(normalizeName(row?.name))) errors.push(`Publish references unknown member: ${row?.name || `${flight} row ${idx + 1}`}.`)
     })
   }
 
