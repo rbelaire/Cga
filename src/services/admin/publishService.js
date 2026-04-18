@@ -61,7 +61,7 @@ export function buildPublishPayload({
   const prevPtmLookup = {}
 
   for (const fl of flights) {
-    for (const p of (currentStandings.flights[fl] ?? [])) {
+    for (const p of (currentStandings?.flights?.[fl] ?? [])) {
       prevStandingsLookup[p.name] = p
       if (p.ptm != null) prevPtmLookup[p.name] = p.ptm
     }
