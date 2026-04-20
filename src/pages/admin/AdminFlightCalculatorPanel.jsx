@@ -25,15 +25,16 @@ function autoAssignFlights(players, extraFlights = []) {
   const newPlayers = players.filter(p => !p.ptm)
   const scored = [...players.filter(p => p.ptm)].sort((a, b) => b.ptm - a.ptm)
 
+  const scoredFlights = [...SCORED_FLIGHT_NAMES, ...extraFlights]
   const N = scored.length
-  const numFlights = SCORED_FLIGHT_NAMES.length
+  const numFlights = scoredFlights.length
   const perFlight = N < numFlights ? 1 : Math.min(14, Math.floor(N / numFlights))
   const allNames = [...BASE_FLIGHT_NAMES, ...extraFlights, NEW_PLAYERS_FLIGHT]
   const groups = Object.fromEntries(allNames.map(f => [f, []]))
 
   scored.forEach((player, i) => {
     const flightIdx = perFlight > 0 && i < perFlight * (numFlights - 1) ? Math.floor(i / perFlight) : numFlights - 1
-    groups[SCORED_FLIGHT_NAMES[flightIdx]].push(player.name)
+    groups[scoredFlights[flightIdx]].push(player.name)
   })
 
   groups[NEW_PLAYERS_FLIGHT] = newPlayers.map(p => p.name)
