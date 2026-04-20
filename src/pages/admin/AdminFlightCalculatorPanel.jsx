@@ -42,6 +42,18 @@ function autoAssignFlights(players, extraFlights = []) {
   return groups
 }
 
+// Build groups from each player's current saved flight assignment rather than
+// recalculating from PTM. Falls back to New Players for unrecognized flights.
+function buildGroupsFromPlayers(players, extraFlights = []) {
+  const allNames = [...BASE_FLIGHT_NAMES, ...extraFlights, NEW_PLAYERS_FLIGHT]
+  const groups = Object.fromEntries(allNames.map(f => [f, []]))
+  for (const p of players) {
+    const target = allNames.includes(p.flight) ? p.flight : NEW_PLAYERS_FLIGHT
+    groups[target].push(p.name)
+  }
+  return groups
+}
+
 export function AdminFlightCalculatorPanel({
   enteredPlayers,
   flightTagStyles,
@@ -50,16 +62,17 @@ export function AdminFlightCalculatorPanel({
   extraFlights = [],
   onAddExtraFlight,
 }) {
-  const [groups, setGroups] = useState(() => autoAssignFlights(enteredPlayers, extraFlights))
+  const [groups, setGroups] = useState(() => buildGroupsFromPlayers(enteredPlayers, extraFlights))
   const [dragSource, setDragSource] = useState(null)
   const [dragOverFlight, setDragOverFlight] = useState(null)
   const prevCountRef = useRef(enteredPlayers.length)
 
-  // Recalculate automatically only if the entered player count changes
+  // When the entered player list changes size, rebuild from current assignments so
+  // newly added players land in their saved flight and removed players are dropped.
   useEffect(() => {
     if (enteredPlayers.length !== prevCountRef.current) {
       prevCountRef.current = enteredPlayers.length
-      setGroups(autoAssignFlights(enteredPlayers, extraFlights))
+      setGroups(buildGroupsFromPlayers(enteredPlayers, extraFlights))
     }
   }, [enteredPlayers]) // eslint-disable-line react-hooks/exhaustive-deps
 
