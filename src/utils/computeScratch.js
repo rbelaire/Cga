@@ -10,6 +10,7 @@ export function computeScratch(allResults) {
     for (const flight of Object.keys(result.leaderboard)) {
       for (const player of result.leaderboard[flight]) {
         if (!player.name || typeof player.points !== 'number') continue
+        if (player.wd) continue
         if (!totals[player.name]) totals[player.name] = { name: player.name, scratchPts: 0, events: 0 }
         totals[player.name].scratchPts += player.points
         totals[player.name].events += 1
