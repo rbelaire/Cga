@@ -36,7 +36,7 @@ export function computeTournamentWorkflowState({
   })
 
   const enteredCount = countUniqueByName(players)
-  const scoredCount = countUniqueByName(players.filter(p => hasScore(p?.score)))
+  const scoredCount = countUniqueByName(players.filter(p => hasScore(p?.score) || p?.wd === true))
 
   const paymentMap = asObject(paymentsByTournament[tournamentId])
   const paidCount = Object.keys(paymentMap).length

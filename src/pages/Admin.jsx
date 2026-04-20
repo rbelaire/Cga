@@ -19,14 +19,6 @@ import { createAdminAuditEntry } from '../services/admin/auditService'
 import { buildPublishPayload } from '../services/admin/publishService'
 import { createSnapshotEntry, getSnapshotLabel } from '../services/admin/snapshotService'
 import {
-  applyImportPlan,
-  buildImportContext,
-  BULK_IMPORT_DEFINITIONS,
-  collectRowsForImportType,
-  parseBulkImportFile,
-  planBulkImport,
-} from '../services/admin/import'
-import {
   formatValidationErrors,
   validateCredits,
   validateMembers,
@@ -47,7 +39,6 @@ import {
 import { compareFlights, FLIGHT_ORDER, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
 import { calcPtmFromHistory, roundPtm } from '../utils/roundPtm'
 import { AdminPaymentsPanel } from './admin/AdminPaymentsPanel'
-import { AdminBulkImportPanel } from './admin/AdminBulkImportPanel'
 import { AdminFlightCalculatorPanel } from './admin/AdminFlightCalculatorPanel'
 
 const FLIGHTS              = FLIGHT_ORDER
@@ -1108,15 +1099,6 @@ function AdminPanel({ currentUser }) {
   const [importStatus,   setImportStatus]   = useState(null)   // null | 'ok' | 'err'
   const [importError,    setImportError]    = useState(null)   // error message | null
   const fileInputRef = useRef(null)
-  const [bulkImportType, setBulkImportType] = useState('credits')
-  const [bulkImportTournamentId, setBulkImportTournamentId] = useState('')
-  const bulkImportMode = 'add-only'
-  const [bulkImportFileName, setBulkImportFileName] = useState('')
-  const [bulkImportPlan, setBulkImportPlan] = useState(null)
-  const [bulkImportStatus, setBulkImportStatus] = useState(null)
-  const [bulkImportError, setBulkImportError] = useState(null)
-  const [bulkImportPlanning, setBulkImportPlanning] = useState(false)
-  const [bulkImportApplying, setBulkImportApplying] = useState(false)
   const [recentActions, setRecentActions] = useState([])
   const actionIdCounterRef = useRef(0)
   const lifecycleStampRef = useRef(0)
@@ -2522,7 +2504,6 @@ function AdminPanel({ currentUser }) {
     { key: 'scores',             label: 'Scores',             Icon: GolfFlagIcon,  onClick: () => setAdminMode('scores'),     active: adminMode === 'scores' },
     { key: 'exports',            label: 'Exports',            Icon: ExportIcon,    onClick: () => setAdminMode('exports'),    active: adminMode === 'exports' },
     { key: 'player-management',  label: 'Player Management',  Icon: FolderIcon,    onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
-    { key: 'bulk-import',        label: 'Bulk Import',        Icon: FolderIcon,    onClick: () => setAdminMode('bulk-import'),active: adminMode === 'bulk-import' },
     { key: 'member-management',  label: 'Member Management',  Icon: UsersIcon,     onClick: () => setAdminMode('users'),      active: adminMode === 'users' },
     { key: 'snapshots',          label: 'Snapshots',          Icon: ArchiveIcon,   onClick: () => setAdminMode('snapshots'),  active: adminMode === 'snapshots' },
     { key: 'changelog',          label: 'Changelog',          Icon: ClockListIcon, onClick: () => setAdminMode('changelog'),  active: adminMode === 'changelog' },
@@ -2706,115 +2687,7 @@ function AdminPanel({ currentUser }) {
     }, setAdminError)
   }
 
-  async function handleBulkImportFile(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setBulkImportPlan(null)
-    setBulkImportError(null)
-    setBulkImportStatus(null)
-    setBulkImportFileName(file.name)
-    setBulkImportPlanning(true)
-    try {
-      const parsedSheets = await parseBulkImportFile(file, {
-        headerAliases: {
-          membername: 'member',
-          player: 'member',
-          amountusd: 'amount',
-          tournament: 'tournamentId',
-          tournamentid: 'tournamentId',
-        },
-      })
-      let rows = collectRowsForImportType(parsedSheets, bulkImportType)
-      if (!rows.length) {
-        throw new Error(`No rows found for "${bulkImportType}". Use a sheet named "${bulkImportType}" or upload a single-sheet file.`)
-      }
 
-      if (bulkImportType === 'results') {
-        if (!bulkImportTournamentId) {
-          throw new Error('Select a tournament before uploading results.')
-        }
-        rows = rows.map(({ rowNumber, row }) => ({
-          rowNumber,
-          row: { ...row, tournamentId: bulkImportTournamentId },
-        }))
-      }
-
-      const context = buildImportContext({
-        members: membersData,
-        resultsByTournament: allResults,
-        credits,
-        creditTransactions: cloudCreditTransactions,
-        schedule,
-      })
-      const plan = planBulkImport({
-        importType: bulkImportType,
-        mode: bulkImportMode,
-        rows,
-        context,
-      })
-      setBulkImportPlan(plan)
-    } catch (error) {
-      console.warn('[CGA] Bulk import plan failed:', error)
-      setBulkImportError('Failed to plan import. Check that the file is a valid template and try again.')
-      setBulkImportStatus('err')
-    } finally {
-      setBulkImportPlanning(false)
-      e.target.value = ''
-    }
-  }
-
-  async function applyBulkImport() {
-    if (!bulkImportPlan) return
-    if (bulkImportPlan.issues.length > 0) {
-      setBulkImportError('Fix validation errors before applying this import.')
-      return
-    }
-    if (!bulkImportPlan.toAdd.length) {
-      setBulkImportError('This dry run has no new rows to import.')
-      return
-    }
-
-    const confirmed = await openConfirm(`Apply ${bulkImportPlan.toAdd.length} ${bulkImportType} row(s) in add-only mode? This cannot be undone without restoring snapshots.`)
-    if (!confirmed) return
-
-    setBulkImportApplying(true)
-    setBulkImportError(null)
-    setBulkImportStatus(null)
-    try {
-      const applied = applyImportPlan({
-        plan: bulkImportPlan,
-        state: {
-          credits,
-          resultsByTournament: allResults,
-        },
-      })
-
-      if (bulkImportType === 'credits') {
-        await saveSnapshot('credits', cloudCredits, `Before bulk import (credits) from ${bulkImportFileName || 'file'}`)
-        await saveSnapshot('credit-transactions', cloudCreditTransactions, `Before bulk import (credits) from ${bulkImportFileName || 'file'}`)
-        await Promise.all([
-          DB.saveCredits(applied.credits),
-          DB.appendCreditTransactions(applied.creditTransactions),
-        ])
-        setCredits(applied.credits)
-      }
-
-      if (bulkImportType === 'tournaments' || bulkImportType === 'results') {
-        await saveSnapshot('results', allResults, `Before bulk import (${bulkImportType}) from ${bulkImportFileName || 'file'}`)
-        await DB.saveResultsMap(applied.resultDocs)
-      }
-
-      const summary = bulkImportPlan.summary
-      logChange('Bulk import applied', `${bulkImportType} · ${bulkImportMode} · added ${summary.toAdd}, duplicates ${summary.duplicates}, invalid ${summary.invalidRows}`)
-      setBulkImportStatus('ok')
-    } catch (error) {
-      console.warn('[CGA] Bulk import apply failed:', error)
-      setBulkImportStatus('err')
-      setBulkImportError('Failed to apply import. The data may be invalid or a save error occurred.')
-    } finally {
-      setBulkImportApplying(false)
-    }
-  }
 
   // ── Save scores draft to Firestore ───────────────────────────────────────────
   async function saveScores() {
@@ -3449,32 +3322,6 @@ function AdminPanel({ currentUser }) {
         />
       )}
 
-      {adminMode === 'bulk-import' && (
-        <AdminBulkImportPanel
-          importType={bulkImportType}
-          setImportType={(type) => {
-            setBulkImportType(type)
-            setBulkImportPlan(null)
-            setBulkImportError(null)
-            setBulkImportStatus(null)
-            setBulkImportTournamentId('')
-          }}
-          importMode={bulkImportMode}
-          importDefinitions={BULK_IMPORT_DEFINITIONS}
-          importPlan={bulkImportPlan}
-          importError={bulkImportError}
-          importStatus={bulkImportStatus}
-          planning={bulkImportPlanning}
-          applying={bulkImportApplying}
-          fileName={bulkImportFileName}
-          onFileSelected={handleBulkImportFile}
-          onApply={applyBulkImport}
-          currentUser={currentUser}
-          schedule={schedule}
-          selectedTournamentId={bulkImportTournamentId}
-          onTournamentIdChange={setBulkImportTournamentId}
-        />
-      )}
 
       {/* ════════════════════════════════════════════════════════════════════════
           CHANGELOG MODE
