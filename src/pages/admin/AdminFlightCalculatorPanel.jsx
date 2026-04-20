@@ -2,18 +2,18 @@ import { useState, useEffect, useRef } from 'react'
 import { formatName } from '../../utils/formatName'
 import { NEW_PLAYERS_FLIGHT } from '../../utils/flightOrder'
 
-const FLIGHT_NAMES = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight', NEW_PLAYERS_FLIGHT]
+const BASE_FLIGHT_NAMES = ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight']
+const SCORED_FLIGHT_NAMES = BASE_FLIGHT_NAMES // excludes New Players from auto-assign
 
-const SCORED_FLIGHT_NAMES = FLIGHT_NAMES.slice(0, -1) // excludes New Players from auto-assign
-
-function autoAssignFlights(players) {
+function autoAssignFlights(players, extraFlights = []) {
   // Sort by PTM descending — highest PTM = best golfer = Championship
   const sorted = [...players].sort((a, b) => (b.ptm ?? 0) - (a.ptm ?? 0))
   const N = sorted.length
   const numFlights = SCORED_FLIGHT_NAMES.length
   // Each of the first (numFlights-1) flights gets up to 14 players; last absorbs the rest
   const perFlight = N < numFlights ? 1 : Math.min(14, Math.floor(N / numFlights))
-  const groups = Object.fromEntries(FLIGHT_NAMES.map(f => [f, []]))
+  const allNames = [...BASE_FLIGHT_NAMES, ...extraFlights, NEW_PLAYERS_FLIGHT]
+  const groups = Object.fromEntries(allNames.map(f => [f, []]))
 
   sorted.forEach((player, i) => {
     const flightIdx = perFlight > 0 && i < perFlight * (numFlights - 1) ? Math.floor(i / perFlight) : numFlights - 1
@@ -23,22 +23,90 @@ function autoAssignFlights(players) {
   return groups
 }
 
+function AddFlightInline({ onAdd }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const inputRef = useRef(null)
+
+  function confirm() {
+    if (!name.trim()) return
+    onAdd(name.trim())
+    setName('')
+    setOpen(false)
+  }
+
+  return open ? (
+    <div className="flex items-center gap-2">
+      <input
+        ref={inputRef}
+        autoFocus
+        type="text"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') confirm()
+          if (e.key === 'Escape') { setOpen(false); setName('') }
+        }}
+        placeholder="Flight name…"
+        className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
+      />
+      <button
+        type="button"
+        onClick={confirm}
+        disabled={!name.trim()}
+        className="px-3 py-1.5 rounded-md bg-forest text-white text-xs font-sans font-semibold disabled:opacity-50"
+      >Add</button>
+      <button
+        type="button"
+        onClick={() => { setOpen(false); setName('') }}
+        className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 text-xs font-sans"
+      >Cancel</button>
+    </div>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className="flex items-center gap-1.5 text-xs font-sans text-gray-400 hover:text-forest transition-colors py-1"
+    >
+      <span className="text-base leading-none">+</span> Add Flight
+    </button>
+  )
+}
+
 export function AdminFlightCalculatorPanel({
   enteredPlayers,
   flightTagStyles,
   onSaveFlights,
   saving,
+  extraFlights = [],
+  onAddExtraFlight,
 }) {
-  const [groups, setGroups] = useState(() => autoAssignFlights(enteredPlayers))
+  const [groups, setGroups] = useState(() => autoAssignFlights(enteredPlayers, extraFlights))
   const [dragSource, setDragSource] = useState(null)   // { name, flight }
   const [dragOverFlight, setDragOverFlight] = useState(null)
   const prevCountRef = useRef(enteredPlayers.length)
+
+  // Sync groups when extra flights change (add new empty column, remove dropped column)
+  useEffect(() => {
+    setGroups(prev => {
+      const allNames = [...BASE_FLIGHT_NAMES, ...extraFlights, NEW_PLAYERS_FLIGHT]
+      const next = Object.fromEntries(allNames.map(f => [f, prev[f] ?? []]))
+      // Re-home any players whose flight was removed
+      const removed = Object.keys(prev).filter(f => !allNames.includes(f))
+      for (const f of removed) {
+        for (const name of prev[f]) {
+          next[NEW_PLAYERS_FLIGHT] = [...next[NEW_PLAYERS_FLIGHT], name]
+        }
+      }
+      return next
+    })
+  }, [extraFlights])
 
   // Recalculate automatically only if the entered player count changes
   useEffect(() => {
     if (enteredPlayers.length !== prevCountRef.current) {
       prevCountRef.current = enteredPlayers.length
-      setGroups(autoAssignFlights(enteredPlayers))
+      setGroups(autoAssignFlights(enteredPlayers, extraFlights))
     }
   }, [enteredPlayers])
 
@@ -103,9 +171,12 @@ export function AdminFlightCalculatorPanel({
             </p>
           </div>
           <div className="flex gap-2 flex-wrap items-center">
+            {onAddExtraFlight && (
+              <AddFlightInline onAdd={onAddExtraFlight} />
+            )}
             <button
               type="button"
-              onClick={() => setGroups(autoAssignFlights(enteredPlayers))}
+              onClick={() => setGroups(autoAssignFlights(enteredPlayers, extraFlights))}
               className="px-3 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-500 hover:text-forest hover:border-forest/40 transition-colors"
             >
               Recalculate
@@ -130,7 +201,7 @@ export function AdminFlightCalculatorPanel({
 
       {/* Flight columns */}
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
-        {FLIGHT_NAMES.map(flight => {
+        {[...BASE_FLIGHT_NAMES, ...extraFlights, NEW_PLAYERS_FLIGHT].map(flight => {
           const players = groups[flight] ?? []
           const count = players.length
           const isOver = dragOverFlight === flight
