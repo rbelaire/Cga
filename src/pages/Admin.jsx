@@ -3385,6 +3385,12 @@ function AdminPanel({ currentUser }) {
           flightTagStyles={flightTagStyles}
           onSaveFlights={saveFlights}
           saving={flightsSaving}
+          extraFlights={extraFlights}
+          onAddExtraFlight={(name) => {
+            const trimmed = name.trim()
+            if (!trimmed || FLIGHTS.includes(trimmed) || trimmed === NEW_PLAYERS_FLIGHT || extraFlights.includes(trimmed)) return
+            setExtraFlights(prev => [...prev, trimmed])
+          }}
         />
       )}
 
@@ -4449,8 +4455,6 @@ function ScoreEntryPanel({
                   />
                 )
               })}
-              {/* Add custom flight inline */}
-              <AddFlightRow onAdd={onAddExtraFlight} />
             </div>
           )}
         </div>
