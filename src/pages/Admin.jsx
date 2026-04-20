@@ -1481,6 +1481,49 @@ function AdminPanel({ currentUser }) {
     setSelectedPool(new Set())
   }
 
+  function applyScoreImport(parsedRows) {
+    const normKey = s => String(s ?? '').trim().toLowerCase()
+    // Build member lookup: normalized name → canonical name (also tries Last, First)
+    const memberLookup = new Map()
+    for (const m of effectiveMembers) {
+      memberLookup.set(normKey(m.name), m.name)
+      const parts = m.name.trim().split(/\s+/)
+      if (parts.length >= 2) {
+        const lf = `${parts[parts.length - 1]}, ${parts.slice(0, -1).join(' ')}`
+        if (!memberLookup.has(normKey(lf))) memberLookup.set(normKey(lf), m.name)
+      }
+    }
+    setData(prev => {
+      const td = { ...(prev[tid] ?? {}) }
+      // Build a lookup of who is already in score entry: normKey → {flight, idx}
+      const entryLookup = new Map()
+      for (const fl of ALL_SCORE_TABS) {
+        for (let i = 0; i < (td[fl] ?? []).length; i++) {
+          entryLookup.set(normKey(td[fl][i].name), { flight: fl, idx: i })
+        }
+      }
+      for (const { name, score, wd } of parsedRows) {
+        const canonical = memberLookup.get(normKey(name))
+        if (!canonical) continue
+        const existing = entryLookup.get(normKey(canonical))
+        if (existing) {
+          const { flight, idx } = existing
+          const fl = [...(td[flight] ?? [])]
+          fl[idx] = { ...fl[idx], score: wd ? '' : score, ...(wd ? { wd: true } : { wd: false }) }
+          td[flight] = fl
+        } else {
+          const memberFlight = memberFlightLookup[canonical]
+          const memberPtm = ptmLookup[canonical]
+          const isNewPlayer = memberPtm == null || memberPtm === '' || Number(memberPtm) === 0
+          const targetFlight = (!isNewPlayer && ALL_SCORE_TABS.includes(memberFlight)) ? memberFlight : 'New Players'
+          const entry = { name: canonical, ptm: memberPtm ?? '', score: wd ? '' : score, eligible: true, ...(wd ? { wd: true } : {}) }
+          td[targetFlight] = [...(td[targetFlight] ?? []), entry]
+        }
+      }
+      return { ...prev, [tid]: td }
+    })
+  }
+
   function removePlayerFromFlight(flightName, idx) {
     const flightPlayers = data[tid]?.[flightName] ?? []
     const removedPlayer = flightPlayers[idx]
@@ -3189,6 +3232,8 @@ function AdminPanel({ currentUser }) {
           pairingsPosted={pairingsPosted}
           onGoToPairings={() => setAdminMode('pairings')}
           onRemoveExtraFlight={(name) => setExtraFlights(prev => prev.filter(f => f !== name))}
+          onImportScores={applyScoreImport}
+          effectiveMembers={effectiveMembers}
         />
       )}
 
@@ -4389,8 +4434,10 @@ function ScoreEntryPanel({
   tournament, totalPlayers, onExportResultsPDF,
   pairingsPosted, onGoToPairings,
   onRemoveExtraFlight,
+  onImportScores, effectiveMembers,
 }) {
   const hasAnyPlayers = allFlights.some(f => (tournamentData[f]?.length ?? 0) > 0)
+  const [showImport, setShowImport] = useState(false)
 
   return (
     <>
@@ -4446,6 +4493,15 @@ function ScoreEntryPanel({
             </div>
           ) : (
             <div className="space-y-4">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowImport(true)}
+                  className="px-3 py-1.5 text-xs font-sans font-semibold rounded border border-gray-200 text-gray-500 hover:text-forest hover:border-forest/40 transition-colors"
+                >
+                  ↑ Import Scores
+                </button>
+              </div>
               {allFlights.map(f => {
                 const rawFlightPlayers = tournamentData[f] ?? []
                 const isNewPlayersTab = f === NEW_PLAYERS_FLIGHT
@@ -4497,7 +4553,152 @@ function ScoreEntryPanel({
           </PdfBtn>
         </div>
       </div>
+      {showImport && (
+        <ScoreImportModal
+          effectiveMembers={effectiveMembers}
+          tournamentData={tournamentData}
+          allFlights={allFlights}
+          onApply={(rows) => { onImportScores(rows); setShowImport(false) }}
+          onClose={() => setShowImport(false)}
+        />
+      )}
     </>
+  )
+}
+
+// ── Score Import Modal ────────────────────────────────────────────────────────
+function parseScoreImport(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  if (!lines.length) return []
+  const delim = lines[0].includes('\t') ? '\t' : ','
+  const firstCols = lines[0].split(delim).map(c => c.trim().toLowerCase().replace(/\s+/g, ''))
+  const nameAliases = ['name', 'player', 'member', 'membername']
+  const headerNameIdx = firstCols.findIndex(c => nameAliases.includes(c))
+  const headerScoreIdx = firstCols.findIndex(c => c === 'score')
+  const hasHeader = headerNameIdx !== -1 || headerScoreIdx !== -1
+  const nameIdx  = hasHeader ? (headerNameIdx  !== -1 ? headerNameIdx  : 0) : 0
+  const scoreIdx = hasHeader ? (headerScoreIdx !== -1 ? headerScoreIdx : 1) : 1
+  const dataLines = hasHeader ? lines.slice(1) : lines
+  return dataLines.flatMap(line => {
+    const cols = line.split(delim).map(c => c.trim())
+    const name = cols[nameIdx] ?? ''
+    const rawScore = cols[scoreIdx] ?? ''
+    if (!name) return []
+    const wd = rawScore.toLowerCase() === 'wd'
+    return [{ name, score: wd ? '' : rawScore, wd }]
+  })
+}
+
+function ScoreImportModal({ effectiveMembers, tournamentData, allFlights, onApply, onClose }) {
+  const [text, setText] = useState('')
+  const normKey = s => String(s ?? '').trim().toLowerCase()
+
+  const memberLookup = useMemo(() => {
+    const map = new Map()
+    for (const m of effectiveMembers) {
+      map.set(normKey(m.name), m.name)
+      const parts = m.name.trim().split(/\s+/)
+      if (parts.length >= 2) {
+        const lf = `${parts[parts.length - 1]}, ${parts.slice(0, -1).join(' ')}`
+        if (!map.has(normKey(lf))) map.set(normKey(lf), m.name)
+      }
+    }
+    return map
+  }, [effectiveMembers])
+
+  const entryLookup = useMemo(() => {
+    const map = new Map()
+    for (const fl of allFlights) {
+      for (const p of (tournamentData[fl] ?? [])) map.set(normKey(p.name), fl)
+    }
+    return map
+  }, [tournamentData, allFlights])
+
+  const preview = useMemo(() => {
+    if (!text.trim()) return []
+    return parseScoreImport(text).map(({ name, score, wd }) => {
+      const canonical = memberLookup.get(normKey(name))
+      if (!canonical) return { name, score, wd, status: 'unknown', flight: null }
+      const existingFlight = entryLookup.get(normKey(canonical))
+      return {
+        name: canonical,
+        score,
+        wd,
+        status: existingFlight ? 'update' : 'add',
+        flight: existingFlight ?? effectiveMembers.find(m => m.name === canonical)?.flight ?? '?',
+      }
+    })
+  }, [text, memberLookup, entryLookup, effectiveMembers])
+
+  const canApply = preview.length > 0 && preview.some(r => r.status !== 'unknown')
+  const unknownCount = preview.filter(r => r.status === 'unknown').length
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-gold/20 bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-forest font-sans">Import Scores</h3>
+            <p className="text-xs text-gray-400 font-sans mt-0.5">Paste CSV or tab-separated data. Columns: <code className="bg-gray-100 px-1 rounded">name, score</code>. Use <code className="bg-gray-100 px-1 rounded">WD</code> as score for withdrawals.</p>
+          </div>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-xl leading-none">×</button>
+        </div>
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder={"name,score\nJohn Smith,38\nJane Doe,WD\nBob Jones,42"}
+          rows={6}
+          className="w-full border border-gray-200 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-forest resize-y"
+          autoFocus
+        />
+        {preview.length > 0 && (
+          <div className="mt-3 border border-gray-100 rounded overflow-hidden">
+            <table className="w-full text-xs font-sans">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="text-left px-3 py-1.5 text-gray-400 font-medium">Player</th>
+                  <th className="text-center px-3 py-1.5 text-gray-400 font-medium">Score</th>
+                  <th className="text-center px-3 py-1.5 text-gray-400 font-medium">Flight</th>
+                  <th className="text-center px-3 py-1.5 text-gray-400 font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.map((r, i) => (
+                  <tr key={i} className={`border-b border-gray-50 last:border-0 ${r.status === 'unknown' ? 'bg-red-50' : 'bg-white'}`}>
+                    <td className="px-3 py-1.5 text-darktext font-medium">{formatName(r.name)}</td>
+                    <td className="px-3 py-1.5 text-center font-mono">
+                      {r.wd
+                        ? <span className="text-orange-600 font-semibold">WD</span>
+                        : <span className="text-darktext">{r.score}</span>
+                      }
+                    </td>
+                    <td className="px-3 py-1.5 text-center text-gray-500">{r.flight ?? '—'}</td>
+                    <td className="px-3 py-1.5 text-center">
+                      {r.status === 'unknown' && <span className="text-red-500 font-medium">Not found</span>}
+                      {r.status === 'update'  && <span className="text-blue-500 font-medium">Update score</span>}
+                      {r.status === 'add'     && <span className="text-green-600 font-medium">Add to flight</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {unknownCount > 0 && (
+          <p className="mt-2 text-xs text-red-500 font-sans">{unknownCount} player{unknownCount !== 1 ? 's' : ''} not found in member list and will be skipped.</p>
+        )}
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-1.5 text-xs font-sans rounded border border-gray-200 text-gray-500 hover:text-forest transition-colors">Cancel</button>
+          <button
+            onClick={() => onApply(preview.filter(r => r.status !== 'unknown').map(r => ({ name: r.name, score: r.score, wd: r.wd })))}
+            disabled={!canApply}
+            className="px-4 py-1.5 text-xs font-sans font-semibold rounded bg-forest text-white disabled:opacity-40 hover:bg-forest/90 transition-colors"
+          >
+            Apply {canApply ? `(${preview.filter(r => r.status !== 'unknown').length} players)` : ''}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
