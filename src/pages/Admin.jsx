@@ -2687,8 +2687,8 @@ function AdminPanel({ currentUser }) {
     const combinedSchedule = [...schedule, ...archivedTournaments]
     const publishErrors = [
       ...validateTournamentId(payload.targetTid, combinedSchedule),
-      ...validateScoresForTournament({ tournamentId: payload.targetTid, scoresByTournament: data, scoreFlights: FLIGHTS }),
-      ...validatePublishPayload(payload, { scoreFlights: FLIGHTS }),
+      ...validateScoresForTournament({ tournamentId: payload.targetTid, scoresByTournament: data, scoreFlights: ALL_SCORE_TABS }),
+      ...validatePublishPayload(payload, { scoreFlights: ALL_SCORE_TABS }),
     ]
     if (blockOnValidation(publishErrors)) return false
 
@@ -2706,6 +2706,12 @@ function AdminPanel({ currentUser }) {
         }),
         DB.saveMembers(updatedMembers),
       ])
+      // Auto-mark tournament as completed so the public site shows results immediately
+      const updatedStatus = {
+        ...liveTournamentStatus,
+        completed: { ...(liveTournamentStatus?.completed ?? {}), [payload.targetTid]: true },
+      }
+      await DB.saveTournamentStatus(updatedStatus)
     }, setAdminError)
 
     if (ok) {
