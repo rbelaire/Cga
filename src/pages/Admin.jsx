@@ -1831,13 +1831,67 @@ function AdminPanel({ currentUser }) {
       ...prev,
       [originalName]: { ...(prev[originalName] ?? {}), name: trimmed }
     }))
-    // Rekey credits from old name to new name so validation passes after rename
+    // Rekey credits
     setCredits(prev => {
       if (!(originalName in prev)) return prev
       const next = { ...prev }
       next[trimmed] = next[originalName]
       delete next[originalName]
       return next
+    })
+    // Rekey payments across all tournaments
+    setPayments(prev => {
+      let changed = false
+      const next = {}
+      for (const [tid, map] of Object.entries(prev)) {
+        if (originalName in map) {
+          changed = true
+          const m = { ...map }
+          m[trimmed] = m[originalName]
+          delete m[originalName]
+          next[tid] = m
+        } else {
+          next[tid] = map
+        }
+      }
+      return changed ? next : prev
+    })
+    // Rename inside score entry rows across all tournaments and flights
+    setData(prev => {
+      let changed = false
+      const next = {}
+      for (const [tid, flights] of Object.entries(prev)) {
+        const nextFlights = {}
+        for (const [flight, rows] of Object.entries(flights)) {
+          const hasMatch = rows.some(r => r.name === originalName)
+          if (hasMatch) {
+            changed = true
+            nextFlights[flight] = rows.map(r => r.name === originalName ? { ...r, name: trimmed } : r)
+          } else {
+            nextFlights[flight] = rows
+          }
+        }
+        next[tid] = nextFlights
+      }
+      return changed ? next : prev
+    })
+    // Rename inside pairing groups across all tournaments
+    setPairingsData(prev => {
+      let changed = false
+      const next = {}
+      for (const [tid, cards] of Object.entries(prev)) {
+        const hasMatch = cards.some(card => card.players?.some(p => p.name === originalName))
+        if (hasMatch) {
+          changed = true
+          next[tid] = cards.map(card => ({
+            ...card,
+            players: card.players?.map(p => p.name === originalName ? { ...p, name: trimmed } : p) ?? [],
+          }))
+        } else {
+          next[tid] = cards
+        }
+      }
+      return changed ? next : prev
     })
   }
 
