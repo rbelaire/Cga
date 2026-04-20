@@ -3161,11 +3161,6 @@ function AdminPanel({ currentUser }) {
           onExportResultsPDF={() => exportResultsPDF(tournament, effectiveFlightData)}
           pairingsPosted={pairingsPosted}
           onGoToPairings={() => setAdminMode('pairings')}
-          onAddExtraFlight={(name) => {
-            const trimmed = name.trim()
-            if (!trimmed || FLIGHTS.includes(trimmed) || trimmed === NEW_PLAYERS_FLIGHT || extraFlights.includes(trimmed)) return
-            setExtraFlights(prev => [...prev, trimmed])
-          }}
           onRemoveExtraFlight={(name) => setExtraFlights(prev => prev.filter(f => f !== name))}
         />
       )}
@@ -4315,57 +4310,6 @@ function ExportRow({ title, description, children }) {
   )
 }
 
-// ── Add Flight Row ────────────────────────────────────────────────────────────
-function AddFlightRow({ onAdd }) {
-  const [open, setOpen] = useState(false)
-  const [name, setName] = useState('')
-  const inputRef = useRef(null)
-
-  function confirm() {
-    if (!name.trim()) return
-    onAdd(name)
-    setName('')
-    setOpen(false)
-  }
-
-  return open ? (
-    <div className="flex items-center gap-2">
-      <input
-        ref={inputRef}
-        autoFocus
-        type="text"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') confirm()
-          if (e.key === 'Escape') { setOpen(false); setName('') }
-        }}
-        placeholder="Flight name…"
-        className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-forest"
-      />
-      <button
-        type="button"
-        onClick={confirm}
-        disabled={!name.trim()}
-        className="px-3 py-1.5 rounded-md bg-forest text-white text-xs font-sans font-semibold disabled:opacity-50"
-      >Add</button>
-      <button
-        type="button"
-        onClick={() => { setOpen(false); setName('') }}
-        className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 text-xs font-sans"
-      >Cancel</button>
-    </div>
-  ) : (
-    <button
-      type="button"
-      onClick={() => setOpen(true)}
-      className="flex items-center gap-1.5 text-xs font-sans text-gray-400 hover:text-forest transition-colors py-1"
-    >
-      <span className="text-base leading-none">+</span> Add Flight
-    </button>
-  )
-}
-
 // ── Tournament Setup Panel (Score Entry) ──────────────────────────────────────
 function ScoreEntryPanel({
   allFlights, tournamentData,
@@ -4376,7 +4320,7 @@ function ScoreEntryPanel({
   publishSaving, publishSaveStatus, saveScores, scoresSaving, scoresSaveStatus,
   tournament, totalPlayers, onExportResultsPDF,
   pairingsPosted, onGoToPairings,
-  onAddExtraFlight, onRemoveExtraFlight,
+  onRemoveExtraFlight,
 }) {
   const hasAnyPlayers = allFlights.some(f => (tournamentData[f]?.length ?? 0) > 0)
 
