@@ -1361,6 +1361,32 @@ function AdminPanel({ currentUser }) {
     })
   }, [cloudScores])
 
+  // Keep score-entry PTMs fresh: when member PTMs change (Player Management save,
+  // publish of another tournament, etc.), update any rows that haven't been scored yet.
+  useEffect(() => {
+    if (!tid || Object.keys(ptmLookup).length === 0) return
+    setData(prev => {
+      const td = prev[tid]
+      if (!td) return prev
+      let anyChanged = false
+      const newTd = { ...td }
+      for (const fl of Object.keys(newTd)) {
+        const players = newTd[fl]
+        if (!Array.isArray(players)) continue
+        const updated = players.map(p => {
+          const latestPtm = ptmLookup[p.name]
+          if (latestPtm == null) return p
+          if (p.score !== '' && p.score != null) return p  // score entered — leave PTM alone
+          if (p.ptm === latestPtm) return p
+          anyChanged = true
+          return { ...p, ptm: latestPtm }
+        })
+        newTd[fl] = updated
+      }
+      return anyChanged ? { ...prev, [tid]: newTd } : prev
+    })
+  }, [ptmLookup, tid]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const paymentMap = payments[tid] ?? {}
 
   // Pool members (not yet in this tournament), grouped by season flight
