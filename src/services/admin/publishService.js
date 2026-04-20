@@ -15,16 +15,19 @@ export function buildPublishPayload({
 
   for (const fl of flights) {
     const ps = calcFlightPOY(scoreData[targetTid]?.[fl] ?? [])
-    const ranked = [...ps].filter(p => p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
-    const allRows = [...ranked, ...ps.filter(p => p.rank == null)]
+    const ranked = [...ps].filter(p => !p.wd && p.rank != null).sort((a, b) => a.rank - b.rank || b.plusMinus - a.plusMinus)
+    const unranked = ps.filter(p => !p.wd && p.rank == null)
+    const withdrew = ps.filter(p => p.wd)
+    const allRows = [...ranked, ...unranked, ...withdrew]
 
     leaderboard[fl] = allRows.map(p => ({
-      rank: p.rank ?? 0,
+      rank: p.wd ? null : (p.rank ?? 0),
       name: p.name,
       poy: p.poy ?? 0,
       points: Number(p.score) || 0,
       ptm: Math.round(Number(p.ptm)) || 0,
       plusMinus: p.plusMinus ?? 0,
+      ...(p.wd ? { wd: true } : {}),
     }))
 
     if (ranked[0]) {
@@ -71,6 +74,7 @@ export function buildPublishPayload({
   for (const fl of flights) {
     const ps = calcFlightPOY(scoreData[targetTid]?.[fl] ?? [])
     newPoy.flights[fl] = [...ps]
+      .filter(p => !p.wd)
       .sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
       .map((p, i) => {
         const prevEvents = prevStandingsLookup[p.name]?.events ?? 0
@@ -81,7 +85,7 @@ export function buildPublishPayload({
   const newStandings = { flights: {} }
   for (const fl of flights) {
     const ps = calcFlightPOY(scoreData[targetTid]?.[fl] ?? [])
-    const sorted = [...ps].sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
+    const sorted = [...ps].filter(p => !p.wd).sort((a, b) => (b.poy ?? -1) - (a.poy ?? -1))
 
     newStandings.flights[fl] = sorted.map((p, i) => {
       const newPtm = (() => {
