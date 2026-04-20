@@ -582,12 +582,13 @@ async function exportPairingsPDF(tournament, pairings) {
 }
 
 // ── PDF: Points to Make ────────────────────────────────────────────────────────
-async function exportPtmPDF(membersList, ptmList = []) {
+async function exportPtmPDF(membersList, ptmList = [], preTournamentByName = {}) {
   const ptmByName = Object.fromEntries((ptmList || []).map(p => [p.name, p]))
   const enriched = membersList.map(m => {
     const p = ptmByName[m.name]
-    if (!p) return m
-    return { ...m, history: p.history ?? m.history }
+    const base = p ? { ...m, history: p.history ?? m.history } : m
+    const pre = preTournamentByName[m.name]
+    return pre?.ptm != null ? { ...base, ptm: pre.ptm } : base
   })
   await exportPtmPdfV2({
     members: enriched,
@@ -811,11 +812,15 @@ function exportPayoutDocXLSX(tournament, resultDoc) {
 }
 
 // ── Excel: Field Roster ──────────────────────────────────────────────────────
-function exportPaymentsXLSX(tournament, paymentMap, membersList) {
+function exportPaymentsXLSX(tournament, paymentMap, membersList, preTournamentByName = {}) {
   if (!tournament) return
+  const members = membersList.map(m => {
+    const pre = preTournamentByName[m.name]
+    return pre ? { ...m, flight: pre.flight ?? m.flight } : m
+  })
   const wsData = [
     ['Player', 'Flight'],
-    ...membersList
+    ...members
       .filter(m => m.active !== false && paymentMap[m.name])
       .slice()
       .sort(compareByLastName)
@@ -829,11 +834,13 @@ function exportPaymentsXLSX(tournament, paymentMap, membersList) {
 }
 
 // ── Excel: Points to Make ─────────────────────────────────────────────────────
-function exportPtmXLSX(membersList, ptmList = []) {
+function exportPtmXLSX(membersList, ptmList = [], preTournamentByName = {}) {
   const ptmByName = Object.fromEntries((ptmList || []).map(p => [p.name, p]))
   const enriched = membersList.map(m => {
     const p = ptmByName[m.name]
-    return p ? { ...m, history: p.history ?? m.history } : m
+    const base = p ? { ...m, history: p.history ?? m.history } : m
+    const pre = preTournamentByName[m.name]
+    return pre?.ptm != null ? { ...base, ptm: pre.ptm } : base
   })
   membersList = enriched
   const roundLabels = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7']
@@ -901,12 +908,17 @@ function PdfBtn({ onClick, children, disabled = false }) {
 }
 
 // ── PDF: Field Roster ────────────────────────────────────────────────────────
-async function exportPaymentsPDF(tournament, paymentMap, membersList) {
+async function exportPaymentsPDF(tournament, paymentMap, membersList, preTournamentByName = {}) {
   if (!tournament) return
+  const members = membersList.map(m => {
+    const pre = preTournamentByName[m.name]
+    if (!pre) return m
+    return { ...m, flight: pre.flight ?? m.flight, ...(pre.ptm != null ? { ptm: pre.ptm } : {}) }
+  })
   await exportFieldRosterPdfV2({
     tournament,
     paymentMap,
-    members: membersList,
+    members,
     flights: [...FLIGHTS, NEW_PLAYERS_FLIGHT],
     logoUrl: `${import.meta.env.BASE_URL}cga-logo.png`,
   })
@@ -1256,6 +1268,19 @@ function AdminPanel({ currentUser }) {
     const hasLive = Object.values(live).some(fl => Array.isArray(fl) && fl.length > 0)
     return hasLive ? live : (allResults[tid]?.leaderboard ?? {})
   }, [data, tid, allResults])
+
+  // Per-player pre-tournament data (flight + PTM from score rows or published leaderboard)
+  const preTournamentPlayerData = useMemo(() => {
+    const lookup = {}
+    for (const [flight, rows] of Object.entries(effectiveFlightData)) {
+      if (!Array.isArray(rows)) continue
+      for (const p of rows) {
+        if (p.name) lookup[p.name] = { flight, ptm: p.ptm ?? null }
+      }
+    }
+    return lookup
+  }, [effectiveFlightData])
+
   const tournamentInfo = tournament ? { ...tournament, ...(tournamentInfoDrafts[tournament.id] ?? {}) } : null
   const nextTournamentInfo = nextTournament ? { ...nextTournament, ...(tournamentInfoDrafts[nextTournament.id] ?? {}) } : null
   const totalPlayers = ALL_SCORE_TABS.reduce((sum, f) => sum + (data[tid]?.[f]?.length ?? 0), 0)
@@ -3474,8 +3499,8 @@ function AdminPanel({ currentUser }) {
           savePayments={savePayments}
           paymentsSaving={paymentsSaving}
           paymentsSaveStatus={paymentsSaveStatus}
-          onExportPaymentsPDF={() => exportPaymentsPDF(tournament, paymentMap, membersData)}
-          onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData)}
+          onExportPaymentsPDF={() => exportPaymentsPDF(tournament, paymentMap, membersData, preTournamentPlayerData)}
+          onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData, preTournamentPlayerData)}
           onClearAllPayments={() => clearAllPayments(tid)}
           tournament={tournament}
           paymentRoster={paymentRoster}
@@ -3524,13 +3549,13 @@ function AdminPanel({ currentUser }) {
           paymentPaidCount={paymentPaidCount}
           credits={credits}
           onOpenTournamentInfoEditor={() => setShowTournamentInfoEditor(true)}
-          onExportPtmPDF={() => exportPtmPDF(membersData, livePtmData)}
-          onExportPtmXLSX={() => exportPtmXLSX(membersData, livePtmData)}
+          onExportPtmPDF={() => exportPtmPDF(membersData, livePtmData, preTournamentPlayerData)}
+          onExportPtmXLSX={() => exportPtmXLSX(membersData, livePtmData, preTournamentPlayerData)}
           onExportResultsPDF={() => exportResultsPDF(tournament, effectiveFlightData)}
           onExportResultsXLSX={() => exportResultsXLSX(tournament, effectiveFlightData)}
           onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}
-          onExportPaymentsPDF={() => exportPaymentsPDF(tournament, paymentMap, membersData)}
-          onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData)}
+          onExportPaymentsPDF={() => exportPaymentsPDF(tournament, paymentMap, membersData, preTournamentPlayerData)}
+          onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData, preTournamentPlayerData)}
           onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
           onExportCreditsXLSX={() => exportCreditsXLSX(credits, membersData)}
           onExportBirdiePoolXLSX={() => exportBirdiePoolXLSX(tournament, data[tid] ?? {}, ALL_SCORE_TABS)}
