@@ -1309,6 +1309,11 @@ function AdminPanel({ currentUser }) {
     [effectiveMembers]
   )
 
+  const roundsLookup = useMemo(
+    () => Object.fromEntries(effectiveMembers.map(m => [m.name, m.rounds ?? 0])),
+    [effectiveMembers]
+  )
+
   // Payments for selected tournament
 
   useEffect(() => {
@@ -1393,6 +1398,31 @@ function AdminPanel({ currentUser }) {
       return anyChanged ? { ...prev, [tid]: newTd } : prev
     })
   }, [ptmLookup, tid]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-set eligible based on rounds: players with fewer than 7 rounds are
+  // ineligible for POY. Runs whenever member data or tournament changes.
+  useEffect(() => {
+    if (!tid || Object.keys(roundsLookup).length === 0) return
+    setData(prev => {
+      const td = prev[tid]
+      if (!td) return prev
+      let anyChanged = false
+      const newTd = { ...td }
+      for (const fl of Object.keys(newTd)) {
+        const players = newTd[fl]
+        if (!Array.isArray(players)) continue
+        const updated = players.map(p => {
+          const rounds = roundsLookup[p.name] ?? 0
+          const shouldBeEligible = rounds >= 7
+          if ((p.eligible !== false) === shouldBeEligible) return p
+          anyChanged = true
+          return { ...p, eligible: shouldBeEligible }
+        })
+        newTd[fl] = updated
+      }
+      return anyChanged ? { ...prev, [tid]: newTd } : prev
+    })
+  }, [roundsLookup, tid]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const paymentMap = payments[tid] ?? {}
 
@@ -1479,7 +1509,7 @@ function AdminPanel({ currentUser }) {
           name,
           ptm: memberPtm ?? '',
           score: '',
-          eligible: true,
+          eligible: (roundsLookup[name] ?? 0) >= 7,
         }
         td[targetFlight] = [...(td[targetFlight] ?? []), entry]
       })
@@ -1523,7 +1553,7 @@ function AdminPanel({ currentUser }) {
           const memberPtm = ptmLookup[canonical]
           const isNewPlayer = memberPtm == null || memberPtm === '' || Number(memberPtm) === 0
           const targetFlight = (!isNewPlayer && ALL_SCORE_TABS.includes(memberFlight)) ? memberFlight : 'New Players'
-          const entry = { name: canonical, ptm: memberPtm ?? '', score: wd ? '' : score, eligible: true, ...(wd ? { wd: true } : {}) }
+          const entry = { name: canonical, ptm: memberPtm ?? '', score: wd ? '' : score, eligible: (roundsLookup[canonical] ?? 0) >= 7, ...(wd ? { wd: true } : {}) }
           td[targetFlight] = [...(td[targetFlight] ?? []), entry]
         }
       }
@@ -4159,14 +4189,13 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
                   }`}>
                     POY: {fmtPOY(p)}
                   </span>
-                  <label className="flex items-center gap-1.5 text-xs font-sans text-gray-500">
-                    <input type="checkbox" checked={p.eligible !== false}
-                      onChange={e => onUpdate(idx, 'eligible', e.target.checked)}
-                      className="accent-forest cursor-pointer w-4 h-4"
-                      disabled={p.wd}
+                  <span className={`text-xs font-sans ${p.wd || p.eligible === false ? 'text-gray-300' : 'text-gray-400'}`}>
+                    <input type="checkbox" checked={!p.wd && p.eligible !== false}
+                      readOnly
+                      className="accent-forest w-4 h-4 mr-1 pointer-events-none"
                     />
-                    Eligible
-                  </label>
+                    Elig.
+                  </span>
                 </div>
               </div>
             ))}
@@ -4231,10 +4260,9 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <input type="checkbox" checked={p.eligible !== false}
-                        onChange={e => onUpdate(idx, 'eligible', e.target.checked)}
-                        className="accent-forest cursor-pointer w-4 h-4"
-                        disabled={p.wd}
+                      <input type="checkbox" checked={!p.wd && p.eligible !== false}
+                        readOnly
+                        className="accent-forest w-4 h-4 pointer-events-none"
                       />
                     </td>
                     <td className="px-3 py-2 text-center">
