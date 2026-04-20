@@ -1467,7 +1467,7 @@ function AdminPanel({ currentUser }) {
         const memberFlight = memberFlightLookup[name]
         const memberPtm = ptmLookup[name]
         const isNewPlayer = memberPtm == null || memberPtm === '' || Number(memberPtm) === 0
-        const targetFlight = (!isNewPlayer && FLIGHTS.includes(memberFlight)) ? memberFlight : 'New Players'
+        const targetFlight = (!isNewPlayer && ALL_SCORE_TABS.includes(memberFlight)) ? memberFlight : 'New Players'
         const entry = {
           name,
           ptm: memberPtm ?? '',
