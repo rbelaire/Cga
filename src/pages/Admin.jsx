@@ -178,7 +178,7 @@ function calcFlightPOY(players) {
   const scale = Array.from({ length: n }, (_, i) => POY_BASE_POINTS - POY_POINTS_PER_RANK * i)
 
   const withPM = players.map((p, i) => {
-    const hasData = p.ptm !== '' && p.score !== '' && p.ptm != null && p.score != null
+    const hasData = !p.wd && p.ptm !== '' && p.score !== '' && p.ptm != null && p.score != null
     return { ...p, _i: i, _has: hasData, plusMinus: hasData ? Number(p.score) - Number(p.ptm) : null }
   })
 
@@ -201,7 +201,7 @@ function calcFlightPOY(players) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const fmtPM  = pm => pm == null ? '—' : pm > 0 ? `+${pm}` : `${pm}`
-const fmtPOY = p  => p.poy == null ? '—' : p.eligible === false ? 'X' : p.poy % 1 === 0 ? String(p.poy) : p.poy.toFixed(1)
+const fmtPOY = p  => p.wd ? 'WD' : p.poy == null ? '—' : p.eligible === false ? 'X' : p.poy % 1 === 0 ? String(p.poy) : p.poy.toFixed(1)
 const fmtCurrency = value => {
   const amount = Number.isFinite(Number(value)) ? Number(value) : 0
   return `$${amount.toFixed(2)}`
@@ -2694,6 +2694,7 @@ function AdminPanel({ currentUser }) {
     const scoreLookup = {}
     for (const fl of allFlights) {
       for (const entry of (data[targetTid]?.[fl] ?? [])) {
+        if (entry.wd) continue
         const score = Number(entry.score)
         if (entry.name && Number.isFinite(score)) {
           scoreLookup[entry.name] = score
@@ -4091,23 +4092,39 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
           {/* Mobile cards */}
           <div className="sm:hidden space-y-2 p-2">
             {players.map((p, idx) => (
-              <div key={p.name} className={`border border-gray-200 rounded-lg p-3 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+              <div key={p.name} className={`border rounded-lg p-3 ${p.wd ? 'border-orange-200 bg-orange-50/40 opacity-60' : `border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-sans text-sm font-semibold text-darktext truncate">{formatName(p.name)}</p>
                     <div className="mt-1 flex items-center gap-2">
                       <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
-                        Rank {p.rank ?? '—'}
+                        {p.wd ? 'WD' : `Rank ${p.rank ?? '—'}`}
                       </span>
-                      <span className={`stat-number text-xs font-semibold ${
-                        p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
-                      }`}>
-                        {fmtPM(p.plusMinus)}
-                      </span>
+                      {!p.wd && (
+                        <span className={`stat-number text-xs font-semibold ${
+                          p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
+                        }`}>
+                          {fmtPM(p.plusMinus)}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <button onClick={() => onRemove(idx)} title="Remove player"
-                    className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors px-1">×</button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onUpdate(idx, 'wd', !p.wd)}
+                      title={p.wd ? 'Undo withdrawal' : 'Mark as withdrew'}
+                      className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded border transition-colors ${
+                        p.wd
+                          ? 'text-orange-600 border-orange-300 bg-orange-100'
+                          : 'text-gray-300 border-gray-200 hover:text-orange-500 hover:border-orange-300'
+                      }`}
+                    >
+                      WD
+                    </button>
+                    <button onClick={() => onRemove(idx)} title="Remove player"
+                      className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors px-1">×</button>
+                  </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <label className="block">
@@ -4119,19 +4136,23 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
                   </label>
                   <label className="block">
                     <span className="text-[11px] font-sans text-gray-400">Score</span>
-                    <input
-                      ref={el => setScoreInputRef('mobile', idx, el)}
-                      type="number" inputMode="numeric" value={p.score}
-                      onChange={e => onUpdate(idx, 'score', e.target.value)}
-                      onKeyDown={e => handleScoreInputKeyDown(e, idx)}
-                      aria-label={`Score for ${formatName(p.name)}`}
-                      className="mt-1 w-full border border-gray-200 rounded px-2 py-2 text-sm font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                    />
+                    {p.wd ? (
+                      <div className="mt-1 w-full border border-orange-200 rounded px-2 py-2 text-sm font-mono text-center bg-orange-50 text-orange-500 font-semibold">WD</div>
+                    ) : (
+                      <input
+                        ref={el => setScoreInputRef('mobile', idx, el)}
+                        type="number" inputMode="numeric" value={p.score}
+                        onChange={e => onUpdate(idx, 'score', e.target.value)}
+                        onKeyDown={e => handleScoreInputKeyDown(e, idx)}
+                        aria-label={`Score for ${formatName(p.name)}`}
+                        className="mt-1 w-full border border-gray-200 rounded px-2 py-2 text-sm font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      />
+                    )}
                   </label>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <span className={`stat-number text-xs font-semibold ${
-                    p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
+                    p.wd ? 'text-orange-400' : p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
                   }`}>
                     POY: {fmtPOY(p)}
                   </span>
@@ -4139,6 +4160,7 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
                     <input type="checkbox" checked={p.eligible !== false}
                       onChange={e => onUpdate(idx, 'eligible', e.target.checked)}
                       className="accent-forest cursor-pointer w-4 h-4"
+                      disabled={p.wd}
                     />
                     Eligible
                   </label>
@@ -4159,15 +4181,16 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
                   <th className="table-header text-gray-400 text-center">+/-</th>
                   <th className="table-header text-gray-400 text-center">POY</th>
                   <th className="table-header text-gray-400 text-center">Elig.</th>
+                  <th className="table-header text-gray-400 text-center">WD</th>
                   <th className="table-header text-gray-400 w-8"></th>
                 </tr>
               </thead>
               <tbody>
                 {players.map((p, idx) => (
-                  <tr key={p.name} className={`border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                  <tr key={p.name} className={`border-b border-gray-100 last:border-0 transition-colors ${p.wd ? 'bg-orange-50/40 opacity-60' : `hover:bg-blue-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}`}>
                     <td className="px-3 py-2">
                       <span className={`stat-number text-xs font-semibold ${p.rank != null && p.rank <= 3 ? 'text-gold' : 'text-gray-400'}`}>
-                        {p.rank ?? '—'}
+                        {p.wd ? '—' : (p.rank ?? '—')}
                       </span>
                     </td>
                     <td className="px-3 py-2 font-sans text-sm text-darktext whitespace-nowrap">{formatName(p.name)}</td>
@@ -4177,25 +4200,29 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
                       />
                     </td>
                     <td className="px-2 py-1.5 text-center">
-                      <input
-                        ref={el => setScoreInputRef('desktop', idx, el)}
-                        type="number" inputMode="numeric" value={p.score}
-                        onChange={e => onUpdate(idx, 'score', e.target.value)}
-                        onKeyDown={e => handleScoreInputKeyDown(e, idx)}
-                        aria-label={`Score for ${formatName(p.name)}`}
-                        className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
-                      />
+                      {p.wd ? (
+                        <span className="inline-block w-14 px-2 py-1 text-xs font-mono font-semibold text-orange-600 bg-orange-100 border border-orange-200 rounded text-center">WD</span>
+                      ) : (
+                        <input
+                          ref={el => setScoreInputRef('desktop', idx, el)}
+                          type="number" inputMode="numeric" value={p.score}
+                          onChange={e => onUpdate(idx, 'score', e.target.value)}
+                          onKeyDown={e => handleScoreInputKeyDown(e, idx)}
+                          aria-label={`Score for ${formatName(p.name)}`}
+                          className="w-14 border border-gray-200 rounded px-2 py-1 text-xs font-mono text-center focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                        />
+                      )}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <span className={`stat-number text-xs font-semibold ${
                         p.plusMinus == null ? 'text-gray-300' : p.plusMinus > 0 ? 'text-green-600' : p.plusMinus < 0 ? 'text-red-500' : 'text-gray-400'
                       }`}>
-                        {fmtPM(p.plusMinus)}
+                        {p.wd ? '—' : fmtPM(p.plusMinus)}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center">
                       <span className={`stat-number text-xs font-semibold ${
-                        p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
+                        p.wd ? 'text-orange-400' : p.eligible === false ? 'text-red-400' : p.poy == null ? 'text-gray-300' : 'text-darktext'
                       }`}>
                         {fmtPOY(p)}
                       </span>
@@ -4204,7 +4231,22 @@ function FlightScoreSection({ flightName, players, rawPlayers, onRemove, onUpdat
                       <input type="checkbox" checked={p.eligible !== false}
                         onChange={e => onUpdate(idx, 'eligible', e.target.checked)}
                         className="accent-forest cursor-pointer w-4 h-4"
+                        disabled={p.wd}
                       />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => onUpdate(idx, 'wd', !p.wd)}
+                        title={p.wd ? 'Undo withdrawal' : 'Mark as withdrew'}
+                        className={`text-xs font-sans font-semibold px-1.5 py-0.5 rounded border transition-colors ${
+                          p.wd
+                            ? 'text-orange-600 border-orange-300 bg-orange-100 hover:bg-orange-200'
+                            : 'text-gray-300 border-gray-200 hover:text-orange-500 hover:border-orange-300'
+                        }`}
+                      >
+                        WD
+                      </button>
                     </td>
                     <td className="px-2 py-2 text-center">
                       <button onClick={() => onRemove(idx)} title="Remove player"
