@@ -3,8 +3,8 @@ import { formatDate } from '../../utils/formatDate'
 import { sortFlights } from '../../utils/flightOrder'
 
 const statusStyles = {
-  upcoming: 'bg-green-100 text-green-700',
-  completed: 'bg-gray-100 text-gray-500',
+  upcoming: 'bg-[#F6F4EF] text-[#0B1F3A] border border-[#E5E0D4]',
+  completed: 'bg-gray-100 text-charcoal border border-[#E5E0D4]',
   cancelled: 'bg-red-100 text-red-600',
 }
 
@@ -15,14 +15,14 @@ export default function TournamentCard({ tournament, compact = false }) {
 
   return (
     <div
-      className={`rounded-lg overflow-hidden border transition-shadow duration-200 hover:shadow-md ${
+      className={`rounded-lg overflow-hidden border transition-shadow duration-200 hover:shadow-sm ${
         isPast
           ? 'bg-gray-50 border-gray-200'
-          : 'bg-white border-gray-200 hover:border-gold'
+          : 'bg-white border-[#E5E0D4] hover:border-gold'
       }`}
     >
       {/* Date strip */}
-      <div className={`px-4 py-1.5 flex items-center justify-between ${isPast ? 'bg-gray-50 border-b border-gray-200' : 'bg-forest'}`}>
+      <div className={`px-3 py-1.5 flex items-center justify-between ${isPast ? 'bg-gray-50 border-b border-gray-200' : 'bg-forest'}`}>
         <span className={`font-mono text-sm font-medium stat-number ${isPast ? 'text-gray-500' : 'text-gold'}`}>
           {formatDate(date)}
         </span>
@@ -36,9 +36,9 @@ export default function TournamentCard({ tournament, compact = false }) {
       </div>
 
       {/* Body */}
-      <div className="p-3.5">
+      <div className="p-3">
         <h3 className="text-darktext font-serif text-xl font-semibold mb-1">{name}</h3>
-        <p className="text-gray-500 text-sm font-sans mb-2">{course}</p>
+        <p className="text-charcoal/80 text-sm font-sans mb-2">{course}</p>
 
         {!compact && (
           <div className="flex flex-wrap gap-2 mb-2.5">
@@ -54,7 +54,7 @@ export default function TournamentCard({ tournament, compact = false }) {
         {!compact && orderedFlights.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2.5">
             {orderedFlights.map((flight) => (
-              <span key={flight} className="text-xs border border-gray-200 text-gray-500 px-2 py-0.5 rounded font-sans">
+              <span key={flight} className="text-xs border border-gray-200 text-charcoal px-2 py-0.5 rounded font-sans">
                 {flight}
               </span>
             ))}

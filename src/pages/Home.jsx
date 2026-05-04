@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import HeroSection from '../components/sections/HeroSection'
 import NextTournament from '../components/sections/NextTournament'
-import QuickLinks from '../components/sections/QuickLinks'
 import SponsorBar from '../components/sections/SponsorBar'
 import { Link } from 'react-router-dom'
 import { formatName } from '../utils/formatName'
@@ -32,11 +31,10 @@ export default function Home() {
   return (
     <>
       <NextTournament />
-      <QuickLinks />
       <HeroSection />
 
       {/* Rankings preview */}
-      <section className="py-10 sm:py-14 bg-white">
+      <section className="py-8 sm:py-10 bg-[#F6F4EF]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-6">
             <div>
@@ -47,10 +45,10 @@ export default function Home() {
               Full Standings →
             </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* HDCP Rankings */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="bg-forest px-4 py-3 flex items-center justify-between">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-forest px-4 py-2 flex items-center justify-between">
                 <h3 className="text-white font-sans text-sm font-semibold uppercase tracking-widest">HDCP Rankings</h3>
                 <span className="text-white/50 font-sans text-xs">Top 10</span>
               </div>
@@ -59,7 +57,7 @@ export default function Home() {
               ) : (
                 <ul className="divide-y divide-gray-100">
                   {hdcpTop10.map((player, idx) => (
-                    <li key={player.name} className="flex items-center justify-between px-4 py-2.5">
+                    <li key={player.name} className="flex items-center justify-between px-4 py-2">
                       <div className="flex items-center gap-3">
                         <span className={`stat-number text-xs font-semibold w-5 text-right ${idx < 3 ? 'text-gold' : 'text-gray-400'}`}>
                           {idx + 1}
@@ -68,7 +66,7 @@ export default function Home() {
                           {formatName(player.name)}
                         </span>
                       </div>
-                      <span className="stat-number text-xs text-gray-500">{player.poy} pts</span>
+                      <span className="stat-number text-sm text-charcoal font-semibold">{player.poy} pts</span>
                     </li>
                   ))}
                 </ul>
@@ -76,8 +74,8 @@ export default function Home() {
             </div>
 
             {/* Scratch Rankings */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="bg-forest px-4 py-3 flex items-center justify-between">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-forest px-4 py-2 flex items-center justify-between">
                 <h3 className="text-white font-sans text-sm font-semibold uppercase tracking-widest">Scratch Rankings</h3>
                 <span className="text-white/50 font-sans text-xs">Top 10</span>
               </div>
@@ -86,7 +84,7 @@ export default function Home() {
               ) : (
                 <ul className="divide-y divide-gray-100">
                   {scratchTop10.map((player, idx) => (
-                    <li key={player.name} className="flex items-center justify-between px-4 py-2.5">
+                    <li key={player.name} className="flex items-center justify-between px-4 py-2">
                       <div className="flex items-center gap-3">
                         <span className={`stat-number text-xs font-semibold w-5 text-right ${idx < 3 ? 'text-gold' : 'text-gray-400'}`}>
                           {idx + 1}
@@ -95,7 +93,7 @@ export default function Home() {
                           {formatName(player.name)}
                         </span>
                       </div>
-                      <span className="stat-number text-xs text-gray-500">{player.scratchPts} pts</span>
+                      <span className="stat-number text-sm text-charcoal font-semibold">{player.scratchPts} pts</span>
                     </li>
                   ))}
                 </ul>
@@ -106,7 +104,7 @@ export default function Home() {
       </section>
 
       {/* Dues CTA */}
-      <section className="py-10 bg-amber-50 border-y border-amber-100">
+      <section className="py-8 bg-white border-y border-[#E5E0D4]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
           <div>
             <h2 className="text-darktext font-serif text-xl font-bold mb-1">2026 Dues Now Open</h2>
