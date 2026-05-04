@@ -2527,16 +2527,16 @@ function AdminPanel({ currentUser }) {
   )
   const keyWorkflowStats = `${paymentPaidCount} Paid / ${totalPlayers} Entered`
   const primaryActions = [
-    { key: 'overview',           label: 'Overview',           Icon: DashboardIcon, onClick: () => setAdminMode('dashboard'),  active: adminMode === 'dashboard' },
-    { key: 'entries',            label: 'Entries',            Icon: ReceiptIcon,   onClick: () => setAdminMode('payments'),   active: adminMode === 'payments' },
+    { key: 'overview',           label: 'Dashboard',           Icon: DashboardIcon, onClick: () => setAdminMode('dashboard'),  active: adminMode === 'dashboard' },
+    { key: 'entries',            label: 'Payments',            Icon: ReceiptIcon,   onClick: () => setAdminMode('payments'),   active: adminMode === 'payments' },
     { key: 'flights',            label: 'Flights',            Icon: LayersIcon,    onClick: () => setAdminMode('flights'),    active: adminMode === 'flights' },
     { key: 'pairings',           label: 'Pairings',           Icon: UsersIcon,     onClick: () => setAdminMode('pairings'),   active: adminMode === 'pairings' },
     { key: 'scores',             label: 'Scores',             Icon: GolfFlagIcon,  onClick: () => setAdminMode('scores'),     active: adminMode === 'scores' },
     { key: 'exports',            label: 'Exports',            Icon: ExportIcon,    onClick: () => setAdminMode('exports'),    active: adminMode === 'exports' },
-    { key: 'player-management',  label: 'Player Management',  Icon: FolderIcon,    onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
+    { key: 'player-management',  label: 'Field',  Icon: FolderIcon,    onClick: () => setAdminMode('operations'), active: adminMode === 'operations' },
     { key: 'member-management',  label: 'Member Management',  Icon: UsersIcon,     onClick: () => setAdminMode('users'),      active: adminMode === 'users' },
-    { key: 'snapshots',          label: 'Snapshots',          Icon: ArchiveIcon,   onClick: () => setAdminMode('snapshots'),  active: adminMode === 'snapshots' },
-    { key: 'changelog',          label: 'Changelog',          Icon: ClockListIcon, onClick: () => setAdminMode('changelog'),  active: adminMode === 'changelog' },
+    { key: 'snapshots',          label: 'Publish',          Icon: ArchiveIcon,   onClick: () => setAdminMode('snapshots'),  active: adminMode === 'snapshots' },
+    { key: 'changelog',          label: 'Audit Log',          Icon: ClockListIcon, onClick: () => setAdminMode('changelog'),  active: adminMode === 'changelog' },
   ]
 
   async function saveAllDirtyDrafts() {
@@ -3175,10 +3175,10 @@ function AdminPanel({ currentUser }) {
               type="button"
               onClick={action.onClick}
               title={action.label}
-              className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs sm:text-sm font-sans font-semibold whitespace-nowrap transition-colors ${
+              className={`inline-flex flex-shrink-0 items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-sans font-semibold whitespace-nowrap transition-colors ${
                 action.active
-                  ? 'border-forest bg-forest text-white shadow-sm'
-                  : 'border-forest/30 bg-white text-forest hover:bg-forest/10'
+                  ? 'border-[#0B1F3A] bg-[#0B1F3A] text-white shadow-sm'
+                  : 'border-[#E5E0D4] bg-white text-[#0B1F3A] hover:bg-[#F6F4EF]'
               }`}
             >
               <action.Icon className="w-4 h-4 flex-shrink-0" />

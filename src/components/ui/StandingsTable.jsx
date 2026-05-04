@@ -36,7 +36,7 @@ function formatSignedDelta(value) {
 
 function CellValue({ col, row, idx, highlightTop, showBubble }) {
   if (col.key === 'rank') return (
-    <span className={`stat-number font-semibold ${idx < highlightTop ? 'text-gold' : 'text-gray-500'}`}>
+    <span className={`stat-number font-semibold ${idx < highlightTop ? 'text-gold' : 'text-charcoal'}`}>
       {idx < highlightTop ? `#${row.rank || idx + 1}` : row.rank || idx + 1}
     </span>
   )
@@ -90,7 +90,7 @@ function CellValue({ col, row, idx, highlightTop, showBubble }) {
     <span className="stat-number text-darktext font-medium">{asFiniteNumber(row.latestScore) ?? '—'}</span>
   )
   if (col.key === 'eventsPlayed') return (
-    <span className="stat-number text-gray-500">{row.eventsPlayed ?? row.events}</span>
+    <span className="stat-number text-charcoal">{row.eventsPlayed ?? row.events}</span>
   )
   if (col.key === 'events') return (
     <span className="stat-number text-darktext">{asFiniteNumber(row.events) ?? '—'}</span>
@@ -215,11 +215,11 @@ export default function StandingsTable({ data, columns, highlightTop = 3, showBu
       <div className="hidden sm:block overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full min-w-[540px] text-left text-sm">
           <thead>
-            <tr className="bg-forest border-b border-forest">
+            <tr className="bg-[#F6F4EF] border-b border-[#E5E0D4]">
               {defaultColumns.map((col) => (
                 <th
                   key={col.key}
-                  className="table-header text-white"
+                  className="table-header text-charcoal"
                   onClick={() => col.sortable && handleSort(col.key)}
                   title={col.tooltip}
                   style={col.sortable ? { cursor: 'pointer' } : {}}
@@ -227,12 +227,12 @@ export default function StandingsTable({ data, columns, highlightTop = 3, showBu
                   <span className="flex items-center gap-1">
                     {col.label}
                     {col.tooltip && (
-                      <span className="text-white/40 text-xs" aria-hidden="true">ⓘ</span>
+                      <span className="text-charcoal/40 text-xs" aria-hidden="true">ⓘ</span>
                     )}
                     {col.sortable && (
                       sortKey === col.key
                         ? <span className="text-gold">{sortDir === 'asc' ? '↑' : '↓'}</span>
-                        : <span className="text-white/30">⇅</span>
+                        : <span className="text-charcoal/40">⇅</span>
                     )}
                   </span>
                 </th>
@@ -243,12 +243,12 @@ export default function StandingsTable({ data, columns, highlightTop = 3, showBu
             {sorted.map((row, idx) => (
               <tr
                 key={row.name || idx}
-                className={`border-b border-gray-100 transition-colors hover:bg-blue-50 ${
+                className={`border-b border-gray-100 transition-colors hover:bg-[#F6F4EF] ${
                   idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                 }`}
               >
                 {defaultColumns.map((col) => (
-                  <td key={col.key} className="px-4 py-3">
+                  <td key={col.key} className="px-3 py-2.5">
                     <CellValue col={col} row={row} idx={idx} highlightTop={highlightTop} showBubble={showBubble} />
                   </td>
                 ))}
