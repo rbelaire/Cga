@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import HeroSection from '../components/sections/HeroSection'
 import NextTournament from '../components/sections/NextTournament'
 import SponsorBar from '../components/sections/SponsorBar'
+import LatestTournamentResults from '../components/sections/LatestTournamentResults'
 import { Link } from 'react-router-dom'
 import { formatName } from '../utils/formatName'
 import { computeScratch } from '../utils/computeScratch'
@@ -32,6 +33,8 @@ export default function Home() {
     <>
       <NextTournament />
       <HeroSection />
+
+      <LatestTournamentResults allResults={allResults} />
 
       {/* Rankings preview */}
       <section className="py-8 sm:py-10 bg-[#F6F4EF]">
