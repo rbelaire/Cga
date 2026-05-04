@@ -19,15 +19,19 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-[#E5E0D4]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          <Link to="/" className="flex items-center gap-3 text-forest-dark" onClick={() => setMenuOpen(false)}>
-            <img src={`${import.meta.env.BASE_URL}cga.svg`} alt="CGA Logo" className="h-12 w-12 sm:h-14 sm:w-14 object-contain" />
-            <span className="hidden sm:inline text-xs tracking-[0.18em] uppercase text-forest-dark font-semibold">Carencro Golf Association</span>
+        <div className="flex items-center justify-between h-16">
+          <Link to="/" className="text-forest-dark" onClick={() => setMenuOpen(false)}>
+            <span className="text-lg sm:text-xl font-bold tracking-tight">CGA</span>
+            <span className="hidden sm:inline ml-2 text-xs tracking-[0.18em] uppercase text-gold">Carencro Golf Association</span>
           </Link>
 
           <nav className="hidden lg:flex items-center gap-1">
             {navLinks.map(({ to, label }) => (
-              <NavLink key={to} to={to} className={({ isActive }) => `${linkBase} ${isActive ? 'border-gold text-forest font-bold' : ''}`}>
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) => `${linkBase} ${isActive ? 'border-gold text-forest font-bold' : ''}`}
+              >
                 {label}
               </NavLink>
             ))}
@@ -42,7 +46,12 @@ export default function Header() {
             )}
           </nav>
 
-          <button className="lg:hidden text-forest-dark p-2 rounded-md border border-[#E5E0D4]" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu" aria-expanded={menuOpen}>
+          <button
+            className="lg:hidden text-forest-dark p-2 rounded-md border border-[#E5E0D4]"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Toggle menu"
+            aria-expanded={menuOpen}
+          >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {menuOpen ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />}
             </svg>
@@ -58,6 +67,15 @@ export default function Header() {
                 {label}
               </NavLink>
             ))}
+            {user ? (
+              <button type="button" onClick={() => { signOut(); setMenuOpen(false) }} className="text-left px-2 py-3 mt-1 text-base font-semibold text-forest">
+                Sign out
+              </button>
+            ) : (
+              <NavLink to="/login" onClick={() => setMenuOpen(false)} className="block px-2 py-3 mt-1 text-base font-semibold text-forest">
+                Login
+              </NavLink>
+            )}
           </nav>
         </div>
       )}
