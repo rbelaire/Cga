@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;500;600;700;900&family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -30,8 +30,8 @@
     flex-direction: column;
   }
 
-  h1, h2, h3, h4 {
-    font-family: 'Playfair Display', Georgia, serif;
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
   }
 
   /* Prevent iOS Safari from auto-zooming on input focus */
@@ -42,16 +42,16 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-forest text-white font-sans font-semibold px-4 py-2.5 rounded-md transition-colors duration-200 hover:bg-forest-dark inline-block;
+    @apply bg-forest text-white font-heading font-semibold px-4 py-2.5 rounded-md transition-colors duration-200 hover:bg-forest-dark inline-block;
   }
 
   .btn-outline {
-    @apply border border-[#E5E0D4] text-forest font-sans font-semibold px-4 py-2.5 rounded-md transition-colors duration-200 hover:bg-forest hover:text-white inline-block;
+    @apply border border-[#E5E0D4] text-forest font-heading font-semibold px-4 py-2.5 rounded-md transition-colors duration-200 hover:bg-forest hover:text-white inline-block;
   }
 
   .section-title {
     @apply text-3xl font-bold text-forest mb-2;
-    font-family: 'Playfair Display', Georgia, serif;
+    @apply font-heading;
   }
 
   .gold-divider {
@@ -59,7 +59,7 @@
   }
 
   .table-header {
-    @apply font-sans text-xs font-semibold uppercase tracking-wide text-forest-dark cursor-pointer select-none py-2.5 px-3;
+    @apply font-heading text-xs font-semibold uppercase tracking-wide text-forest-dark cursor-pointer select-none py-2.5 px-3;
   }
 
   .stat-number {

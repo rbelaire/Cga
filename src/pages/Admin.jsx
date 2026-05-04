@@ -954,7 +954,7 @@ export default function Admin() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-24">
         <LockIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <h1 className="font-serif text-xl font-bold text-darktext mb-2">Admin Access Required</h1>
+        <h1 className="font-heading text-xl font-bold text-darktext mb-2">Admin Access Required</h1>
         <p className="text-sm text-gray-500 mb-1">Your account (<span className="font-mono">{user?.email}</span>) does not have admin privileges.</p>
         <p className="text-xs text-gray-400">Contact the site administrator to request access.</p>
       </div>
@@ -3047,10 +3047,10 @@ function AdminPanel({ currentUser }) {
       </div>
 
       <section className="mb-6 rounded-xl border border-forest/20 bg-gradient-to-br from-forest/[0.06] via-white to-gold/[0.08] p-4 sm:p-5">
-        <p className="text-[11px] font-sans font-semibold uppercase tracking-widest text-forest/80">Tournament Command Center</p>
+        <p className="text-[11px] font-heading font-semibold uppercase tracking-widest text-forest/80">Tournament Command Center</p>
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-serif text-darktext font-semibold">{tournament?.name ?? 'Select Tournament'}</h2>
+            <h2 className="text-2xl sm:text-3xl font-heading text-darktext font-semibold">{tournament?.name ?? 'Select Tournament'}</h2>
             <p className="mt-1 text-sm font-sans text-gray-600">{tournament ? fmtDate(tournament.date) : 'Choose a tournament to begin operations.'}</p>
             {tournament && (
               <div className="mt-3 inline-flex rounded-lg border border-forest/20 bg-white px-3 py-2">
@@ -3059,7 +3059,7 @@ function AdminPanel({ currentUser }) {
             )}
           </div>
           <div className="w-full lg:w-auto space-y-2">
-            <label className="block text-xs font-sans font-semibold uppercase tracking-widest text-forest">Switch Tournament</label>
+            <label className="block text-xs font-heading font-semibold uppercase tracking-widest text-forest">Switch Tournament</label>
             <select
               value={tid}
               onChange={e => { setTid(e.target.value); setPoolSearch(''); setSelectedPool(new Set()) }}
@@ -3304,7 +3304,7 @@ function AdminPanel({ currentUser }) {
       {adminMode === 'operations' && (
         <div className="space-y-5">
           <section className="bg-white border border-gray-200 rounded-lg p-4">
-            <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-3">Player Management</p>
+            <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-3">Player Management</p>
             <FlightManagementPanel
               effectiveMembers={effectiveMembers}
               membersData={membersData}
@@ -3594,8 +3594,8 @@ function DashboardPanel({
   return (
     <div className="space-y-5">
       <section className="bg-white border border-gray-200 rounded-lg p-5">
-        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Overview</p>
-        <h2 className="text-darktext font-serif text-2xl font-semibold mb-1">{selectedTournament?.name ?? 'No tournament selected'}</h2>
+        <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-2">Overview</p>
+        <h2 className="text-darktext font-heading text-2xl font-semibold mb-1">{selectedTournament?.name ?? 'No tournament selected'}</h2>
         <p className="text-gray-500 font-sans text-sm mb-4">{selectedTournament?.date ? fmtDate(selectedTournament.date) : 'No date available'}</p>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <MetricCard label="Field" value={`${workflow.counts.enteredCount} / ${workflow.counts.fieldCap}`} detail={`${Math.max(workflow.counts.fieldCap - workflow.counts.enteredCount, 0)} spots remaining`} />
@@ -3612,7 +3612,7 @@ function DashboardPanel({
 
         {selectedTournament && (
           <div className="mt-5 pt-4 border-t border-gray-100">
-            <p className="text-[11px] font-sans font-semibold uppercase tracking-widest text-gray-500 mb-2">Site Completion Status</p>
+            <p className="text-[11px] font-heading font-semibold uppercase tracking-widest text-gray-500 mb-2">Site Completion Status</p>
             {isStaticCompleted ? (
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200">
                 <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
@@ -3653,10 +3653,10 @@ function DashboardPanel({
       </section>
 
       <section className="bg-white border border-gray-200 rounded-lg p-5">
-        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Next Tournament</p>
+        <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-2">Next Tournament</p>
         {nextTournament ? (
           <>
-            <h2 className="text-darktext font-serif text-2xl font-semibold mb-1">{nextTournament.name}</h2>
+            <h2 className="text-darktext font-heading text-2xl font-semibold mb-1">{nextTournament.name}</h2>
             <p className="text-gray-500 font-sans text-sm mb-4">{fmtDate(nextTournament.date)}</p>
             <CountdownTimer targetDate={nextTournament.date} />
           </>
@@ -3679,11 +3679,11 @@ function DashboardPanel({
       </section>
 
       <section className="bg-white border border-gray-200 rounded-lg p-5">
-        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Last Published Tournament</p>
+        <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-2">Last Published Tournament</p>
         {lastPublishedTournament ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-darktext font-serif text-xl font-semibold">{lastPublishedTournament.name}</h3>
+              <h3 className="text-darktext font-heading text-xl font-semibold">{lastPublishedTournament.name}</h3>
               <p className="text-gray-500 font-sans text-sm">{fmtDateShort(lastPublishedTournament.date)}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -3714,7 +3714,7 @@ function DashboardPanel({
 function MetricCard({ label, value, detail }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="text-[11px] font-sans font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="text-[11px] font-heading font-semibold uppercase tracking-wide text-gray-500">{label}</p>
       <p className="mt-1 stat-number text-2xl text-forest leading-none">{value}</p>
       <p className="mt-1 text-xs font-sans text-gray-500">{detail}</p>
     </div>
@@ -3751,7 +3751,7 @@ function TournamentWorkflowTracker({ workflow, actions = {} }) {
 
   return (
     <div>
-      <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-2">Tournament Workflow</p>
+      <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-2">Tournament Workflow</p>
       <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
         {workflow.steps.map((step, idx) => {
           const style = statusStyles[step.status]
@@ -3892,7 +3892,7 @@ function RetroEligibilityPanel({ currentPoy, roundsLookup, openConfirm, logChang
 
   return (
     <section className="bg-white border border-gray-200 rounded-lg p-4">
-      <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-1">Handicap POY Eligibility Fix</p>
+      <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-1">Handicap POY Eligibility Fix</p>
       <p className="text-xs font-sans text-gray-500 mb-3">
         Zeros out Handicap POY points for players with fewer than 7 rounds in their PTM history and re-ranks each flight.
         {affected.length > 0
@@ -3957,7 +3957,7 @@ function BeginningPtmPanel({ livePtmData, logChange, openConfirm }) {
 
   return (
     <section className="bg-white border border-gray-200 rounded-lg p-4">
-      <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-1">Beginning-of-Year PTM Snapshot</p>
+      <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-1">Beginning-of-Year PTM Snapshot</p>
       <p className="text-xs font-sans text-gray-500 mb-3">
         Saves the current PTM data as the season-start baseline used to compute Most/Least Improved standings.
         {snapshotCount > 0 && (
@@ -4062,7 +4062,7 @@ function PublishConfirmModal({ preview, publishSaving, publishSaveStatus, onCanc
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-3xl bg-white rounded-xl border border-gray-200 shadow-2xl max-h-[90vh] overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-darktext font-serif text-2xl">Confirm Publish Results</h2>
+          <h2 className="text-darktext font-heading text-2xl">Confirm Publish Results</h2>
           <p className="text-gray-500 font-sans text-sm mt-1">
             This will overwrite live standings and POY with the results below.
           </p>
@@ -4436,7 +4436,7 @@ function ExportPanel({
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
       <div className="bg-forest px-4 py-2.5">
-        <p className="text-xs font-sans font-semibold uppercase tracking-widest text-white/70">Exports</p>
+        <p className="text-xs font-heading font-semibold uppercase tracking-widest text-white/70">Exports</p>
       </div>
       <div className="divide-y divide-gray-100">
         <ExportRow title="Tournament Info" description="Registration sheet with date, course, entry fee, and Venmo QR"><PdfBtn onClick={onOpenTournamentInfoEditor} disabled={!tournamentInfo}>PDF</PdfBtn></ExportRow>
@@ -4784,7 +4784,7 @@ function MemberPool({
                   <button
                     type="button"
                     onClick={() => onToggleGroup(group)}
-                    className={`w-full flex items-center justify-between px-1 pt-1 pb-0.5 text-[10px] font-sans font-semibold uppercase tracking-widest transition-colors ${
+                    className={`w-full flex items-center justify-between px-1 pt-1 pb-0.5 text-[10px] font-heading font-semibold uppercase tracking-widest transition-colors ${
                       allInGroupSelected ? 'text-forest' : 'text-gray-400 hover:text-forest'
                     }`}
                   >
@@ -5161,7 +5161,7 @@ function PairingsPanel({
       <div className="flex gap-0 mb-4 border-b border-gray-200">
         <button
           onClick={() => setActiveTab('pairings')}
-          className={`px-4 py-2 text-xs font-sans font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
+          className={`px-4 py-2 text-xs font-heading font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
             activeTab === 'pairings'
               ? 'border-forest text-forest'
               : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -5171,7 +5171,7 @@ function PairingsPanel({
         </button>
         <button
           onClick={() => setActiveTab('rules')}
-          className={`px-4 py-2 text-xs font-sans font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${
+          className={`px-4 py-2 text-xs font-heading font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${
             activeTab === 'rules'
               ? 'border-forest text-forest'
               : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -5186,7 +5186,7 @@ function PairingsPanel({
         </button>
         <button
           onClick={() => setActiveTab('import')}
-          className={`px-4 py-2 text-xs font-sans font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
+          className={`px-4 py-2 text-xs font-heading font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
             activeTab === 'import'
               ? 'border-forest text-forest'
               : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -5199,7 +5199,7 @@ function PairingsPanel({
       {/* Import panel */}
       {activeTab === 'import' && (
         <div className="bg-white border border-gray-200 rounded-lg p-5">
-          <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-1">Import Pairings from CSV</p>
+          <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-1">Import Pairings from CSV</p>
           <p className="text-xs font-sans text-gray-500 mb-4">
             Upload a CSV with <span className="font-mono font-semibold">group</span> and <span className="font-mono font-semibold">player</span> columns.
             Each row is one player; rows with the same group value form one pairing card.
@@ -5243,7 +5243,7 @@ function PairingsPanel({
       {/* Rules panel */}
       {activeTab === 'rules' && (
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-xs font-sans font-semibold uppercase tracking-widest text-forest mb-4">Pairing Rules</p>
+          <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-4">Pairing Rules</p>
           <PairingRulesPanel
             pairingRules={pairingRules}
             setPairingRules={setPairingRules}

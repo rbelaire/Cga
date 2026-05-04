@@ -38,7 +38,7 @@ function FlightLeaderboards({ leaderboard }) {
 
   return (
     <div>
-      <h4 className="text-gold text-xs font-sans font-semibold uppercase tracking-widest mb-3">
+      <h4 className="text-gold text-xs font-heading font-semibold uppercase tracking-widest mb-3">
         Full Leaderboard
       </h4>
       <div className="mb-3 -mx-1 px-1 overflow-x-auto">
@@ -185,7 +185,7 @@ export default function Tournaments() {
                     aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${t.name} results`}
                   >
                     <div>
-                      <h3 className="text-darktext font-serif text-xl font-semibold mb-1">{t.name}</h3>
+                      <h3 className="text-darktext font-heading text-xl font-semibold mb-1">{t.name}</h3>
                       <p className="text-gray-500 font-sans text-sm">{formatDateLong(t.date)} · {t.course}</p>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
@@ -206,7 +206,7 @@ export default function Tournaments() {
 
                   {isOpen && result && (
                     <div className="border-t border-gray-100 p-5">
-                      <h4 className="text-forest text-xs font-sans font-semibold uppercase tracking-widest mb-2.5">Flight Winners</h4>
+                      <h4 className="text-forest text-xs font-heading font-semibold uppercase tracking-widest mb-2.5">Flight Winners</h4>
                       <FlightWinnerCards winners={buildFlightWinnerCards(result, t.format)} className="mb-4" />
                       <FlightLeaderboards leaderboard={result.leaderboard} />
                     </div>
