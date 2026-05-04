@@ -5,12 +5,12 @@
 @tailwind utilities;
 
 :root {
-  --color-forest:   #1B3B6F;
-  --color-gold:     #C9A84C;
-  --color-cream:    #F2F2F2;
-  --color-charcoal: #1C1C1C;
+  --color-forest:   #0B1F3A;
+  --color-gold:     #C9A227;
+  --color-cream:    #F6F4EF;
+  --color-charcoal: #111111;
   --color-offwhite: #FFFFFF;
-  --color-darktext: #1A1A1A;
+  --color-darktext: #111111;
 }
 
 @layer base {
@@ -42,11 +42,11 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-forest text-white font-sans font-semibold px-6 py-3 rounded transition-colors duration-200 hover:bg-forest-dark inline-block;
+    @apply bg-forest text-white font-sans font-semibold px-4 py-2.5 rounded-md transition-colors duration-200 hover:bg-forest-dark inline-block;
   }
 
   .btn-outline {
-    @apply border-2 border-forest text-forest font-sans font-semibold px-6 py-3 rounded transition-colors duration-200 hover:bg-forest hover:text-white inline-block;
+    @apply border border-[#E5E0D4] text-forest font-sans font-semibold px-4 py-2.5 rounded-md transition-colors duration-200 hover:bg-forest hover:text-white inline-block;
   }
 
   .section-title {
@@ -59,7 +59,7 @@
   }
 
   .table-header {
-    @apply font-sans text-xs font-semibold uppercase tracking-widest text-gold cursor-pointer select-none py-3 px-4;
+    @apply font-sans text-xs font-semibold uppercase tracking-wide text-forest-dark cursor-pointer select-none py-2.5 px-3;
   }
 
   .stat-number {
