@@ -32,7 +32,7 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
             <img
-              src={`${import.meta.env.BASE_URL}cga-logo.png`}
+              src={`${import.meta.env.BASE_URL}cga.svg`}
               alt="CGA Logo"
               className="h-10 w-10 object-contain"
             />
