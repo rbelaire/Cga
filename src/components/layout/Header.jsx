@@ -21,10 +21,10 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2 text-forest-dark" onClick={() => setMenuOpen(false)}>
-            <img src="/cga.svg" alt="Carencro Golf Association logo" className="h-9 w-auto" />
+            <img src={`${import.meta.env.BASE_URL}cga.svg`} alt="Carencro Golf Association" className="h-9 w-auto" onError={(event) => {event.currentTarget.style.display = 'none'}}/>
             <span className="hidden sm:inline text-xs tracking-[0.18em] uppercase text-gold">Carencro Golf Association</span>
           </Link>
-
+          
           <nav className="hidden lg:flex items-center gap-1">
             {navLinks.map(({ to, label }) => (
               <NavLink
