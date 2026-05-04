@@ -19,8 +19,8 @@ export default {
         'darktext':     '#1A1A1A',   // Black text
       },
       fontFamily: {
-        serif: ['"Playfair Display"', 'Georgia', 'serif'],
-        sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+        sans: ['Lato', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        heading: ['Montserrat', 'Lato', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
     },

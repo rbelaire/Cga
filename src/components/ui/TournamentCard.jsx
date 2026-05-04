@@ -37,7 +37,7 @@ export default function TournamentCard({ tournament, compact = false }) {
 
       {/* Body */}
       <div className="p-3">
-        <h3 className="text-darktext font-serif text-xl font-semibold mb-1">{name}</h3>
+        <h3 className="text-darktext font-heading text-xl font-semibold mb-1">{name}</h3>
         <p className="text-charcoal/80 text-sm font-sans mb-2">{course}</p>
 
         {!compact && (

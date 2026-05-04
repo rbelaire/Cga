@@ -10,7 +10,7 @@ const navLinks = [
   { to: '/admin', label: 'Admin' },
 ]
 
-const linkBase = 'px-3 py-2 text-sm font-semibold text-forest-dark border-b-2 border-transparent hover:border-gold hover:text-forest transition-colors'
+const linkBase = 'px-3 py-2 text-sm font-heading font-semibold text-forest-dark border-b-2 border-transparent hover:border-gold hover:text-forest transition-colors'
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -36,11 +36,11 @@ export default function Header() {
               </NavLink>
             ))}
             {user ? (
-              <button type="button" onClick={signOut} className="ml-3 px-4 py-2 text-sm font-semibold text-forest border border-[#E5E0D4] rounded-md hover:bg-[#F6F4EF]">
+              <button type="button" onClick={signOut} className="ml-3 px-4 py-2 text-sm font-heading font-semibold text-forest border border-[#E5E0D4] rounded-md hover:bg-[#F6F4EF]">
                 Sign out
               </button>
             ) : (
-              <NavLink to="/login" className="ml-3 px-4 py-2 text-sm font-semibold text-white bg-forest rounded-md hover:bg-forest-dark">
+              <NavLink to="/login" className="ml-3 px-4 py-2 text-sm font-heading font-semibold text-white bg-forest rounded-md hover:bg-forest-dark">
                 Login
               </NavLink>
             )}
@@ -63,16 +63,16 @@ export default function Header() {
         <div className="lg:hidden bg-white border-t border-[#E5E0D4]">
           <nav className="px-4 py-3 flex flex-col">
             {navLinks.map(({ to, label }) => (
-              <NavLink key={to} to={to} onClick={() => setMenuOpen(false)} className={({ isActive }) => `block px-2 py-3 text-base font-semibold border-b border-[#E5E0D4] ${isActive ? 'text-forest border-l-2 border-l-gold pl-3' : 'text-charcoal'}`}>
+              <NavLink key={to} to={to} onClick={() => setMenuOpen(false)} className={({ isActive }) => `block px-2 py-3 text-base font-heading font-semibold border-b border-[#E5E0D4] ${isActive ? 'text-forest border-l-2 border-l-gold pl-3' : 'text-charcoal'}`}>
                 {label}
               </NavLink>
             ))}
             {user ? (
-              <button type="button" onClick={() => { signOut(); setMenuOpen(false) }} className="text-left px-2 py-3 mt-1 text-base font-semibold text-forest">
+              <button type="button" onClick={() => { signOut(); setMenuOpen(false) }} className="text-left px-2 py-3 mt-1 text-base font-heading font-semibold text-forest">
                 Sign out
               </button>
             ) : (
-              <NavLink to="/login" onClick={() => setMenuOpen(false)} className="block px-2 py-3 mt-1 text-base font-semibold text-forest">
+              <NavLink to="/login" onClick={() => setMenuOpen(false)} className="block px-2 py-3 mt-1 text-base font-heading font-semibold text-forest">
                 Login
               </NavLink>
             )}

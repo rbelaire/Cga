@@ -110,7 +110,7 @@ export default function Home() {
       <section className="py-8 bg-white border-y border-[#E5E0D4]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
           <div>
-            <h2 className="text-darktext font-serif text-xl font-bold mb-1">2026 Dues Now Open</h2>
+            <h2 className="text-darktext font-heading text-xl font-bold mb-1">2026 Dues Now Open</h2>
             <p className="text-gray-600 font-sans text-sm">Annual membership dues are $75. Pay via Venmo to stay active for the season.</p>
           </div>
           <a
