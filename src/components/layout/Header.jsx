@@ -20,9 +20,9 @@ export default function Header() {
     <header className="sticky top-0 z-50 bg-white border-b border-[#E5E0D4]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="text-forest-dark" onClick={() => setMenuOpen(false)}>
-            <span className="text-lg sm:text-xl font-bold tracking-tight">CGA</span>
-            <span className="hidden sm:inline ml-2 text-xs tracking-[0.18em] uppercase text-gold">Carencro Golf Association</span>
+          <Link to="/" className="flex items-center gap-2 text-forest-dark" onClick={() => setMenuOpen(false)}>
+            <img src="/cga.svg" alt="Carencro Golf Association logo" className="h-9 w-auto" />
+            <span className="hidden sm:inline text-xs tracking-[0.18em] uppercase text-gold">Carencro Golf Association</span>
           </Link>
 
           <nav className="hidden lg:flex items-center gap-1">
