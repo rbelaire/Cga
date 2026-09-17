@@ -41,6 +41,7 @@ export function parseBeginningPtmXlsx(buffer) {
     const name = String(rawName).trim()
     if (!name || /^(total|totals|player|name)$/i.test(name)) continue
     const ptmRaw = valueKey != null ? row[valueKey] : null
+    if (ptmRaw == null || ptmRaw === '') continue  // no established PTM → not part of the baseline
     const ptm = Number(ptmRaw)
     if (!Number.isFinite(ptm)) continue
     const key = name.toLowerCase()
@@ -172,12 +173,20 @@ export function parseRosterXlsx(buffer, membersList) {
   const firstRowKeys = Object.keys(rows[0] ?? {})
   const keyOf = {}
   for (const k of firstRowKeys) keyOf[String(k).trim().toLowerCase()] = k
+  // Returns the first present, non-empty value for the given header labels.
+  // Empty-string cells (common in exported sheets) count as absent.
   const cell = (row, ...labels) => {
     for (const label of labels) {
       const k = keyOf[label.toLowerCase()]
-      if (k != null && row[k] != null) return row[k]
+      if (k != null && row[k] != null && row[k] !== '') return row[k]
     }
     return null
+  }
+  // Coerce a history cell to a finite number, or null when blank/non-numeric.
+  const roundNum = (v) => {
+    if (v == null || v === '') return null
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
   }
   const looksLikeName = v => typeof v === 'string' && /[a-z]/i.test(v)
 
@@ -205,17 +214,18 @@ export function parseRosterXlsx(buffer, membersList) {
     const email           = cell(row, 'Email Address', 'Email')
     const homePhone       = cell(row, 'Home Phone')
     const cellPhone       = cell(row, 'Cell/Work', 'Cell', 'Work', 'Phone')
-    // History accepts both the human labels (New/2nd…7th) and the export labels (R1…R7)
+    // History accepts both the human labels (New/2nd…7th) and the export labels (R1…R7).
+    // Blank cells become null so they are not counted as played rounds.
     const history = [
-      cell(row, 'New', 'NEW', '1st', 'R1'),
-      cell(row, '2nd', 'R2'),
-      cell(row, '3rd', 'R3'),
-      cell(row, '4th', 'R4'),
-      cell(row, '5th', 'R5'),
-      cell(row, '6th', 'R6'),
-      cell(row, '7th', 'R7'),
+      roundNum(cell(row, 'New', 'NEW', '1st', 'R1')),
+      roundNum(cell(row, '2nd', 'R2')),
+      roundNum(cell(row, '3rd', 'R3')),
+      roundNum(cell(row, '4th', 'R4')),
+      roundNum(cell(row, '5th', 'R5')),
+      roundNum(cell(row, '6th', 'R6')),
+      roundNum(cell(row, '7th', 'R7')),
     ]
-    const rounds = history.filter(v => v !== null).length
+    const rounds = history.filter(v => v != null).length
 
     const memberName = findMember(rawName)
     const entry = {
