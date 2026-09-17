@@ -7,32 +7,13 @@ import { drawEmptyState } from './components/EmptyState'
 import { FLIGHT_CODES, PDF_COLORS, PDF_LAYOUT } from './utils/constants'
 import { formatCurrency, formatDate, formatPTM, formatScore, formatText, formatTrend, formatValue } from './utils/formatters'
 import { sanitizeTournamentData } from './utils/sanitize'
+import { loadAssetBase64 } from './utils/loadAsset'
 import { formatName, compareByLastName } from '../utils/formatName'
 
 function safeFilename(id, suffix, name) {
   const idSlug = formatText(id, 'tournament').replace(/[^a-z0-9]/gi, '-').toLowerCase()
   const nameSlug = name ? `-${name.replace(/[^a-z0-9]/gi, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '')}` : ''
   return `${idSlug}${nameSlug}-${suffix}.pdf`
-}
-
-async function loadAssetBase64(url) {
-  if (!url) return null
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    const blob = await res.blob()
-    return await new Promise(resolve => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve({
-        data: reader.result,
-        format: blob.type === 'image/png' ? 'PNG' : 'JPEG',
-      })
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return null
-  }
 }
 
 function normalizeResultsHeader(text) {

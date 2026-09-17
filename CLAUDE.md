@@ -140,7 +140,7 @@ Rendered as a tab inside `Standings.jsx` (`buildMostImprovedRows`, `MostImproved
 - No separate PTM Δ column in HDCP or Scratch tabs
 
 ## POY calculation
-Defined inline in `Admin.jsx` (`calcFlightPOY`):
+`calcFlightPOY` in `src/utils/poy.js` (shared by publish, exports, and score entry):
 - Base: 350 pts for flight winner, −25 pts per rank below first
 - Ties share the average of their tied positions' points
 - Players marked `eligible: false` receive 0 POY points
@@ -158,6 +158,10 @@ Defined inline in `Admin.jsx` (`calcFlightPOY`):
 | `src/services/admin/snapshotService.js` | Snapshot/restore helpers |
 | `src/services/admin/validation/index.js` | All validation functions (scores, pairings, members, publish, etc.) |
 | `src/exports/pdfExports.js` | PDF exports: tournament info, pairings, field roster, results, PTM |
+| `src/exports/xlsxExports.js` | XLSX exports (credits, results, birdie pool, payout, roster, PTM) + `parseRosterXlsx` |
+| `src/exports/creditsPdf.js` | Credit-on-books PDF (navy-bar header/footer style) |
+| `src/exports/utils/loadAsset.js` | Shared image→base64 loader for PDF embedding |
+| `src/utils/poy.js` | `calcFlightPOY` — POY points per flight |
 | `src/utils/tournamentWorkflow.js` | `computeTournamentWorkflowState()` — dashboard status logic |
 | `src/utils/flightOrder.js` | `FLIGHT_ORDER`, `compareFlights`, `NEW_PLAYERS_FLIGHT` |
 | `src/utils/roundPtm.js` | Shared PTM rounding utility |
