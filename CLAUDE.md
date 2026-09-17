@@ -35,7 +35,7 @@ Public views subscribe via `useFireData` and fall back gracefully when data is u
 **Single-document collections (`cga/*`):**
 | Document | Purpose |
 |---|---|
-| `members` | Member roster with flight, PTM, tee |
+| `members` | Member roster (PTM, tee). `flight` is retained internally as each member's most-recent-tournament flight (set by the flight calculator on Save Flights) but is NOT shown as a permanent attribute in season views — flights are per-tournament (results/pairings) |
 | `standings` | Current PTM standings per flight |
 | `poy` | Player-of-Year points per flight |
 | `ptm` | PTM list (redundant with members in some flows) |
@@ -75,7 +75,7 @@ cross-panel state of their own.
 | `'pairings'` | Pairings | Generate/edit pairings + Pairing Rules tab |
 | `'scores'` | Scores | Score entry per flight |
 | `'exports'` | Exports | PDF/XLSX exports |
-| `'operations'` | Player Management | Flight, PTM, tee overrides |
+| `'operations'` | Player Management | PTM, tee, name, credit overrides (no flight — flights are per-tournament) |
 | `'users'` | Member Management | User account management |
 | `'snapshots'` | Snapshots | Snapshot/restore |
 | `'changelog'` | Changelog | Audit log |

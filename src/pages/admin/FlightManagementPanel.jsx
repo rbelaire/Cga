@@ -10,15 +10,13 @@ const TEE_OPTIONS = ['Back', 'Senior', 'Front']
 
 export function FlightManagementPanel({
   effectiveMembers, membersData, credits, flightSearch, setFlightSearch,
-  updateMemberFlight, updateMemberPtm, updateMemberTee, updateMemberName, updateMemberCell, removeMember,
+  updateMemberPtm, updateMemberTee, updateMemberName, updateMemberCell, removeMember,
   openConfirm,
   applyCredit,
-  savePlayerManagement, playerManagementSaving, playerManagementSaveStatus, flightTagStyles,
+  savePlayerManagement, playerManagementSaving, playerManagementSaveStatus,
   fileInputRef, handleXlsxFile, importPreview, setImportPreview,
   confirmImport, importSaving, importStatus, importError, setImportError,
-  allFlights,
 }) {
-  const FLIGHT_OPTIONS = allFlights
   const SORTABLE_COLUMNS = ['name', 'ptm', 'creditOnBooks', 'tee']
   const [sortBy, setSortBy] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
@@ -29,7 +27,6 @@ export function FlightManagementPanel({
   const [selectedRows, setSelectedRows] = useState(new Set())
   const [bulkTee, setBulkTee] = useState('')
   const [bulkCredit, setBulkCredit] = useState('')
-  const [filterFlight, setFilterFlight] = useState('all')
   const [filterTee, setFilterTee] = useState('all')
   const [onlyCredits, setOnlyCredits] = useState(false)
   const [scrollTop, setScrollTop] = useState(0)
@@ -44,7 +41,6 @@ export function FlightManagementPanel({
           id: member.id ?? member.name,
           originalName: member.originalName ?? member.name,
           name: member.name,
-          flight: (member.flight && allFlights.includes(member.flight)) ? member.flight : null,
           ptm: fmtPtmValue(member.ptm),
           tee: member.tee ?? null,
           creditOnBooks: Number.isFinite(parsedCredit) ? parsedCredit : 0,
@@ -52,10 +48,6 @@ export function FlightManagementPanel({
       })
       .filter(member => {
         if (search && !member.name.toLowerCase().includes(search) && !formatName(member.name).toLowerCase().includes(search)) return false
-        if (filterFlight !== 'all') {
-          if (filterFlight === '__unassigned__' && member.flight) return false
-          if (filterFlight !== '__unassigned__' && member.flight !== filterFlight) return false
-        }
         if (filterTee !== 'all') {
           if (filterTee === '__unset__' && member.tee) return false
           if (filterTee !== '__unset__' && member.tee !== filterTee) return false
@@ -70,7 +62,7 @@ export function FlightManagementPanel({
         if (sortBy === 'creditOnBooks') return (a.creditOnBooks - b.creditOnBooks) * direction
         return String(a[sortBy] ?? '').localeCompare(String(b[sortBy] ?? '')) * direction
       })
-  }, [credits, effectiveMembers, filterFlight, filterTee, flightSearch, onlyCredits, sortBy, sortDir])
+  }, [credits, effectiveMembers, filterTee, flightSearch, onlyCredits, sortBy, sortDir])
 
   const selectedCount = selectedRows.size
   const selectedVisibleNames = useMemo(
@@ -328,15 +320,6 @@ export function FlightManagementPanel({
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <select
-              value={filterFlight}
-              onChange={e => setFilterFlight(e.target.value)}
-              className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-gold"
-            >
-              <option value="all" className="text-darktext">All Flights</option>
-              <option value="__unassigned__" className="text-darktext">Unassigned</option>
-              {FLIGHT_OPTIONS.map(flight => <option key={flight} value={flight} className="text-darktext">{flight}</option>)}
-            </select>
-            <select
               value={filterTee}
               onChange={e => setFilterTee(e.target.value)}
               className="border border-white/20 rounded px-2 py-1 text-xs font-sans bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-gold"
@@ -396,7 +379,7 @@ export function FlightManagementPanel({
               )}
               {visibleRows.map((row, idx) => {
                 const isEditing = !!editingRows[row.originalName]
-                const draft = rowDrafts[row.originalName] ?? { name: row.name, flight: row.flight ?? '', tee: row.tee ?? '', ptm: row.ptm ?? '', cell: row.cell ?? '' }
+                const draft = rowDrafts[row.originalName] ?? { name: row.name, tee: row.tee ?? '', ptm: row.ptm ?? '', cell: row.cell ?? '' }
                 const setDraft = (patch) => setRowDrafts(prev => ({ ...prev, [row.originalName]: { ...draft, ...patch } }))
                 return (
                   <tr

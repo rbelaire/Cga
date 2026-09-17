@@ -26,7 +26,7 @@ function countCurrentYearRounds(allResults) {
   return byPlayer
 }
 
-function buildMostImprovedRows(ptmList, beginningPtmList, allResults, memberFlightLookup) {
+function buildMostImprovedRows(ptmList, beginningPtmList, allResults) {
   if (!beginningPtmList?.length || !ptmList?.length) return []
   const beginningLookup = {}
   for (const p of beginningPtmList) {
@@ -46,7 +46,6 @@ function buildMostImprovedRows(ptmList, beginningPtmList, allResults, memberFlig
       return {
         name: p.name,
         tee: p.tee ?? beg.tee ?? null,
-        flight: memberFlightLookup[p.name] ?? beg.flight ?? null,
         beginningPtm,
         currentPtm,
         delta,
@@ -591,14 +590,6 @@ export default function Standings() {
     return lookup
   }, [standings])
 
-  const liveMemberFlightLookup = useMemo(() => {
-    const lookup = {}
-    for (const member of liveMembers || []) {
-      if (member?.name && member?.flight) lookup[member.name] = member.flight
-    }
-    return lookup
-  }, [liveMembers])
-
   const flightData = useMemo(
     () => FLIGHTS.flatMap((flight) => (standings?.flights?.[flight] || []).map(row => {
       const rounds = roundsFromPtm[row.name]
@@ -642,22 +633,21 @@ export default function Standings() {
       const standingRow = standingsByName[row.name] ?? null
       return {
         ...row,
-        flight: liveMemberFlightLookup[row.name] ?? null,
         ptm: standingRow?.ptm ?? null,
         ptmDelta: standingRow?.ptmDelta ?? null,
         latestScore: latestScoreLookup[row.name] ?? null,
         trend: standingRow?.trend ?? null,
       }
     }),
-    [allResults, liveMemberFlightLookup, latestScoreLookup, standingsByName]
+    [allResults, latestScoreLookup, standingsByName]
   )
 
 
   const latestTournament = latestCompletedTournament?.name ?? null
 
   const mostImprovedRows = useMemo(
-    () => buildMostImprovedRows(ptmList, beginningPtmList, allResults, liveMemberFlightLookup),
-    [ptmList, beginningPtmList, allResults, liveMemberFlightLookup]
+    () => buildMostImprovedRows(ptmList, beginningPtmList, allResults),
+    [ptmList, beginningPtmList, allResults]
   )
 
   const modes = [

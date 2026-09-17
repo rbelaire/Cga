@@ -2,8 +2,8 @@ import { formatName } from '../../utils/formatName'
 import TeeTag from './TeeTag'
 
 export default function MemberCard({ member }) {
-  const { name, ptm, memberSince, email, cell, homePhone, tee, flight } = member
-  const hasData = ptm !== null && flight != null
+  const { name, ptm, memberSince, email, cell, homePhone, tee } = member
+  const hasData = ptm != null
   const phone = cell || homePhone
   const displayName = formatName(name)
   const initials = name
