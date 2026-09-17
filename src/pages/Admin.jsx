@@ -2749,7 +2749,7 @@ function AdminPanel({ currentUser }) {
           onExportPairingsPDF={() => exportPairingsPDF(tournament, currentPairings)}
           onExportPaymentsPDF={() => exportPaymentsPDF(tournament, paymentMap, membersData, preTournamentPlayerData)}
           onExportPaymentsXLSX={() => exportPaymentsXLSX(tournament, paymentMap, membersData, preTournamentPlayerData)}
-          onExportCreditsPDF={() => exportCreditsPDF(credits, membersData)}
+          onExportCreditsPDF={() => exportCreditsPDF(credits, membersData, `${import.meta.env.BASE_URL}cga-logo.png`)}
           onExportCreditsXLSX={() => exportCreditsXLSX(credits, membersData)}
           onExportBirdiePoolXLSX={() => exportBirdiePoolXLSX(tournament, data[tid] ?? {}, ALL_SCORE_TABS)}
         />
