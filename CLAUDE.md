@@ -62,6 +62,11 @@ Public views subscribe via `useFireData` and fall back gracefully when data is u
 
 ## Admin panel (`src/pages/Admin.jsx`)
 
+`Admin.jsx` holds the auth gate and the `AdminPanel` orchestrator (all shared
+state, save/publish workflow, and dirty-tracking). Each mode's UI is a separate
+component under `src/pages/admin/` receiving data via props — they hold no
+cross-panel state of their own.
+
 ### adminMode values
 | Value | Nav label | What it shows |
 |---|---|---|
@@ -150,7 +155,9 @@ Rendered as a tab inside `Standings.jsx` (`buildMostImprovedRows`, `MostImproved
 |---|---|
 | `src/db.js` | All Firestore read/write wrappers |
 | `src/hooks/useFireData.js` | Real-time Firestore subscription hook |
-| `src/pages/Admin.jsx` | Admin UI + all workflow orchestration |
+| `src/pages/Admin.jsx` | Auth gate + `AdminPanel` orchestrator (shared state + workflow) |
+| `src/pages/admin/*.jsx` | Individual admin panels (Dashboard, ScoreEntry, Pairings, Users, Exports, FlightManagement, Changelog, Snapshots, etc.) + shared `icons.jsx` / `ui.jsx` |
+| `src/utils/adminFormat.js` | Admin display helpers: `fmtPM`, `fmtPOY`, `fmtCurrency`, `fmtPtmValue`, `fmtLogTime` |
 | `src/pages/Standings.jsx` | PTM standings + HDCP/Scratch tabs + Most/Least Improved tab |
 | `src/components/ui/StandingsTable.jsx` | Reusable standings table |
 | `src/services/admin/publishService.js` | `buildPublishPayload()` — all publish math |
