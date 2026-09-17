@@ -5,6 +5,52 @@ import { calcFlightPOY } from '../utils/poy'
 
 const FLIGHTS = FLIGHT_ORDER
 
+// ── Beginning-of-season PTM import ───────────────────────────────────────────
+const PTM_NAME_KEYS = ['', 'Player', 'Name', 'Member', 'Golfer', 'Full Name']
+const PTM_VALUE_KEYS = ['PTM', 'Points to make', 'Points to Make', 'Points To Make']
+
+/**
+ * Parse an ArrayBuffer of a "Points to Make" .xlsx into a beginning-of-season
+ * snapshot: [{ name, ptm }]. Reads the first sheet. The name column may be
+ * labelled (Player/Name/…) or unlabelled (a blank header); the PTM column is
+ * "PTM" or "Points to make". Rows without a text name or a numeric PTM are
+ * skipped, as are obvious total/summary rows.
+ */
+export function parseBeginningPtmXlsx(buffer) {
+  const wb = XLSX.read(buffer, { type: 'array' })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: null })
+  if (!rows.length) return []
+
+  const headerKeys = Object.keys(rows[0])
+  const looksLikeName = v => typeof v === 'string' && /[a-z]/i.test(v)
+
+  // Pick the name column: a known header, else the first column whose values
+  // are mostly text.
+  let nameKey = PTM_NAME_KEYS.find(k => headerKeys.includes(k) && rows.some(r => looksLikeName(r[k])))
+  if (nameKey == null) {
+    nameKey = headerKeys.find(k => rows.filter(r => looksLikeName(r[k])).length >= rows.length / 2) ?? headerKeys[0]
+  }
+  const valueKey = PTM_VALUE_KEYS.find(k => headerKeys.includes(k))
+
+  const seen = new Set()
+  const out = []
+  for (const row of rows) {
+    const rawName = row[nameKey]
+    if (!looksLikeName(rawName)) continue
+    const name = String(rawName).trim()
+    if (!name || /^(total|totals|player|name)$/i.test(name)) continue
+    const ptmRaw = valueKey != null ? row[valueKey] : null
+    const ptm = Number(ptmRaw)
+    if (!Number.isFinite(ptm)) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ name, ptm: Math.round(ptm) })
+  }
+  return out
+}
+
 // ── Results sanitization (shared by results export) ─────────────────────────
 export function sanitizeResultsData(flightData = {}) {
   const cleanNumber = (value) => {

@@ -135,7 +135,7 @@ Rendered as a tab inside `Standings.jsx` (`buildMostImprovedRows`, `MostImproved
 - `delta = currentPtm − beginningPtm` (positive = improved; higher PTM = better scorer)
 - Non-qualified rows: amber highlight + NQ badge; top qualified = Leader badge
 - No 6-point floor on display values
-- Beginning-of-year snapshot stored in `cga/beginningOfYearPtm`, saved manually via BeginningPtmPanel
+- Beginning-of-year snapshot stored in `cga/beginningOfYearPtm`, set via BeginningPtmPanel — either from the current live PTM or by uploading a Points-to-Make `.xlsx` (`parseBeginningPtmXlsx` in `xlsxExports.js`; name column + `PTM`/"Points to make" column, first sheet)
 
 ## PTM standings display
 - PTM change after last tournament shown inline as colored arrow + whole number
