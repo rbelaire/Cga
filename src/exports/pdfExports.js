@@ -58,15 +58,27 @@ export async function exportTournamentInfoPDF({ tournament, venmoImageUrl, logoU
   }
 
   if (venmo?.data) {
-    y = ensurePageSpace(doc, y, 52)
-    const pageW = doc.internal.pageSize.getWidth()
-    drawSectionCard(doc, { y, title: 'Payment', rows: ['Scan to pay on Venmo.'], highlight: true })
     const props = doc.getImageProperties(venmo.data)
     const ratio = props.width / props.height
-    const h = 40
-    const w = h * ratio
-    const x = pageW - 14 - w
-    doc.addImage(venmo.data, venmo.format, x, y + 4, w, h)
+    const qh = 40
+    const qw = qh * ratio
+    const panelH = qh + 12
+    y = ensurePageSpace(doc, y, panelH + 4)
+    const pageW = doc.internal.pageSize.getWidth()
+    const panelW = pageW - 28
+    // A single panel that fully contains the label and the QR image
+    doc.setDrawColor(...PDF_COLORS.border)
+    doc.setFillColor(...PDF_COLORS.rowAlt)
+    doc.roundedRect(14, y, panelW, panelH, 1.5, 1.5, 'FD')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(...PDF_COLORS.blue)
+    doc.text('Payment', 17, y + 6)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.8)
+    doc.setTextColor(...PDF_COLORS.primaryText)
+    doc.text('Scan to pay on Venmo.', 17, y + 12)
+    doc.addImage(venmo.data, venmo.format, pageW - 14 - qw - 3, y + (panelH - qh) / 2, qw, qh)
   }
 
   withFooter('CGA Tournament Information')
@@ -89,6 +101,7 @@ function drawPairingCards(doc, { groups, startY }) {
   for (let i = 0; i < groups.length; i += COLS) rows.push(groups.slice(i, i + COLS))
 
   let y = startY
+  let groupNum = 0
   for (const rowGroups of rows) {
     const maxPlayers = Math.max(...rowGroups.map(g => (g.players ?? []).length), 1)
     const cardH = TITLE_H + maxPlayers * ROW_H + PAD_B
@@ -100,6 +113,7 @@ function drawPairingCards(doc, { groups, startY }) {
     }
 
     rowGroups.forEach((group, colIdx) => {
+      groupNum += 1
       const x = ML + colIdx * (cardW + GAP)
       const players = group.players ?? []
       const thisH = TITLE_H + Math.max(players.length, 1) * ROW_H + PAD_B
@@ -118,7 +132,7 @@ function drawPairingCards(doc, { groups, startY }) {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(7.5)
       doc.setTextColor(255, 255, 255)
-      doc.text(group.pairing ?? `Pairing ${colIdx + 1}`, x + 2.5, y + TITLE_H - 1.2)
+      doc.text(group.pairing ?? `Pairing ${groupNum}`, x + 2.5, y + TITLE_H - 1.2)
 
       // Players
       if (players.length === 0) {
@@ -153,7 +167,7 @@ export async function exportPairingsPDF({ tournament, pairings, logoUrl }) {
   const logo = await loadAssetBase64(logoUrl)
   const { doc, cursorY, withFooter } = createExportPage({
     title: 'Pairings',
-    subtitle: `${clean.course} • ${formatDate(clean.date)}`,
+    subtitle: clean.course, // header appends the date; don't repeat it here
     tournamentName: clean.name,
     tournamentDate: clean.date,
     logo,
@@ -186,16 +200,8 @@ export async function exportFieldRosterPDF({ tournament, paymentMap, members, fl
 
   const fieldCount = Object.keys(clean.paymentMap).filter(k => !k.includes('__') && clean.paymentMap[k]).length
 
-  let y = drawStatGrid(doc, {
-    startY: cursorY,
-    cols: 2,
-    stats: [
-      { label: 'Players in Field', value: String(fieldCount), highlight: true },
-      { label: 'Flights', value: String(0) }, // filled below
-    ],
-  })
-
-  // Build flight groups — only field players, preserving flight order
+  // Build flight groups first — only field players, preserving flight order —
+  // so the stat grid can be drawn once with the real flight count.
   const knownFlights = flights.length ? flights : ['Championship', '1st Flight', '2nd Flight', '3rd Flight', '4th Flight', '5th Flight', 'New Players']
   const grouped = Object.fromEntries(knownFlights.map(f => [f, []]))
   const unassigned = []
@@ -214,22 +220,15 @@ export async function exportFieldRosterPDF({ tournament, paymentMap, members, fl
     ...(unassigned.length ? [{ label: 'Unassigned', names: unassigned }] : []),
   ]
 
-  // Patch flight count into stat grid now that we know it
-  // (re-draw over the placeholder with the correct value)
   const pageW = doc.internal.pageSize.getWidth()
-  const cardW = (pageW - 28 - 4) / 2
-  doc.setFillColor(255, 255, 255)
-  doc.rect(14 + cardW + 4, cursorY, cardW, 20, 'F')
-  doc.setDrawColor(...PDF_COLORS.border)
-  doc.roundedRect(14 + cardW + 4, cursorY, cardW, 16, 1.2, 1.2, 'D')
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7.5)
-  doc.setTextColor(...PDF_COLORS.blue)
-  doc.text('Flights', 14 + cardW + 4 + 2.5, cursorY + 5)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(...PDF_COLORS.primaryText)
-  doc.text(String(allGroups.length), 14 + cardW + 4 + 2.5, cursorY + 11.5)
+  let y = drawStatGrid(doc, {
+    startY: cursorY,
+    cols: 2,
+    stats: [
+      { label: 'Players in Field', value: String(fieldCount), highlight: true },
+      { label: 'Flights', value: String(allGroups.length) },
+    ],
+  })
 
   if (allGroups.length === 0) {
     drawEmptyState(doc, { message: 'No players in field for this tournament', startY: y })
@@ -358,11 +357,21 @@ export async function exportResultsPDF({ tournament, flightData, flights, calcFl
         return a.rank - b.rank
       })
     if (!rows.length) continue
-    y = ensurePageSpace(doc, y, 24)
-    y = drawSectionCard(doc, { y, title: fl, rows: [] })
+    y = ensurePageSpace(doc, y, 20)
+
+    // Slim flight header band — compact, reclaims vertical space vs a full card
+    const rPageW = doc.internal.pageSize.getWidth()
+    const bandH = 6.4
+    doc.setFillColor(...PDF_COLORS.blue)
+    doc.rect(PDF_LAYOUT.marginX, y, rPageW - PDF_LAYOUT.marginX * 2, bandH, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8.5)
+    doc.setTextColor(255, 255, 255)
+    doc.text(fl, PDF_LAYOUT.marginX + 2.5, y + bandH * 0.72)
+    y += bandH
 
     y = drawDataTable(doc, {
-      startY: y - 2,
+      startY: y,
       head: ['Rank', 'Player', 'PTM', 'Score', normalizeResultsHeader('+/-'), 'POY'],
       body: rows.map(p => [
         formatValue(p.rank, 'number'),
