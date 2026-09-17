@@ -1206,14 +1206,6 @@ function AdminPanel({ currentUser }) {
   }
 
   // ── Flight management mutations ───────────────────────────────────────────────
-  function updateMemberFlight(name, newFlight) {
-    setMembersDirtyTouched(true)
-    setMembersOverride(prev => ({
-      ...prev,
-      [name]: { ...(prev[name] ?? {}), flight: newFlight || null }
-    }))
-  }
-
   function updateMemberPtm(name, newPtm) {
     setMembersDirtyTouched(true)
     setMembersOverride(prev => ({
@@ -2620,7 +2612,6 @@ function AdminPanel({ currentUser }) {
               credits={credits}
               flightSearch={flightSearch}
               setFlightSearch={setFlightSearch}
-              updateMemberFlight={updateMemberFlight}
               updateMemberPtm={updateMemberPtm}
               updateMemberTee={updateMemberTee}
               updateMemberName={updateMemberName}
@@ -2633,7 +2624,6 @@ function AdminPanel({ currentUser }) {
               playerManagementSaveStatus={membersSaveStatus === 'err' || creditsSaveStatus === 'err'
                 ? 'err'
                 : (membersSaveStatus === 'ok' || creditsSaveStatus === 'ok' ? 'ok' : null)}
-              flightTagStyles={flightTagStyles}
               fileInputRef={fileInputRef}
               handleXlsxFile={handleXlsxFile}
               importPreview={importPreview}
@@ -2643,7 +2633,6 @@ function AdminPanel({ currentUser }) {
               importStatus={importStatus}
               importError={importError}
               setImportError={setImportError}
-              allFlights={ALL_SCORE_TABS}
             />
           </section>
 
