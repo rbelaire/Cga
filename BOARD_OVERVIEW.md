@@ -25,8 +25,7 @@ Once published, the site reflects changes immediately.
 
 ## Member-facing pages
 - **Tournaments** — schedule, upcoming events, completed results by flight
-- **Standings** — per-flight PTM standings and Player of the Year points tables (handicap and scratch)
-- **Most / Least Improved** — ranks members by PTM change from the start of the season, with qualification requirements (7+ total rounds, 3+ current-year rounds)
+- **Standings** — per-flight PTM standings and Player of the Year points tables (handicap and scratch), plus a **Most / Least Improved** tab that ranks members by PTM change from the start of the season, with qualification requirements (7+ total rounds, 3+ current-year rounds)
 - **Members** — active member directory with flight assignments
 - **Pairings** — live group assignments for each tournament
 - **Info** — rules, eligibility details, and board information

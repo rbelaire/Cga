@@ -44,19 +44,20 @@ Use this only when the event is final.
 ## What happens when results are published
 When you confirm publish:
 - the selected tournament result is marked complete and written live,
+- each scored player's PTM is recalculated automatically from their updated round history — no need to edit PTM by hand first,
 - season standings are recalculated and updated,
 - season POY tables are recalculated and updated,
 - public/member views update immediately.
 
 ## Most Improved tracking — Beginning PTM
-The **Most Improved / Least Improved** page compares each player's current PTM against their PTM at the start of the season.
+The **Most / Least Improved** tab (on the public **Standings** page) compares each player's current PTM against their PTM at the start of the season.
 
 To set the season baseline:
 1. Go to **Beginning PTM** in the admin nav.
 2. Confirm the action — this snapshots the current PTM list as the season-start reference.
 3. Save once at the beginning of the season. Overwriting mid-season will reset all comparisons.
 
-Qualification for the Most Improved page requires a player to have 7 or more total rounds on record and at least 3 rounds in the current calendar year.
+Qualification for the Most / Least Improved tab requires a player to have 7 or more total rounds on record and at least 3 rounds in the current calendar year.
 
 ## Exports
 The **Exports** panel generates downloadable files from live data:

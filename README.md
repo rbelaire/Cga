@@ -6,7 +6,7 @@ Live site: **https://rbelaire.github.io/Cga/**
 
 The CGA site is a React + Firebase web app for tournament operations and member-facing updates.
 
-- Public pages show schedule, pairings, standings, most/least improved, members, and club info.
+- Public pages show schedule, pairings, standings (with a most/least improved tab), members, and club info.
 - The admin area manages entries, payments, pairings, scores, publish, and rollback workflows.
 - Firestore remains the live source of truth for operational CGA tournament data under `cga/*`.
 - Firebase Auth secures the admin panel.
@@ -22,23 +22,19 @@ The CGA site is a React + Firebase web app for tournament operations and member-
 ## Local development
 
 ```bash
-npm install
-npm run dev
+npm install      # install dependencies
+npm run dev      # start the Vite dev server
+npm test         # run the test suite (node --test tests/*.test.js)
+npm run lint     # run ESLint
+npm run build    # production build → out/ (gitignored)
+npm run preview  # serve the production build locally
 ```
 
-Run tests:
+> In dev the app runs at `http://localhost:5173/` (Vite `base` is `/`). The
+> production build uses `base: /Cga/` for GitHub Pages. Routes use `HashRouter`,
+> so paths look like `http://localhost:5173/#/standings`.
 
-```bash
-npm test
-```
-
-Build production bundle:
-
-```bash
-npm run build
-```
-
-> App runs at `http://localhost:5173/Cga/` in local Vite dev.
+CI (`.github/workflows/ci.yml`) runs `npm test` and `npm run build` on every PR to `main`.
 
 ## Environment variables
 
@@ -112,35 +108,48 @@ Current user-facing usage:
 ## Data flow
 
 ```text
-Admin local draft state
-  ├─ Save Draft / Save Pairings / Save Users / Save Payments ...
-  │    -> Firestore draft-like docs (cga/scores, cga/pairings, cga/users, ...)
-  └─ Publish Results
-       -> Firestore live docs (cga/results, cga/standings, cga/poy)
+Admin local draft state (browser localStorage, per section)
+  ├─ Save to Cloud (scores / pairings / members / credits / payments / users)
+  │    -> per-tournament collections (cgaScores/{tid}, cgaPairings/{tid}, ...)
+  │       and cga/* docs (cga/members, cga/credits, cga/users, ...)
+  └─ Publish Results  (DB.batchPublish, single atomic batch)
+       -> cgaResults/{tid}, cga/standings, cga/poy   (+ DB.saveMembers persists
+          each scored player's recomputed post-event PTM)
 
 Public pages
-  -> subscribe to Firestore in real-time via useFireData()
-  -> render live data when available
+  -> subscribe to Firestore in real time via useFireData()
+  -> render live data, falling back gracefully when unavailable
 ```
 
 ## Firestore structure
 
-### Operational docs (`cga/*`)
+### Single-document collections (`cga/*`)
 
-- `cga/members` → `{ list: [...] }`
-- `cga/standings` → `{ flights: {...} }`
-- `cga/poy` → `{ flights: {...} }`
-- `cga/ptm` → `{ list: [...] }`
-- `cga/beginningOfYearPtm` → `{ list: [...] }` — season-start PTM snapshot for Most Improved
-- `cga/pairings` → `{ map: { [tournamentId]: [...] } }`
-- `cga/payments` → `{ data: { [tournamentId]: { [member]: true } } }`
-- `cga/credits` → `{ balances: { [member]: number } }`
-- `cga/creditTransactions` → `{ entries: [...] }`
-- `cga/users` → `{ list: [...] }`
-- `cga/scores` → `{ data: { [tournamentId]: { [flight]: [...] } } }`
-- `cga/results` → `{ data: { [tournamentId]: resultDoc } }`
-- `cga/changelog` → `{ entries: [...] }`
-- `cga/snapshots` → `{ entries: [...] }`
+- `cga/members` → member roster (flight, PTM, tee)
+- `cga/standings` → current PTM standings per flight
+- `cga/poy` → Player-of-Year points per flight
+- `cga/ptm` → PTM list (feeds the public PTM standings + Most Improved tab)
+- `cga/beginningOfYearPtm` → season-start PTM snapshot for Most Improved
+- `cga/credits` → credit balances per member
+- `cga/creditTransactions` → append-only credit transaction log
+- `cga/users` → admin/user roles
+- `cga/changelog` → append-only audit log
+- `cga/tournamentStatus` → site-wide tournament lifecycle overrides
+
+### Per-tournament collections (document key = tournament ID)
+
+- `cgaResults/{tid}` → published result doc (leaderboard, flight winners)
+- `cgaScores/{tid}` → score-entry data (pre-publish)
+- `cgaPairings/{tid}` → pairing groups
+- `cgaPayments/{tid}` → paid/entered player map
+- `cgaPaymentMeta/{tid}` → payment metadata (credit used, timestamps)
+- `cgaLifecycle/{tid}` → pairings state, memo/payout flags
+
+### Append-only
+
+- `cgaSnapshots/{autoId}` → snapshot/restore records
+
+See [`CLAUDE.md`](./CLAUDE.md) for the full data model and admin workflow.
 
 ### Lightweight user docs
 
