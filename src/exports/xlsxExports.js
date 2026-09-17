@@ -168,31 +168,52 @@ export function parseRosterXlsx(buffer, membersList) {
     return null
   }
 
-  // Detect the name column — try common header names case-insensitively
+  // Case-insensitive header lookup: map lowercased/trimmed header → actual key.
   const firstRowKeys = Object.keys(rows[0] ?? {})
-  const nameColKey = firstRowKeys.find(k => /^(name|player|member|golfer|full.?name|member.?name)$/i.test(k))
+  const keyOf = {}
+  for (const k of firstRowKeys) keyOf[String(k).trim().toLowerCase()] = k
+  const cell = (row, ...labels) => {
+    for (const label of labels) {
+      const k = keyOf[label.toLowerCase()]
+      if (k != null && row[k] != null) return row[k]
+    }
+    return null
+  }
+  const looksLikeName = v => typeof v === 'string' && /[a-z]/i.test(v)
+
+  // Detect the name column: a labelled header, else a blank-header / first
+  // column whose values are mostly text names (handles sheets where the name
+  // column has no header, e.g. the Points-to-Make export).
+  let nameColKey = firstRowKeys.find(k => /^(name|player|member|golfer|full.?name|member.?name)$/i.test(k))
+  if (!nameColKey) {
+    nameColKey = firstRowKeys.find(k => (k === '' || k === '__EMPTY') && rows.some(r => looksLikeName(r[k])))
+      ?? firstRowKeys.find(k => rows.filter(r => looksLikeName(r[k])).length >= rows.length / 2)
+      ?? null
+  }
 
   const matched   = []
   const unmatched = []
 
   for (const row of rows) {
-    const rawName = (nameColKey ? row[nameColKey] : null) ?? row['__EMPTY'] ?? row['Name'] ?? row['Player'] ?? null
-    if (!rawName) continue
+    const rawName = (nameColKey != null ? row[nameColKey] : null) ?? row['__EMPTY'] ?? row['Name'] ?? row['Player'] ?? null
+    if (!looksLikeName(rawName)) continue
 
-    const tee             = normalizeTee(row['Tees'] ?? row['Tee'] ?? null)
-    const ptm             = row['Points to make'] ?? row['PTM'] ?? null
-    const creditOnBooks   = row['Credit on Books'] !== null ? Number(row['Credit on Books']) : null
-    const email           = row['Email Address'] ?? row['Email'] ?? null
-    const homePhone       = row['Home Phone'] ?? null
-    const cellPhone       = row['Cell/Work'] ?? row['Cell'] ?? row['Work'] ?? row['Phone'] ?? null
+    const tee             = normalizeTee(cell(row, 'Tees', 'Tee'))
+    const ptm             = cell(row, 'Points to make', 'PTM')
+    const creditRaw       = cell(row, 'Credit on Books')
+    const creditOnBooks   = creditRaw != null ? Number(creditRaw) : null
+    const email           = cell(row, 'Email Address', 'Email')
+    const homePhone       = cell(row, 'Home Phone')
+    const cellPhone       = cell(row, 'Cell/Work', 'Cell', 'Work', 'Phone')
+    // History accepts both the human labels (New/2nd…7th) and the export labels (R1…R7)
     const history = [
-      row['NEW'] ?? row['1st'] ?? null,
-      row['2nd'] ?? null,
-      row['3rd'] ?? null,
-      row['4th'] ?? null,
-      row['5th'] ?? null,
-      row['6th'] ?? null,
-      row['7th'] ?? null,
+      cell(row, 'New', 'NEW', '1st', 'R1'),
+      cell(row, '2nd', 'R2'),
+      cell(row, '3rd', 'R3'),
+      cell(row, '4th', 'R4'),
+      cell(row, '5th', 'R5'),
+      cell(row, '6th', 'R6'),
+      cell(row, '7th', 'R7'),
     ]
     const rounds = history.filter(v => v !== null).length
 
