@@ -160,7 +160,6 @@ export const DB = {
   listenUsers: (cb) => fsListen('cga/users', d => cb(d?.list ?? [])),
 
   // PTM history
-  getPtm:    () => fsGet('cga/ptm').then(d => d?.list ?? null),
   savePtm:   (list) => fsSet('cga/ptm', { list }),
   listenPtm: (cb)   => fsListen('cga/ptm', d => cb(d?.list ?? null)),
 

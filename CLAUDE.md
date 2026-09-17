@@ -99,14 +99,12 @@ Tracks unsaved local state vs. cloud for: `scores`, `pairings`, `members`, `cred
 
 ### Publish workflow
 1. Admin enters scores in **Scores** panel (`data` state, keyed by `[tid][flight]`)
-2. Update member PTM to post-event values in **Player Management** before publishing — `ptmLookup` (from members) is what gets written to standings, not the score-row PTM
-3. **Preview** builds payload via `buildPublishPayload()` in `publishService.js`
-4. On confirm, snapshots current results/standings/poy, then `DB.batchPublish` writes atomically:
-   - `cgaResults/{tid}` — leaderboard, flight winners, status = 'completed'
-   - `cga/standings` — updated PTM, PTM delta, trend, event count
-   - `cga/poy` — updated POY points per flight
+2. **Preview** builds payload via `buildPublishPayload()` in `publishService.js`. Post-event PTM is derived automatically — no manual PTM edit needed: `computePublishMemberUpdates()` prepends each scored player's new score to their `history` (capped at 7) and recomputes PTM via `calcPtmFromHistory()`; those values become `ptmLookup` for the payload.
+3. On confirm, snapshots current results/standings/poy, then `publishTournament()` writes atomically:
+   - `DB.batchPublish` → `cgaResults/{tid}` (leaderboard, flight winners, status = 'completed'), `cga/standings` (updated PTM, PTM delta, trend, event count), `cga/poy` (updated POY points per flight)
+   - `DB.saveMembers(updatedMembers)` persists each scored player's new history + recomputed PTM
 
-**Key distinction:** score-row PTM = pre-event (used for plus/minus); members PTM = post-event (stored in standings after publish).
+**Key distinction:** score-row PTM = pre-event (used for plus/minus); the post-event PTM written to `members` and `standings` at publish is computed from history + the new score, not hand-entered.
 
 ## Pairings system
 
