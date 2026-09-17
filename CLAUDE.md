@@ -13,8 +13,7 @@ Uses `HashRouter` (`#/path`). Routes defined in `src/App.jsx`.
 - `/` — Home
 - `/tournaments` — schedule cards + completed results view
 - `/tournaments/:tournamentId` — tournament detail
-- `/standings` — PTM standings + HDCP/Scratch POY displays
-- `/most-improved` — Most / Least Improved page (PTM delta from season start)
+- `/standings` — PTM standings + HDCP/Scratch POY displays + Most/Least Improved tab (PTM delta from season start)
 - `/pairings/:tournamentId` — member pairings (public)
 - `/members` — member directory
 - `/info` — rules, eligibility, board tabs
@@ -22,7 +21,7 @@ Uses `HashRouter` (`#/path`). Routes defined in `src/App.jsx`.
 - `/login` — Firebase Auth login
 - `/admin` — auth-gated admin panel (lazy-loaded)
 
-**Legacy redirects:** `/schedule`, `/results` → `/tournaments` · `/points-to-make`, `/poy` → `/standings` · `/rules`, `/board`, `/eligibility` → `/info`
+**Legacy redirects:** `/schedule`, `/results` → `/tournaments` · `/points-to-make`, `/poy`, `/most-improved` → `/standings` · `/rules`, `/board`, `/eligibility` → `/info`
 
 ## Data sources
 ### Static (`src/data/`)
@@ -63,6 +62,11 @@ Public views subscribe via `useFireData` and fall back gracefully when data is u
 
 ## Admin panel (`src/pages/Admin.jsx`)
 
+`Admin.jsx` holds the auth gate and the `AdminPanel` orchestrator (all shared
+state, save/publish workflow, and dirty-tracking). Each mode's UI is a separate
+component under `src/pages/admin/` receiving data via props — they hold no
+cross-panel state of their own.
+
 ### adminMode values
 | Value | Nav label | What it shows |
 |---|---|---|
@@ -72,7 +76,6 @@ Public views subscribe via `useFireData` and fall back gracefully when data is u
 | `'scores'` | Scores | Score entry per flight |
 | `'exports'` | Exports | PDF/XLSX exports |
 | `'operations'` | Player Management | Flight, PTM, tee overrides |
-| `'bulk-import'` | Bulk Import | CSV/XLSX bulk import |
 | `'users'` | Member Management | User account management |
 | `'snapshots'` | Snapshots | Snapshot/restore |
 | `'changelog'` | Changelog | Audit log |
@@ -128,6 +131,7 @@ The auto-generated card grid is directly editable — no mode switch needed:
 - "Build Your Own" mode retained for building from blank groups
 
 ## Most Improved / Least Improved logic
+Rendered as a tab inside `Standings.jsx` (`buildMostImprovedRows`, `MostImprovedTab`).
 - Qualification: `totalRounds >= 7` AND `currentYearRounds >= 3`
 - `currentYearRounds` = results whose `date` starts with current calendar year
 - `delta = currentPtm − beginningPtm` (positive = improved; higher PTM = better scorer)
@@ -141,7 +145,7 @@ The auto-generated card grid is directly editable — no mode switch needed:
 - No separate PTM Δ column in HDCP or Scratch tabs
 
 ## POY calculation
-Defined inline in `Admin.jsx` (`calcFlightPOY`):
+`calcFlightPOY` in `src/utils/poy.js` (shared by publish, exports, and score entry):
 - Base: 350 pts for flight winner, −25 pts per rank below first
 - Ties share the average of their tied positions' points
 - Players marked `eligible: false` receive 0 POY points
@@ -151,16 +155,20 @@ Defined inline in `Admin.jsx` (`calcFlightPOY`):
 |---|---|
 | `src/db.js` | All Firestore read/write wrappers |
 | `src/hooks/useFireData.js` | Real-time Firestore subscription hook |
-| `src/pages/Admin.jsx` | Admin UI + all workflow orchestration (~4700 lines) |
-| `src/pages/MostImproved.jsx` | Most/Least Improved page |
-| `src/pages/Standings.jsx` | PTM standings + HDCP/Scratch tabs |
+| `src/pages/Admin.jsx` | Auth gate + `AdminPanel` orchestrator (shared state + workflow) |
+| `src/pages/admin/*.jsx` | Individual admin panels (Dashboard, ScoreEntry, Pairings, Users, Exports, FlightManagement, Changelog, Snapshots, etc.) + shared `icons.jsx` / `ui.jsx` |
+| `src/utils/adminFormat.js` | Admin display helpers: `fmtPM`, `fmtPOY`, `fmtCurrency`, `fmtPtmValue`, `fmtLogTime` |
+| `src/pages/Standings.jsx` | PTM standings + HDCP/Scratch tabs + Most/Least Improved tab |
 | `src/components/ui/StandingsTable.jsx` | Reusable standings table |
 | `src/services/admin/publishService.js` | `buildPublishPayload()` — all publish math |
 | `src/services/admin/auditService.js` | Changelog/audit payload helpers |
 | `src/services/admin/snapshotService.js` | Snapshot/restore helpers |
-| `src/services/admin/import/` | Bulk import: parser, planner, templates, barrel |
 | `src/services/admin/validation/index.js` | All validation functions (scores, pairings, members, publish, etc.) |
 | `src/exports/pdfExports.js` | PDF exports: tournament info, pairings, field roster, results, PTM |
+| `src/exports/xlsxExports.js` | XLSX exports (credits, results, birdie pool, payout, roster, PTM) + `parseRosterXlsx` |
+| `src/exports/creditsPdf.js` | Credit-on-books PDF (navy-bar header/footer style) |
+| `src/exports/utils/loadAsset.js` | Shared image→base64 loader for PDF embedding |
+| `src/utils/poy.js` | `calcFlightPOY` — POY points per flight |
 | `src/utils/tournamentWorkflow.js` | `computeTournamentWorkflowState()` — dashboard status logic |
 | `src/utils/flightOrder.js` | `FLIGHT_ORDER`, `compareFlights`, `NEW_PLAYERS_FLIGHT` |
 | `src/utils/roundPtm.js` | Shared PTM rounding utility |
@@ -175,9 +183,6 @@ Defined inline in `Admin.jsx` (`calcFlightPOY`):
 - `validatePairingsForTournament` — players exist in scores, max 4 per group
 - `validatePublishPayload` — leaderboard structure, member references
 - `formatValidationErrors` — first error + count summary for UI display
-
-## Bulk import (`src/services/admin/import/`)
-Supports three import types defined in `BULK_IMPORT_DEFINITIONS`: `credits`, `tournaments`, `results`. Flow: parse file → collect rows → build context → plan (add-only or replace) → apply. CSV templates downloadable via `getBulkImportTemplateDownload(importType)`.
 
 ## Styling conventions
 - `forest` = dark green (primary)

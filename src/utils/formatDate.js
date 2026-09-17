@@ -6,6 +6,7 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
  * Format "2026-03-21" → "Sat, Mar 21, 2026"
  */
 export function formatDate(dateStr) {
+  if (!dateStr) return '—'
   // Parse as local date to avoid timezone shift
   const [y, m, d] = dateStr.split('-').map(Number)
   const date = new Date(y, m - 1, d)
@@ -18,6 +19,17 @@ export function formatDate(dateStr) {
  * Format "2026-03-21" → "March 21, 2026"
  */
 export function formatDateLong(dateStr) {
+  if (!dateStr) return '—'
   const [y, m, d] = dateStr.split('-').map(Number)
   return `${MONTHS_LONG[m - 1]} ${d}, ${y}`
+}
+
+/**
+ * Format "2026-03-21" → "Saturday, March 21, 2026"
+ */
+export function formatDateFull(dateStr) {
+  if (!dateStr) return '—'
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  return `${DAYS[date.getDay()]}, ${MONTHS_LONG[m - 1]} ${d}, ${y}`
 }
