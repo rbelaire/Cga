@@ -9,3 +9,10 @@ export const fmtPtmValue = value => {
   const ptm = Number(value)
   return Number.isFinite(ptm) ? Math.round(ptm) : null
 }
+
+export function fmtLogTime(ts) {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
