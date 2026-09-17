@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
-import * as XLSXStyle from 'xlsx-js-style'
+import * as XLSX from 'xlsx-js-style'
 import { Link } from 'react-router-dom'
 import PageWrapper from '../components/layout/PageWrapper'
 import schedule from '../data/schedule.json'
 import { formatName, compareByLastName } from '../utils/formatName'
+import { formatDateFull, formatDateLong } from '../utils/formatDate'
 import { DB } from '../db'
 import { useFireData } from '../hooks/useFireData'
 import { useAuth } from '../context/AuthContext'
@@ -383,13 +383,6 @@ async function withSaveState(setSaving, setSaveStatus, fn, setErrMsg = null) {
   }
 }
 
-function fmtDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  })
-}
-
 function toMoney(value) {
   // Round via integer arithmetic to avoid floating-point accumulation
   return Math.round((Number(value) || 0) * 100) / 100
@@ -407,12 +400,6 @@ function createCreditTxn({ name, tournamentId, creditUsed, user }) {
   }
 }
 
-function fmtDateShort(iso) {
-  if (!iso) return '—'
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  })
-}
 
 function stableSerialize(value) {
   if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`
@@ -729,7 +716,7 @@ function exportBirdiePoolXLSX(tournament, flightData, allFlights) {
       return [index + 1, last, first, ...Array.from({ length: 18 }, () => '')]
     }),
   ]
-  const ws = XLSXStyle.utils.aoa_to_sheet(wsData)
+  const ws = XLSX.utils.aoa_to_sheet(wsData)
 
   ws['!cols'] = [
     { wch: 4 },  // #
@@ -739,7 +726,7 @@ function exportBirdiePoolXLSX(tournament, flightData, allFlights) {
   ]
   ws['!freeze'] = { xSplit: 3, ySplit: 1, topLeftCell: 'D2', state: 'frozen', activePane: 'bottomRight' }
 
-  const range = XLSXStyle.utils.decode_range(ws['!ref'] || `A1:${XLSXStyle.utils.encode_cell({ r: wsData.length - 1, c: headers.length - 1 })}`)
+  const range = XLSX.utils.decode_range(ws['!ref'] || `A1:${XLSX.utils.encode_cell({ r: wsData.length - 1, c: headers.length - 1 })}`)
   const thinBorder = {
     top: { style: 'thin', color: { rgb: BORDER_COLOR } },
     bottom: { style: 'thin', color: { rgb: BORDER_COLOR } },
@@ -749,7 +736,7 @@ function exportBirdiePoolXLSX(tournament, flightData, allFlights) {
 
   for (let row = range.s.r; row <= range.e.r; row += 1) {
     for (let col = range.s.c; col <= range.e.c; col += 1) {
-      const cellAddress = XLSXStyle.utils.encode_cell({ r: row, c: col })
+      const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
       if (!ws[cellAddress]) ws[cellAddress] = { t: 's', v: '' }
       const isHeader = row === 0
       const isCoreHeader = isHeader && col <= 2
@@ -776,9 +763,9 @@ function exportBirdiePoolXLSX(tournament, flightData, allFlights) {
     }
   }
 
-  const wb = XLSXStyle.utils.book_new()
-  XLSXStyle.utils.book_append_sheet(wb, ws, 'Birdie Pool')
-  XLSXStyle.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-birdie-pool.xlsx`)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Birdie Pool')
+  XLSX.writeFile(wb, `${tournament.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-birdie-pool.xlsx`)
 }
 
 function exportPayoutDocXLSX(tournament, resultDoc) {
@@ -3051,7 +3038,7 @@ function AdminPanel({ currentUser }) {
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-2xl sm:text-3xl font-heading text-darktext font-semibold">{tournament?.name ?? 'Select Tournament'}</h2>
-            <p className="mt-1 text-sm font-sans text-gray-600">{tournament ? fmtDate(tournament.date) : 'Choose a tournament to begin operations.'}</p>
+            <p className="mt-1 text-sm font-sans text-gray-600">{tournament ? formatDateFull(tournament.date) : 'Choose a tournament to begin operations.'}</p>
             {tournament && (
               <div className="mt-3 inline-flex rounded-lg border border-forest/20 bg-white px-3 py-2">
                 <CountdownTimer targetDate={tournament.date} />
@@ -3596,7 +3583,7 @@ function DashboardPanel({
       <section className="bg-white border border-gray-200 rounded-lg p-5">
         <p className="text-xs font-heading font-semibold uppercase tracking-widest text-forest mb-2">Overview</p>
         <h2 className="text-darktext font-heading text-2xl font-semibold mb-1">{selectedTournament?.name ?? 'No tournament selected'}</h2>
-        <p className="text-gray-500 font-sans text-sm mb-4">{selectedTournament?.date ? fmtDate(selectedTournament.date) : 'No date available'}</p>
+        <p className="text-gray-500 font-sans text-sm mb-4">{selectedTournament?.date ? formatDateFull(selectedTournament.date) : 'No date available'}</p>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <MetricCard label="Field" value={`${workflow.counts.enteredCount} / ${workflow.counts.fieldCap}`} detail={`${Math.max(workflow.counts.fieldCap - workflow.counts.enteredCount, 0)} spots remaining`} />
           <MetricCard label="Paid" value={`${workflow.counts.paidCount}`} detail={workflow.counts.enteredCount > 0 ? `${workflow.counts.enteredCount - workflow.counts.paidCount} unpaid` : 'No entries yet'} />
@@ -3657,7 +3644,7 @@ function DashboardPanel({
         {nextTournament ? (
           <>
             <h2 className="text-darktext font-heading text-2xl font-semibold mb-1">{nextTournament.name}</h2>
-            <p className="text-gray-500 font-sans text-sm mb-4">{fmtDate(nextTournament.date)}</p>
+            <p className="text-gray-500 font-sans text-sm mb-4">{formatDateFull(nextTournament.date)}</p>
             <CountdownTimer targetDate={nextTournament.date} />
           </>
         ) : (
@@ -3684,7 +3671,7 @@ function DashboardPanel({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-darktext font-heading text-xl font-semibold">{lastPublishedTournament.name}</h3>
-              <p className="text-gray-500 font-sans text-sm">{fmtDateShort(lastPublishedTournament.date)}</p>
+              <p className="text-gray-500 font-sans text-sm">{formatDateLong(lastPublishedTournament.date)}</p>
             </div>
             <div className="flex items-center gap-2">
               <Link
@@ -4073,7 +4060,7 @@ function PublishConfirmModal({ preview, publishSaving, publishSaveStatus, onCanc
             <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
               <p className="text-[11px] uppercase tracking-widest font-semibold text-forest font-sans">Tournament</p>
               <p className="text-darktext font-sans font-semibold mt-1">{targetTournament.name}</p>
-              <p className="text-gray-500 text-xs font-sans mt-1">{fmtDateShort(targetTournament.date)}</p>
+              <p className="text-gray-500 text-xs font-sans mt-1">{formatDateLong(targetTournament.date)}</p>
             </div>
             <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
               <p className="text-[11px] uppercase tracking-widest font-semibold text-forest font-sans">Players Affected</p>

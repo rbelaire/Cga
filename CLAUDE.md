@@ -13,8 +13,7 @@ Uses `HashRouter` (`#/path`). Routes defined in `src/App.jsx`.
 - `/` — Home
 - `/tournaments` — schedule cards + completed results view
 - `/tournaments/:tournamentId` — tournament detail
-- `/standings` — PTM standings + HDCP/Scratch POY displays
-- `/most-improved` — Most / Least Improved page (PTM delta from season start)
+- `/standings` — PTM standings + HDCP/Scratch POY displays + Most/Least Improved tab (PTM delta from season start)
 - `/pairings/:tournamentId` — member pairings (public)
 - `/members` — member directory
 - `/info` — rules, eligibility, board tabs
@@ -22,7 +21,7 @@ Uses `HashRouter` (`#/path`). Routes defined in `src/App.jsx`.
 - `/login` — Firebase Auth login
 - `/admin` — auth-gated admin panel (lazy-loaded)
 
-**Legacy redirects:** `/schedule`, `/results` → `/tournaments` · `/points-to-make`, `/poy` → `/standings` · `/rules`, `/board`, `/eligibility` → `/info`
+**Legacy redirects:** `/schedule`, `/results` → `/tournaments` · `/points-to-make`, `/poy`, `/most-improved` → `/standings` · `/rules`, `/board`, `/eligibility` → `/info`
 
 ## Data sources
 ### Static (`src/data/`)
@@ -72,7 +71,6 @@ Public views subscribe via `useFireData` and fall back gracefully when data is u
 | `'scores'` | Scores | Score entry per flight |
 | `'exports'` | Exports | PDF/XLSX exports |
 | `'operations'` | Player Management | Flight, PTM, tee overrides |
-| `'bulk-import'` | Bulk Import | CSV/XLSX bulk import |
 | `'users'` | Member Management | User account management |
 | `'snapshots'` | Snapshots | Snapshot/restore |
 | `'changelog'` | Changelog | Audit log |
@@ -128,6 +126,7 @@ The auto-generated card grid is directly editable — no mode switch needed:
 - "Build Your Own" mode retained for building from blank groups
 
 ## Most Improved / Least Improved logic
+Rendered as a tab inside `Standings.jsx` (`buildMostImprovedRows`, `MostImprovedTab`).
 - Qualification: `totalRounds >= 7` AND `currentYearRounds >= 3`
 - `currentYearRounds` = results whose `date` starts with current calendar year
 - `delta = currentPtm − beginningPtm` (positive = improved; higher PTM = better scorer)
@@ -151,14 +150,12 @@ Defined inline in `Admin.jsx` (`calcFlightPOY`):
 |---|---|
 | `src/db.js` | All Firestore read/write wrappers |
 | `src/hooks/useFireData.js` | Real-time Firestore subscription hook |
-| `src/pages/Admin.jsx` | Admin UI + all workflow orchestration (~4700 lines) |
-| `src/pages/MostImproved.jsx` | Most/Least Improved page |
-| `src/pages/Standings.jsx` | PTM standings + HDCP/Scratch tabs |
+| `src/pages/Admin.jsx` | Admin UI + all workflow orchestration |
+| `src/pages/Standings.jsx` | PTM standings + HDCP/Scratch tabs + Most/Least Improved tab |
 | `src/components/ui/StandingsTable.jsx` | Reusable standings table |
 | `src/services/admin/publishService.js` | `buildPublishPayload()` — all publish math |
 | `src/services/admin/auditService.js` | Changelog/audit payload helpers |
 | `src/services/admin/snapshotService.js` | Snapshot/restore helpers |
-| `src/services/admin/import/` | Bulk import: parser, planner, templates, barrel |
 | `src/services/admin/validation/index.js` | All validation functions (scores, pairings, members, publish, etc.) |
 | `src/exports/pdfExports.js` | PDF exports: tournament info, pairings, field roster, results, PTM |
 | `src/utils/tournamentWorkflow.js` | `computeTournamentWorkflowState()` — dashboard status logic |
@@ -175,9 +172,6 @@ Defined inline in `Admin.jsx` (`calcFlightPOY`):
 - `validatePairingsForTournament` — players exist in scores, max 4 per group
 - `validatePublishPayload` — leaderboard structure, member references
 - `formatValidationErrors` — first error + count summary for UI display
-
-## Bulk import (`src/services/admin/import/`)
-Supports three import types defined in `BULK_IMPORT_DEFINITIONS`: `credits`, `tournaments`, `results`. Flow: parse file → collect rows → build context → plan (add-only or replace) → apply. CSV templates downloadable via `getBulkImportTemplateDownload(importType)`.
 
 ## Styling conventions
 - `forest` = dark green (primary)

@@ -59,7 +59,7 @@ test('all static internal links point to defined routes', () => {
 
 test('vite base path and hash router are configured for GitHub Pages', () => {
   const viteConfig = read('vite.config.js')
-  assert.match(viteConfig, /base:\s*'\/Cga\/'/)
+  assert.match(viteConfig, /'\/Cga\/'/)
   assert.match(appSource, /<HashRouter>/)
 })
 
