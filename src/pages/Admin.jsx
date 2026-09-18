@@ -723,9 +723,11 @@ function AdminPanel({ currentUser }) {
         const updated = players.map(p => {
           const rounds = roundsLookup[p.name] ?? 0
           const shouldBeEligible = rounds >= 7
-          if ((p.eligible !== false) === shouldBeEligible) return p
+          // Stamp rounds (for the 2nd/3rd-round +/- display cap in calcFlightPOY)
+          // alongside eligibility.
+          if ((p.eligible !== false) === shouldBeEligible && p.rounds === rounds) return p
           anyChanged = true
-          return { ...p, eligible: shouldBeEligible }
+          return { ...p, eligible: shouldBeEligible, rounds }
         })
         newTd[fl] = updated
       }

@@ -7,7 +7,14 @@ export const POY_POINTS_PER_RANK = 25   // points deducted per rank position bel
  * Base: 350 pts for the flight winner, −25 pts per rank below first.
  * Ties share the average of their tied positions' points.
  * Players marked `eligible: false` receive 0 POY points.
+ *
+ * Display-only cap: a player on their 2nd or 3rd round (`rounds` of 1 or 2 —
+ * i.e. 1–2 completed rounds before this one) shows a plus/minus of at most +2.
+ * Ranking and POY are computed from the true plus/minus first, so this cap only
+ * affects the plus/minus value shown on leaderboards, score entry, and exports.
  */
+const PROVISIONAL_PM_CAP = 2
+const isProvisional = p => p?.rounds === 1 || p?.rounds === 2
 export function calcFlightPOY(players) {
   if (!players.length) return players
   const n     = players.length
@@ -32,5 +39,10 @@ export function calcFlightPOY(players) {
     })
     pos = j
   }
-  return withPM.map((p, i) => ({ ...p, rank: rankMap[i]?.rank ?? null, poy: rankMap[i]?.poy ?? null }))
+  return withPM.map((p, i) => {
+    const displayPM = (isProvisional(p) && p.plusMinus != null)
+      ? Math.min(p.plusMinus, PROVISIONAL_PM_CAP)
+      : p.plusMinus
+    return { ...p, rank: rankMap[i]?.rank ?? null, poy: rankMap[i]?.poy ?? null, plusMinus: displayPM }
+  })
 }
