@@ -147,6 +147,7 @@ Rendered as a tab inside `Standings.jsx` (`buildMostImprovedRows`, `MostImproved
 - Base: 350 pts for flight winner, −25 pts per rank below first
 - Ties share the average of their tied positions' points
 - Players marked `eligible: false` receive 0 POY points
+- **2nd/3rd-round display cap:** a player with `rounds` of 1 or 2 (their 2nd/3rd round ever) shows a plus/minus of at most +2. Ranking and POY use the true plus/minus — only the displayed value is capped. Score rows are stamped with `rounds` (from `roundsLookup`) alongside `eligible` so `calcFlightPOY` can apply it.
 
 ## Key files
 | File | Purpose |
