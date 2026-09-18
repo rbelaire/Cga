@@ -147,7 +147,8 @@ Rendered as a tab inside `Standings.jsx` (`buildMostImprovedRows`, `MostImproved
 - Base: 350 pts for flight winner, −25 pts per rank below first
 - Ties share the average of their tied positions' points
 - Players marked `eligible: false` receive 0 POY points
-- **2nd/3rd-round display cap:** a player with `rounds` of 1 or 2 (their 2nd/3rd round ever) shows a plus/minus of at most +2. Ranking and POY use the true plus/minus — only the displayed value is capped. Score rows are stamped with `rounds` (from `roundsLookup`) alongside `eligible` so `calcFlightPOY` can apply it.
+- **2nd/3rd-round display cap:** a player with `rounds` of 1 or 2 (their 2nd/3rd round ever) shows a plus/minus of at most +2. Ranking and POY use the true plus/minus — only the displayed value is capped. Score rows are stamped with `rounds` (from `roundsLookup`) alongside `eligible` so `calcFlightPOY` can apply it at publish time.
+- **Retroactive display cap (already-published tournaments):** published leaderboards store a frozen plus/minus and no per-row round count, so the cap is re-applied at display time using each player's *current lifetime* `member.rounds` (1 or 2 → cap at +2). `buildRoundsByName(members)` + `capProvisionalLeaderboard(leaderboard, roundsByName)` in `src/utils/poy.js` do this; they run on the public results views (`Home.jsx` Latest Results, `Tournaments.jsx`, `TournamentDetail.jsx`) before rendering. Rank/POY/score are never altered, and the clamp is idempotent (values already ≤ +2 are unchanged). Scratch rankings read raw scores, so they stay on the uncapped results.
 
 ## Key files
 | File | Purpose |

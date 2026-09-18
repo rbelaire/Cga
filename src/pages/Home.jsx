@@ -8,6 +8,7 @@ import { formatName } from '../utils/formatName'
 import { computeScratch } from '../utils/computeScratch'
 import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
+import { buildRoundsByName, capProvisionalLeaderboard } from '../utils/poy'
 import { FLIGHT_ORDER } from '../utils/flightOrder'
 
 const FLIGHTS = FLIGHT_ORDER
@@ -16,6 +17,21 @@ export default function Home() {
   useEffect(() => { document.title = 'Carencro Golf Association' }, [])
   const { data: standings } = useFireData(DB.listenStandings, { flights: {} })
   const { data: allResults } = useFireData(DB.listenResults, {})
+  const { data: members } = useFireData(DB.listenMembers, [])
+
+  // Cap the displayed +/- for provisional (2nd/3rd-round) players in the
+  // published leaderboards shown by the Latest Results section. Scratch rankings
+  // below read raw scores, so they stay on the uncapped results.
+  const cappedResults = useMemo(() => {
+    const roundsByName = buildRoundsByName(members)
+    const out = {}
+    for (const [tid, result] of Object.entries(allResults || {})) {
+      out[tid] = result?.leaderboard
+        ? { ...result, leaderboard: capProvisionalLeaderboard(result.leaderboard, roundsByName) }
+        : result
+    }
+    return out
+  }, [allResults, members])
 
   const hdcpTop10 = useMemo(() => {
     const all = []
@@ -34,7 +50,7 @@ export default function Home() {
       <NextTournament />
       <HeroSection />
 
-      <LatestTournamentResults allResults={allResults} />
+      <LatestTournamentResults allResults={cappedResults} />
 
       {/* Rankings preview */}
       <section className="py-8 sm:py-10 bg-[#F6F4EF]">

@@ -9,6 +9,7 @@ import { useFireData } from '../hooks/useFireData'
 import { DB } from '../db'
 import { buildFlightWinnerCards } from '../utils/flightWinners'
 import FlightWinnerCards from '../components/ui/FlightWinnerCards'
+import { buildRoundsByName, capProvisionalLeaderboard } from '../utils/poy'
 import { sortFlights } from '../utils/flightOrder'
 import { useAuth } from '../context/AuthContext'
 import { mergeScheduleStatus } from '../utils/mergeScheduleStatus'
@@ -83,6 +84,20 @@ export default function Tournaments() {
 
   const [expanded, setExpanded] = useState(state?.expand ?? completed[0]?.id ?? null)
   const { data: allResults, status: resultsStatus } = useFireData(DB.listenResults, {})
+  const { data: members } = useFireData(DB.listenMembers, [])
+
+  // Apply the provisional +/- display cap (2nd/3rd-round players show at most +2)
+  // to published leaderboards, using each player's current lifetime round count.
+  const roundsByName = useMemo(() => buildRoundsByName(members), [members])
+  const cappedResults = useMemo(() => {
+    const out = {}
+    for (const [tid, result] of Object.entries(allResults || {})) {
+      out[tid] = result?.leaderboard
+        ? { ...result, leaderboard: capProvisionalLeaderboard(result.leaderboard, roundsByName) }
+        : result
+    }
+    return out
+  }, [allResults, roundsByName])
 
   useEffect(() => {
     if (!user?.uid) return undefined
@@ -174,7 +189,7 @@ export default function Tournaments() {
           <h2 className="text-lg font-sans font-semibold text-forest uppercase tracking-widest mb-4">Completed</h2>
           <div className="space-y-4">
             {completed.map((t) => {
-              const result = allResults[t.id]
+              const result = cappedResults[t.id]
               const isOpen = expanded === t.id
               return (
                 <div key={t.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden">

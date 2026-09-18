@@ -5,7 +5,9 @@ import CountdownTimer from '../components/ui/CountdownTimer'
 import schedule from '../data/schedule.json'
 import { formatDate, formatDateLong } from '../utils/formatDate'
 import { DB } from '../db'
+import { useFireData } from '../hooks/useFireData'
 import { buildFlightWinnerCards } from '../utils/flightWinners'
+import { buildRoundsByName, capProvisionalLeaderboard } from '../utils/poy'
 import FlightWinnerCards from '../components/ui/FlightWinnerCards'
 
 function DetailItem({ label, value }) {
@@ -31,6 +33,17 @@ export default function TournamentDetail() {
   const [result,       setResult]       = useState(null)
   const [pairingsDoc,  setPairingsDoc]  = useState(null)
   const [lifecycleDoc, setLifecycleDoc] = useState(null)
+  const { data: members } = useFireData(DB.listenMembers, [])
+
+  // Provisional +/- display cap: 2nd/3rd-round players (1–2 lifetime rounds now)
+  // show at most +2 on this published leaderboard. Rank/POY/score are untouched.
+  const roundsByName = useMemo(() => buildRoundsByName(members), [members])
+  const cappedResult = useMemo(
+    () => (result?.leaderboard
+      ? { ...result, leaderboard: capProvisionalLeaderboard(result.leaderboard, roundsByName) }
+      : result),
+    [result, roundsByName],
+  )
 
   useEffect(() => {
     if (!tournamentId) return
@@ -127,8 +140,8 @@ export default function TournamentDetail() {
           <h2 className="text-forest text-xs font-sans font-semibold uppercase tracking-widest mb-2.5">
             Published Results
           </h2>
-          {buildFlightWinnerCards(result, tournament.format).length > 0 && (
-            <FlightWinnerCards winners={buildFlightWinnerCards(result, tournament.format)} className="mb-4" />
+          {buildFlightWinnerCards(cappedResult, tournament.format).length > 0 && (
+            <FlightWinnerCards winners={buildFlightWinnerCards(cappedResult, tournament.format)} className="mb-4" />
           )}
           <Link
             to="/tournaments"

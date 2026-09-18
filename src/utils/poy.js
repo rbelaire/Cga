@@ -13,8 +13,53 @@ export const POY_POINTS_PER_RANK = 25   // points deducted per rank position bel
  * Ranking and POY are computed from the true plus/minus first, so this cap only
  * affects the plus/minus value shown on leaderboards, score entry, and exports.
  */
-const PROVISIONAL_PM_CAP = 2
+export const PROVISIONAL_PM_CAP = 2
 const isProvisional = p => p?.rounds === 1 || p?.rounds === 2
+
+// Provisional status for the retroactive display cap is keyed on a player's
+// current lifetime completed rounds: 1 or 2 total rounds = their 2nd or 3rd event.
+const isProvisionalRounds = rounds => rounds === 1 || rounds === 2
+
+const normNameKey = name => String(name ?? '').trim().toLowerCase()
+
+/**
+ * Build a name → lifetime-rounds lookup from the members roster. Used to apply
+ * the provisional +/- display cap to already-published leaderboards, whose rows
+ * store a frozen plus/minus and no per-player round count.
+ */
+export function buildRoundsByName(members) {
+  const map = {}
+  if (Array.isArray(members)) {
+    for (const m of members) {
+      if (m?.name != null) map[normNameKey(m.name)] = Number(m.rounds) || 0
+    }
+  }
+  return map
+}
+
+/**
+ * Return a copy of a published leaderboard with each provisional player's
+ * DISPLAYED plus/minus clamped to at most +2. A player is provisional when their
+ * current lifetime round count (from `roundsByName`) is 1 or 2. Rank, POY, score,
+ * and every other field are left untouched — only the shown plus/minus changes,
+ * so already-published tournaments reflect the cap without a re-publish. Idempotent:
+ * values already at or below the cap (e.g. capped at publish time) are unchanged.
+ */
+export function capProvisionalLeaderboard(leaderboard, roundsByName) {
+  if (!leaderboard || typeof leaderboard !== 'object' || !roundsByName) return leaderboard
+  const out = {}
+  for (const [flight, rows] of Object.entries(leaderboard)) {
+    out[flight] = Array.isArray(rows)
+      ? rows.map(row => {
+          const rounds = roundsByName[normNameKey(row?.name)]
+          return (isProvisionalRounds(rounds) && typeof row?.plusMinus === 'number' && row.plusMinus > PROVISIONAL_PM_CAP)
+            ? { ...row, plusMinus: PROVISIONAL_PM_CAP }
+            : row
+        })
+      : rows
+  }
+  return out
+}
 export function calcFlightPOY(players) {
   if (!players.length) return players
   const n     = players.length
