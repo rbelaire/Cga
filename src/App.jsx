@@ -1,8 +1,9 @@
 import { lazy, Suspense } from 'react'
-import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import ErrorBoundary from './components/ErrorBoundary'
 import Header from './components/layout/Header'
 import Footer from './components/layout/Footer'
+import ProtectedRoute from './components/auth/ProtectedRoute'
 import Home from './pages/Home'
 import Tournaments from './pages/Tournaments'
 import Standings from './pages/Standings'
@@ -12,19 +13,45 @@ import Pairings from './pages/Pairings'
 import Sponsors from './pages/Sponsors'
 import TournamentDetail from './pages/TournamentDetail'
 import Login from './pages/Login'
-import ProtectedRoute from './components/auth/ProtectedRoute'
+import NotFound from './pages/NotFound'
 
-// Admin is lazy-loaded so its heavy dependencies (jsPDF, XLSX) are excluded
-// from the main bundle and only fetched when a user navigates to /admin.
-const Admin = lazy(() => import('./pages/Admin'))
+const AdminApp = lazy(() => import('./admin/AdminApp'))
 
-function NotFound() {
+function Shell() {
+  const location = useLocation()
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-24">
-      <p className="text-gold font-mono text-5xl font-bold mb-4">404</p>
-      <h1 className="text-darktext font-serif text-2xl font-bold mb-2">Page not found</h1>
-      <p className="text-gray-500 font-sans text-sm mb-6">The page you're looking for doesn't exist.</p>
-      <Link to="/" className="btn-primary">Back to Home</Link>
+    <div className="flex flex-col min-h-screen">
+      <Header />
+      <ErrorBoundary resetKey={`${location.pathname}${location.search}`}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/tournaments" element={<Tournaments />} />
+          <Route path="/tournaments/:tournamentId" element={<TournamentDetail />} />
+          <Route path="/standings" element={<Standings />} />
+          <Route path="/members" element={<Members />} />
+          <Route path="/info" element={<Info />} />
+          <Route path="/sponsors" element={<Sponsors />} />
+          <Route path="/pairings/:tournamentId" element={<Pairings />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/admin/*" element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center py-24 text-sm text-gray-500">Loading admin…</div>}>
+                <AdminApp />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/schedule" element={<Navigate to="/tournaments" replace />} />
+          <Route path="/results" element={<Navigate to="/tournaments" replace />} />
+          <Route path="/points-to-make" element={<Navigate to="/standings" replace />} />
+          <Route path="/poy" element={<Navigate to="/standings" replace />} />
+          <Route path="/most-improved" element={<Navigate to="/standings" replace />} />
+          <Route path="/rules" element={<Navigate to="/info" replace />} />
+          <Route path="/board" element={<Navigate to="/info" replace />} />
+          <Route path="/eligibility" element={<Navigate to="/info" replace />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </ErrorBoundary>
+      <Footer />
     </div>
   )
 }
@@ -32,40 +59,7 @@ function NotFound() {
 export default function App() {
   return (
     <HashRouter>
-      <div className="flex flex-col min-h-screen">
-        <Header />
-        <ErrorBoundary>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/tournaments" element={<Tournaments />} />
-            <Route path="/tournaments/:tournamentId" element={<TournamentDetail />} />
-            <Route path="/standings" element={<Standings />} />
-            <Route path="/most-improved" element={<Navigate to="/standings" replace />} />
-            <Route path="/members" element={<Members />} />
-            <Route path="/info" element={<Info />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/admin" element={
-              <ProtectedRoute>
-                <Suspense fallback={<div className="flex-1 flex items-center justify-center py-24"><span className="text-gray-400 font-sans text-sm">Loading admin…</span></div>}>
-                  <Admin />
-                </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/pairings/:tournamentId" element={<Pairings />} />
-            <Route path="/sponsors" element={<Sponsors />} />
-            {/* Legacy redirects */}
-            <Route path="/schedule" element={<Navigate to="/tournaments" replace />} />
-            <Route path="/results" element={<Navigate to="/tournaments" replace />} />
-            <Route path="/points-to-make" element={<Navigate to="/standings" replace />} />
-            <Route path="/poy" element={<Navigate to="/standings" replace />} />
-            <Route path="/rules" element={<Navigate to="/info" replace />} />
-            <Route path="/board" element={<Navigate to="/info" replace />} />
-            <Route path="/eligibility" element={<Navigate to="/info" replace />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </ErrorBoundary>
-        <Footer />
-      </div>
+      <Shell />
     </HashRouter>
   )
 }

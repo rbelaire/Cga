@@ -1,720 +1,156 @@
-import { useState, useEffect, useMemo } from 'react'
-import PageWrapper from '../components/layout/PageWrapper'
-import StandingsTable from '../components/ui/StandingsTable'
-import TeeTag from '../components/ui/TeeTag'
-import { computeScratch } from '../utils/computeScratch'
-import { formatName } from '../utils/formatName'
-import { useFireData } from '../hooks/useFireData'
+import { useEffect, useMemo, useState } from 'react'
 import { DB } from '../db'
+import { useSubscription } from '../hooks/useSubscription'
+import { buildMostImproved } from '../domain/improved'
+import { computeScratch } from '../utils/computeScratch'
 import { FLIGHT_ORDER } from '../utils/flightOrder'
-import { roundPtm } from '../utils/roundPtm'
+import { formatName } from '../utils/formatName'
+import PageWrapper from '../components/layout/PageWrapper'
+import Empty from '../components/ui/Empty'
 
-// ── Most Improved helpers ────────────────────────────────────────────────────
-
-function countCurrentYearRounds(allResults) {
-  const year = String(new Date().getFullYear())
-  const byPlayer = {}
-  for (const result of Object.values(allResults ?? {})) {
-    if (result?.status !== 'completed') continue
-    if (!String(result?.date ?? '').startsWith(year)) continue
-    for (const players of Object.values(result.leaderboard ?? {})) {
-      for (const player of players ?? []) {
-        if (player?.name) byPlayer[player.name] = (byPlayer[player.name] ?? 0) + 1
-      }
-    }
-  }
-  return byPlayer
-}
-
-function buildMostImprovedRows(ptmList, beginningPtmList, allResults) {
-  if (!beginningPtmList?.length || !ptmList?.length) return []
-  const beginningLookup = {}
-  for (const p of beginningPtmList) {
-    if (p.name) beginningLookup[p.name] = p
-  }
-  const yearRounds = countCurrentYearRounds(allResults)
-  return ptmList
-    .filter(p => p.name && p.ptm != null && beginningLookup[p.name] != null)
-    .map(p => {
-      const beg = beginningLookup[p.name]
-      const beginningPtm = beg.ptm
-      const currentPtm = p.ptm
-      const delta = +(currentPtm - beginningPtm).toFixed(2)
-      const totalRounds = p.rounds ?? 0
-      const currentYearRounds = yearRounds[p.name] ?? 0
-      const qualified = totalRounds >= 7 && currentYearRounds >= 3
-      return {
-        name: p.name,
-        tee: p.tee ?? beg.tee ?? null,
-        beginningPtm,
-        currentPtm,
-        delta,
-        totalRounds,
-        currentYearRounds,
-        qualified,
-      }
-    })
-}
-
-function formatDelta(delta) {
-  if (delta == null) return '—'
-  if (delta === 0) return '0'
-  return delta > 0 ? `+${delta}` : `${delta}`
-}
-
-function DeltaCell({ delta }) {
-  if (delta == null) return <span className="stat-number text-gray-400">—</span>
-  const color = delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-500' : 'text-gray-500'
-  return <span className={`stat-number font-semibold ${color}`}>{formatDelta(delta)}</span>
-}
-
-function LeaderBadge() {
-  return (
-    <span className="ml-1.5 text-[10px] font-sans font-bold px-1.5 py-0.5 rounded bg-gold/20 text-amber-700 border border-gold/40 whitespace-nowrap leading-none">
-      Leader
-    </span>
-  )
-}
-
-function NQBadge() {
-  return (
-    <span className="ml-1.5 text-[10px] font-sans font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 whitespace-nowrap leading-none">
-      NQ
-    </span>
-  )
-}
-
-function MostImprovedMobileCard({ row, isLeader }) {
-  return (
-    <div className={`border rounded-lg p-3 ${row.qualified ? 'bg-white border-gray-200' : 'bg-amber-50 border-amber-200'}`}>
-      <div className="flex items-center gap-2 mb-2">
-        {row.rank != null ? (
-          <span className={`stat-number font-semibold text-sm w-7 flex-shrink-0 ${isLeader ? 'text-gold' : 'text-gray-400'}`}>
-            #{row.rank}
-          </span>
-        ) : (
-          <span className="stat-number text-sm w-7 flex-shrink-0 text-gray-300">—</span>
-        )}
-        <span className="font-sans text-darktext font-medium flex-1 min-w-0 truncate">
-          {formatName(row.name)}
-        </span>
-        {isLeader && <LeaderBadge />}
-        {!row.qualified && <NQBadge />}
-        <TeeTag tee={row.tee} />
-      </div>
-      <div className="pl-7 flex flex-wrap gap-x-4 gap-y-1 text-xs font-sans">
-        <div>
-          <span className="text-gray-400 uppercase tracking-wide">Improvement</span>
-          <div className="text-sm"><DeltaCell delta={row.delta} /></div>
-        </div>
-        <div>
-          <span className="text-gray-400 uppercase tracking-wide">Beg PTM</span>
-          <div className="stat-number text-darktext">{roundPtm(row.beginningPtm) ?? '—'}</div>
-        </div>
-        <div>
-          <span className="text-gray-400 uppercase tracking-wide">Cur PTM</span>
-          <div className="stat-number text-darktext">{roundPtm(row.currentPtm) ?? '—'}</div>
-        </div>
-        <div>
-          <span className="text-gray-400 uppercase tracking-wide">Rounds</span>
-          <div className="stat-number text-gray-500">{row.totalRounds}/7 · {row.currentYearRounds} yr</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MostImprovedTab({ allRows }) {
-  const [subMode, setSubMode] = useState('most')
-  const [search, setSearch] = useState('')
-
-  const sortedWithRank = useMemo(() => {
-    const list = [...allRows].sort((a, b) =>
-      subMode === 'most' ? b.delta - a.delta : a.delta - b.delta
-    )
-    let rank = 0
-    return list.map(row => ({ ...row, rank: row.qualified ? ++rank : null }))
-  }, [allRows, subMode])
-
-  const filtered = useMemo(() => {
-    let rows = sortedWithRank
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      rows = rows.filter(r => r.name?.toLowerCase().includes(q))
-    }
-    return rows
-  }, [sortedWithRank, search])
-
-  const leaderName = filtered.find(r => r.qualified)?.name ?? null
-  const hasData = (allRows?.length ?? 0) > 0
-
-  return (
-    <div>
-      <p className="text-gray-600 font-sans text-sm max-w-2xl leading-relaxed mb-5">
-        Players ranked by the change in PTM from the start of the season to today.
-        Qualification requires 7 or more total rounds and at least 3 in the current year.
-      </p>
-
-      {/* Most / Least sub-toggle */}
-      <div className="mb-5 flex gap-2">
-        {[
-          { key: 'most',  label: 'Most Improved'  },
-          { key: 'least', label: 'Least Improved' },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setSubMode(key)}
-            className={`px-4 py-1.5 text-sm font-sans font-semibold rounded-lg transition-colors ${
-              subMode === key
-                ? 'bg-forest text-white'
-                : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-forest'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Search */}
-      <div className="mb-5">
-        <div className="relative max-w-sm">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search player…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm font-sans border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold"
-          />
-        </div>
-      </div>
-
-      {!hasData ? (
-        <div className="rounded-lg border border-gray-100 bg-gray-50 py-16 text-center">
-          <p className="text-gray-400 font-sans text-sm">No beginning-of-year PTM data set yet.</p>
-          <p className="text-gray-400 font-sans text-xs mt-1">An admin must save the beginning-of-year PTM snapshot before this section is active.</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-gray-100 bg-gray-50 py-12 text-center">
-          <p className="text-gray-400 font-sans text-sm">No players found.</p>
-        </div>
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-4 text-xs font-sans text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-amber-50 border border-amber-200 inline-block flex-shrink-0" />
-              Not qualified (highlighted)
-            </span>
-            <span>Highest non-highlighted player = leader</span>
-          </div>
-
-          {/* Mobile cards */}
-          <div className="sm:hidden space-y-2 mb-6">
-            {filtered.map(row => (
-              <MostImprovedMobileCard key={row.name} row={row} isLeader={row.name === leaderName} />
-            ))}
-          </div>
-
-          {/* Desktop table */}
-          <div className="hidden sm:block overflow-x-auto rounded-lg border border-gray-200">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="bg-forest border-b border-forest">
-                  <th className="table-header text-white">Rank</th>
-                  <th className="table-header text-white">Player</th>
-                  <th className="table-header text-white" title="Change in PTM from beginning of year to today. Positive = improved.">
-                    <span className="flex items-center gap-1">
-                      Improvement <span className="text-white/40 text-xs" aria-hidden="true">ⓘ</span>
-                    </span>
-                  </th>
-                  <th className="table-header text-white/80 font-normal" title="PTM at start of season">Beg PTM</th>
-                  <th className="table-header text-white/80 font-normal" title="Current PTM">Cur PTM</th>
-                  <th className="table-header text-white/80 font-normal" title="Total rounds / current-year rounds">Rounds</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row, idx) => {
-                  const isLeader = row.name === leaderName
-                  return (
-                    <tr
-                      key={row.name}
-                      className={`border-b border-gray-100 transition-colors hover:bg-blue-50 ${
-                        row.qualified
-                          ? idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                          : 'bg-amber-50'
-                      }`}
-                    >
-                      <td className="px-4 py-2.5">
-                        {row.rank != null ? (
-                          <span className={`stat-number font-semibold ${isLeader ? 'text-gold' : 'text-gray-500'}`}>
-                            {isLeader ? `#${row.rank}` : row.rank}
-                          </span>
-                        ) : (
-                          <span className="stat-number text-gray-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-sans text-darktext ${isLeader ? 'font-semibold' : 'font-medium'}`}>
-                            {formatName(row.name)}
-                          </span>
-                          <TeeTag tee={row.tee} />
-                          {isLeader && <LeaderBadge />}
-                          {!row.qualified && <NQBadge />}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5"><DeltaCell delta={row.delta} /></td>
-                      <td className="px-4 py-2.5">
-                        <span className="stat-number text-darktext">{roundPtm(row.beginningPtm) ?? '—'}</span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className="stat-number text-darktext">{roundPtm(row.currentPtm) ?? '—'}</span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className="stat-number text-gray-500 text-xs">
-                          {row.totalRounds}/7 · <span className={row.currentYearRounds < 3 ? 'text-amber-600' : ''}>{row.currentYearRounds} yr</span>
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      <div className="mt-8 bg-white border border-gray-200 rounded-lg p-5">
-        <h3 className="text-forest font-serif text-base font-semibold mb-3">Qualification &amp; Rules</h3>
-        <ul className="space-y-1.5 text-sm font-sans text-gray-600">
-          {[
-            'A player must have a minimum of 7 rounds played totally and 3 in the current year.',
-            "Players' current PTM is compared to their beginning-of-year PTM. The resulting +/− determines standing.",
-            'Non-qualified players are highlighted. The highest non-highlighted player is the leader.',
-            'If a player has less than 6 PTM, the 6-point minimum does not apply — actual PTM values are displayed.',
-          ].map((line, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gold flex-shrink-0" />
-              {line}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
-}
-
-const FLIGHTS = FLIGHT_ORDER
-const HISTORY_LABELS = ['New', '2nd', '3rd', '4th', '5th', '6th', '7th']
-
-const sharedStandingsColumns = [
-  { key: 'rank',        label: 'Rank',         sortable: false },
-  { key: 'name',        label: 'Player',        sortable: true  },
-  { key: 'ptm',         label: 'PTM',           sortable: true,  tooltip: 'Points to Make — your handicap target score calculated from your last 7 rounds. Arrow shows change after the latest tournament.' },
-  { key: 'latestScore', label: 'Latest Score',  sortable: true,  tooltip: 'Your Stableford score at the most recent tournament.' },
-  { key: 'events',      label: 'Events',        sortable: true,  tooltip: 'Number of tournaments played this season.' },
-  { key: 'trend',       label: '',              sortable: false  },
+const TABS = [
+  ['hdcp', 'Handicap'],
+  ['scratch', 'Scratch'],
+  ['ptm', 'Points to make'],
+  ['improved', 'Most improved'],
 ]
 
-const buildStandingsColumns = (mode) => {
-  const pointsCol = mode === 'hdcp'
-    ? { key: 'poy', label: 'HDCP Points', sortable: true, tooltip: 'Handicap Player of the Year points. Top finishers per flight earn points each tournament (base 350, −25 per position).' }
-    : { key: 'scratchPts', label: 'Scratch Pts', sortable: true, tooltip: 'Total Stableford points scored across all completed tournaments.' }
-
-  return [sharedStandingsColumns[0], sharedStandingsColumns[1], pointsCol, ...sharedStandingsColumns.slice(2)]
+function Delta({ value }) {
+  if (value == null || value === 0) return null
+  const up = value > 0
+  return <span className={`stat-number text-xs ${up ? 'text-red-700' : 'text-green-700'}`}>{up ? '↑' : '↓'} {Math.abs(Math.round(value))}</span>
 }
-
-// ── PTM sub-components ───────────────────────────────────────────────────────
-
-function ScoreCell({ value }) {
-  if (value == null) return <span className="text-gray-300 stat-number">—</span>
-  return <span className="stat-number text-darktext font-medium">{value}</span>
-}
-
-function TrendArrow({ ptmDelta }) {
-  if (typeof ptmDelta !== 'number') return null
-  const rounded = Math.round(ptmDelta)
-  if (rounded === 0) return null
-  if (rounded > 0) {
-    return (
-      <span className="inline-flex items-center gap-0.5 text-red-500 flex-shrink-0" aria-label={`PTM increased by ${rounded}`}>
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-        </svg>
-        <span className="stat-number text-xs font-semibold leading-none">{rounded}</span>
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-0.5 text-green-600 flex-shrink-0" aria-label={`PTM decreased by ${Math.abs(rounded)}`}>
-      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-      </svg>
-      <span className="stat-number text-xs font-semibold leading-none">{Math.abs(rounded)}</span>
-    </span>
-  )
-}
-
-function SortHeader({ label, colKey, sortKey, sortDir, onSort, className = '', tooltip }) {
-  return (
-    <th
-      className={`table-header text-white cursor-pointer select-none ${className}`}
-      onClick={() => onSort(colKey)}
-      title={tooltip}
-    >
-      <span className="flex items-center gap-1">
-        {label}
-        {tooltip && <span className="text-white/40 text-xs" aria-hidden="true">ⓘ</span>}
-        {sortKey === colKey
-          ? <span className="text-gold">{sortDir === 'asc' ? '↑' : '↓'}</span>
-          : <span className="text-white/30">⇅</span>
-        }
-      </span>
-    </th>
-  )
-}
-
-function PtmTab({ ptmList, liveMembers, ptmDeltaLookup }) {
-  const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState('name')
-  const [sortDir, setSortDir] = useState('asc')
-  const [showAll, setShowAll] = useState(false)
-
-  const ptmData = useMemo(() => {
-    const memberToPtmRow = (m) => {
-      const history = Array.isArray(m.history) ? m.history : Array(7).fill(null)
-      const rounds = history.filter(v => typeof v === 'number').length
-      return { name: m.name, tee: m.tee ?? null, ptm: m.ptm ?? null, history, rounds, ptmDelta: ptmDeltaLookup[m.name] ?? null }
-    }
-    return (liveMembers ?? []).map(m => {
-      if (Array.isArray(m.history) && m.history.some(v => v != null)) return memberToPtmRow(m)
-      const ptmEntry = ptmList?.find(p => p.name === m.name)
-      if (ptmEntry) return { ...ptmEntry, ptmDelta: ptmDeltaLookup[m.name] ?? null }
-      return memberToPtmRow(m)
-    })
-  }, [liveMembers, ptmList, ptmDeltaLookup])
-
-  const handleSort = (key) => {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(key); setSortDir('asc') }
-  }
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim()
-    return ptmData.filter(p => !q || p.name.toLowerCase().includes(q))
-  }, [search, ptmData])
-
-  const active = useMemo(
-    () => showAll ? filtered : filtered.filter(p => p.ptm != null),
-    [filtered, showAll]
-  )
-
-  const sorted = useMemo(() => {
-    return [...active].sort((a, b) => {
-      if (sortKey === 'name') {
-        const cmp = formatName(a.name ?? '').localeCompare(formatName(b.name ?? ''))
-        return sortDir === 'asc' ? cmp : -cmp
-      }
-      let av = sortKey === 'ptm' ? (roundPtm(a.ptm) ?? -Infinity) : (a[sortKey] ?? -Infinity)
-      let bv = sortKey === 'ptm' ? (roundPtm(b.ptm) ?? -Infinity) : (b[sortKey] ?? -Infinity)
-      return sortDir === 'asc' ? av - bv : bv - av
-    })
-  }, [active, sortKey, sortDir])
-
-  return (
-    <div>
-      <p className="text-gray-600 font-sans text-sm max-w-2xl leading-relaxed mb-5">
-        Each player's target score (PTM) plus their last 7 rounds from most recent (New) to oldest (7th).
-      </p>
-
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <div className="relative flex-1 max-w-sm">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search player…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm font-sans border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold"
-          />
-        </div>
-        <label className="flex items-center gap-2 text-sm font-sans text-gray-600 cursor-pointer select-none">
-          <input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} className="accent-forest rounded" />
-          Show players without PTM
-        </label>
-      </div>
-
-      <div className="flex flex-wrap gap-4 mb-5 text-sm font-sans text-gray-500">
-        <span>Showing <span className="text-darktext font-semibold stat-number">{sorted.length}</span> players</span>
-      </div>
-
-      {/* Mobile cards */}
-      <div className="sm:hidden space-y-2 mb-6">
-        {sorted.length === 0 ? (
-          <p className="text-center text-gray-400 font-sans text-sm py-8">No players found.</p>
-        ) : sorted.map((player, idx) => {
-          const displayPtm = roundPtm(player.ptm)
-          const noPtm = displayPtm == null
-          return (
-            <div key={player.name} className={`border border-gray-200 rounded-lg p-3 ${noPtm ? 'opacity-50 bg-white' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="font-sans text-darktext font-medium flex-1 min-w-0 truncate">{formatName(player.name)}</span>
-                <TeeTag tee={player.tee} />
-                {displayPtm != null ? (
-                  <span className="flex items-center gap-1">
-                    <span className="text-xs text-gray-400 font-sans">PTM</span>
-                    <span className="stat-number font-bold text-forest">{displayPtm}</span>
-                    <TrendArrow ptmDelta={player.ptmDelta} />
-                  </span>
-                ) : <span className="text-gray-300 stat-number text-sm">—</span>}
-              </div>
-              <div className="flex items-end gap-3 flex-wrap">
-                {player.history.slice(0, 5).map((score, hi) => (
-                  <div key={hi} className="flex flex-col items-center">
-                    <span className="text-gray-400 font-sans text-xs leading-none mb-0.5">{HISTORY_LABELS[hi]}</span>
-                    <ScoreCell value={score} />
-                  </div>
-                ))}
-                <span className="ml-auto stat-number text-gray-400 text-xs self-end">{player.rounds}/7</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Desktop table */}
-      <div className="hidden sm:block overflow-x-auto rounded-lg border border-gray-200">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead>
-            <tr className="bg-forest border-b border-forest">
-              <SortHeader label="Player" colKey="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-              <SortHeader label="PTM" colKey="ptm" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} tooltip="Points to Make — your handicap target score, calculated from your last 7 rounds." />
-              {HISTORY_LABELS.map(lbl => (
-                <th
-                  key={lbl}
-                  className={`table-header ${lbl === 'New' ? 'text-gold font-bold' : 'text-white/70 font-normal'}`}
-                >
-                  {lbl}
-                </th>
-              ))}
-              <th className="table-header text-white/70 font-normal">Rounds</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.length === 0 ? (
-              <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400 font-sans">No players found.</td></tr>
-            ) : sorted.map((player, idx) => {
-              const displayPtm = roundPtm(player.ptm)
-              const noPtm = displayPtm == null
-              return (
-                <tr key={player.name} className={`border-b border-gray-100 transition-colors hover:bg-blue-50 ${noPtm ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-sans text-darktext font-medium">{formatName(player.name)}</span>
-                      <TeeTag tee={player.tee} />
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {displayPtm != null ? (
-                      <span className="flex items-center gap-1">
-                        <span className="stat-number font-bold text-forest text-base">{displayPtm}</span>
-                        <TrendArrow ptmDelta={player.ptmDelta} />
-                      </span>
-                    ) : <span className="text-gray-300 stat-number">—</span>}
-                  </td>
-                  {player.history.map((score, hi) => (
-                    <td key={hi} className="px-4 py-2.5"><ScoreCell value={score} /></td>
-                  ))}
-                  <td className="px-4 py-2.5"><span className="stat-number text-gray-400 text-xs">{player.rounds}/7</span></td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-8 bg-white border border-gray-200 rounded-lg p-5">
-        <h3 className="text-forest font-serif text-base font-semibold mb-3">How PTM Is Calculated</h3>
-        <ul className="space-y-1.5 text-sm font-sans text-gray-600">
-          {[
-            'Round 1 — Score posted; PTM is set to this score.',
-            'Round 2 — On the "Bubble." PTM = Round 1 score.',
-            'Round 3 — On the "Bubble." PTM = best of first 2 scores.',
-            'Rounds 4–7 — Drop lowest, average the rest.',
-            'Round 8+ — Drop lowest two, average the remaining five.',
-            "A player's last 7 rounds are recorded at any time. Minimum PTM is 6.",
-          ].map((line, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gold flex-shrink-0" />
-              {line}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
-}
-
-// ── Main Standings page ──────────────────────────────────────────────────────
 
 export default function Standings() {
   useEffect(() => { document.title = 'Standings | CGA 2026' }, [])
-  const [mode, setMode] = useState('ptm')
-
-  const { data: standings } = useFireData(DB.listenStandings, { flights: {} })
-  const { data: ptmList } = useFireData(DB.listenPtm, [])
-  const { data: beginningPtmList } = useFireData(DB.listenBeginningPtm, [])
-  const { data: allResults } = useFireData(DB.listenResults, {})
-  const { data: liveMembers } = useFireData(DB.listenMembers, [])
-
-  const roundsFromPtm = useMemo(() => {
-    const lookup = {}
-    for (const player of ptmList || []) {
-      if (player.name && typeof player.rounds === 'number') lookup[player.name] = player.rounds
-    }
-    return lookup
-  }, [ptmList])
-
-  const ptmDeltaLookup = useMemo(() => {
-    const lookup = {}
-    for (const flight of FLIGHTS) {
-      for (const player of standings?.flights?.[flight] || []) {
-        if (player?.name && typeof player.ptmDelta === 'number') lookup[player.name] = player.ptmDelta
-      }
-    }
-    return lookup
-  }, [standings])
-
-  const flightData = useMemo(
-    () => FLIGHTS.flatMap((flight) => (standings?.flights?.[flight] || []).map(row => {
-      const rounds = roundsFromPtm[row.name]
-      const nextRowBase = { ...row, flight }
-      return rounds != null ? { ...nextRowBase, rounds } : nextRowBase
-    })),
-    [standings, roundsFromPtm]
-  )
-
-
-  const latestCompletedTournament = useMemo(() => {
-    return Object.values(allResults ?? {})
-      .filter((result) => result?.status === 'completed')
-      .sort((a, b) => String(b?.date ?? '').localeCompare(String(a?.date ?? '')))[0] ?? null
-  }, [allResults])
-
-  const latestScoreLookup = useMemo(() => {
-    const lookup = {}
-    if (!latestCompletedTournament?.leaderboard) return lookup
-    for (const rows of Object.values(latestCompletedTournament.leaderboard)) {
-      for (const player of rows ?? []) {
-        const score = typeof player?.points === 'number' && Number.isFinite(player.points)
-          ? player.points
-          : null
-        if (player?.name && score != null) lookup[player.name] = score
-      }
-    }
-    return lookup
-  }, [latestCompletedTournament])
-
-  const standingsByName = useMemo(() => {
-    const lookup = {}
-    for (const row of flightData) {
-      if (row?.name) lookup[row.name] = row
-    }
-    return lookup
-  }, [flightData])
-
-  const scratchData = useMemo(
-    () => computeScratch(allResults ?? {}).map(row => {
-      const standingRow = standingsByName[row.name] ?? null
-      return {
-        ...row,
-        ptm: standingRow?.ptm ?? null,
-        ptmDelta: standingRow?.ptmDelta ?? null,
-        latestScore: latestScoreLookup[row.name] ?? null,
-        trend: standingRow?.trend ?? null,
-      }
-    }),
-    [allResults, latestScoreLookup, standingsByName]
-  )
-
-
-  const latestTournament = latestCompletedTournament?.name ?? null
-
-  const mostImprovedRows = useMemo(
-    () => buildMostImprovedRows(ptmList, beginningPtmList, allResults),
-    [ptmList, beginningPtmList, allResults]
-  )
-
-  const modes = [
-    { key: 'hdcp',          label: 'HDCP POY' },
-    { key: 'scratch',       label: 'Scratch' },
-    { key: 'ptm',           label: 'Points to Make' },
-    { key: 'most-improved', label: 'Most Improved' },
-  ]
+  const [tab, setTab] = useState('hdcp')
+  const standings = useSubscription(DB.listenStandings, [])
+  const ptm = useSubscription(DB.listenPtm, [])
+  const beginning = useSubscription(DB.listenBeginningPtm, [])
+  const results = useSubscription(DB.listenResults, [])
+  const scratch = useMemo(() => computeScratch(results || {}), [results])
+  const improved = useMemo(() => buildMostImproved(ptm || [], beginning || [], results || {}), [ptm, beginning, results])
+  const qualified = improved.filter((row) => row.qualified && row.delta != null)
+  const leader = [...qualified].sort((a, b) => b.delta - a.delta)[0]
 
   return (
     <PageWrapper>
-      <div className="mb-8">
-        <h1 className="section-title text-3xl sm:text-4xl">2026 Season Standings</h1>
-        <div className="gold-divider" />
-        {mode === 'hdcp' && (
-          <p className="text-gray-600 font-sans text-sm">
-            Ranked by Handicap POY points. Click column headers to sort.
-            {latestTournament && (
-              <span className="ml-1">Latest score from <span className="font-medium text-forest">{latestTournament}</span>.</span>
-            )}
-          </p>
-        )}
-        {mode === 'scratch' && (
-          <p className="text-gray-600 font-sans text-sm">Ranked by total Stableford points across all completed tournaments.</p>
-        )}
+      <h1 className="section-title">Standings</h1>
+      <div className="gold-divider" />
+      <div className="flex gap-2 overflow-x-auto mb-6">
+        {TABS.map(([key, label]) => (
+          <button key={key} type="button" onClick={() => setTab(key)} className={`px-3 py-2 rounded-md text-sm font-heading font-semibold whitespace-nowrap ${tab === key ? 'bg-forest text-white' : 'bg-white border border-[#E5E0D4]'}`}>{label}</button>
+        ))}
       </div>
 
-      {/* Mode tabs */}
-      <div className="mb-6 -mx-1 px-1 overflow-x-auto">
-        <div className="flex gap-2 w-max min-w-full whitespace-nowrap">
-          {modes.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setMode(key)}
-              className={`px-5 py-2 text-sm font-sans font-semibold rounded-lg transition-colors ${
-                mode === key ? 'bg-forest text-white' : 'bg-white text-gray-500 border border-gray-200 hover:text-forest hover:border-forest'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {mode === 'hdcp' && (
-        <div className="animate-tab-in">
-          <StandingsTable data={flightData} columns={buildStandingsColumns('hdcp')} highlightTop={3} />
-        </div>
-      )}
-
-      {mode === 'scratch' && (
-        <div className="animate-tab-in">
-          <StandingsTable data={scratchData} columns={buildStandingsColumns('scratch')} highlightTop={3} showBubble={false} />
-        </div>
-      )}
-
-      {mode === 'ptm' && (
-        <div className="animate-tab-in">
-          <PtmTab ptmList={ptmList} liveMembers={liveMembers} ptmDeltaLookup={ptmDeltaLookup} />
+      {tab === 'hdcp' && (
+        <div className="space-y-6">
+          {FLIGHT_ORDER.every((flight) => !(standings?.flights?.[flight] || []).length) && <Empty title="Handicap standings are not posted yet." />}
+          {FLIGHT_ORDER.map((flight) => {
+            const rows = standings?.flights?.[flight] || []
+            if (!rows.length) return null
+            return (
+              <section key={flight}>
+                <h2 className="font-heading font-bold text-forest mb-2">{flight}</h2>
+                <div className="overflow-x-auto bg-white border border-[#E5E0D4] rounded-xl">
+                  <table className="w-full text-sm">
+                    <thead><tr className="text-left text-xs uppercase text-gray-500"><th className="px-3 py-2">#</th><th className="px-3 py-2">Player</th><th className="px-3 py-2">Points</th><th className="px-3 py-2">Events</th><th className="px-3 py-2">PTM</th></tr></thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={row.name} className="border-t border-[#E5E0D4]">
+                          <td className="px-3 py-2 stat-number">{row.rank}</td>
+                          <td className="px-3 py-2">{formatName(row.name)}</td>
+                          <td className="px-3 py-2 stat-number">{row.poy}</td>
+                          <td className="px-3 py-2 stat-number">{row.events}</td>
+                          <td className="px-3 py-2"><span className="stat-number">{row.ptm ?? '—'}</span> <Delta value={row.ptmDelta} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )
+          })}
         </div>
       )}
 
-      {mode === 'most-improved' && (
-        <div className="animate-tab-in">
-          <MostImprovedTab allRows={mostImprovedRows} />
+      {tab === 'scratch' && (
+        scratch.length === 0 ? <Empty title="Scratch standings appear after a result is published." /> : (
+          <div className="overflow-x-auto bg-white border border-[#E5E0D4] rounded-xl">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-xs uppercase text-gray-500"><th className="px-3 py-2">#</th><th className="px-3 py-2">Player</th><th className="px-3 py-2">Points</th><th className="px-3 py-2">Events</th></tr></thead>
+              <tbody>
+                {scratch.map((row) => (
+                  <tr key={row.name} className="border-t border-[#E5E0D4]">
+                    <td className="px-3 py-2 stat-number">{row.rank}</td>
+                    <td className="px-3 py-2">{formatName(row.name)}</td>
+                    <td className="px-3 py-2 stat-number">{row.scratchPts}</td>
+                    <td className="px-3 py-2 stat-number">{row.events}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+
+      {tab === 'ptm' && (
+        !(ptm || []).length ? <Empty title="The points-to-make list is empty." /> : (
+          <div>
+            <p className="text-sm text-gray-500 mb-3">Showing {(ptm || []).length} players. The last seven scores are the ones that count.</p>
+            <div className="overflow-x-auto bg-white border border-[#E5E0D4] rounded-xl">
+              <table className="w-full text-sm">
+                <thead><tr className="text-left text-xs uppercase text-gray-500"><th className="px-3 py-2">Player</th><th className="px-3 py-2">Tee</th><th className="px-3 py-2">PTM</th><th className="px-3 py-2">Recent scores</th></tr></thead>
+                <tbody>
+                  {(ptm || []).map((row) => (
+                    <tr key={row.name} className="border-t border-[#E5E0D4]">
+                      <td className="px-3 py-2">{formatName(row.name)}</td>
+                      <td className="px-3 py-2">{row.tee || '—'}</td>
+                      <td className="px-3 py-2 stat-number">{row.ptm ?? '—'}</td>
+                      <td className="px-3 py-2 stat-number text-gray-600">{(row.history || []).slice(0, 7).join(', ') || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      )}
+
+      {tab === 'improved' && (
+        <div className="space-y-6">
+          <p className="text-sm text-gray-600">A player qualifies with 7 rounds overall and 3 rounds this year. A higher points-to-make number is an improvement. Players who do not qualify are marked NQ.</p>
+          {!improved.length ? <Empty title="Most improved needs a beginning-of-year points list.">A board member can save that list from the roster page.</Empty> : (
+            <>
+              <ImprovedTable title="Most improved" rows={[...improved].sort((a, b) => (b.delta ?? -999) - (a.delta ?? -999))} leader={leader?.name} />
+              <ImprovedTable title="Least improved" rows={[...improved].sort((a, b) => (a.delta ?? 999) - (b.delta ?? 999))} leader={null} />
+            </>
+          )}
         </div>
       )}
     </PageWrapper>
+  )
+}
+
+function ImprovedTable({ title, rows, leader }) {
+  return (
+    <section>
+      <h2 className="font-heading font-bold text-forest mb-2">{title}</h2>
+      <div className="overflow-x-auto bg-white border border-[#E5E0D4] rounded-xl">
+        <table className="w-full text-sm">
+          <thead><tr className="text-left text-xs uppercase text-gray-500"><th className="px-3 py-2">Player</th><th className="px-3 py-2">Start</th><th className="px-3 py-2">Now</th><th className="px-3 py-2">Change</th></tr></thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.name} className={`border-t border-[#E5E0D4] ${row.qualified ? '' : 'bg-amber-50'}`}>
+                <td className="px-3 py-2">{formatName(row.name)} {row.name === leader && <span className="ml-2 text-xs font-heading font-semibold text-gold">Leader</span>} {!row.qualified && <span className="ml-2 text-xs font-heading font-semibold text-amber-800">NQ</span>}</td>
+                <td className="px-3 py-2 stat-number">{row.start ?? '—'}</td>
+                <td className="px-3 py-2 stat-number">{row.current ?? '—'}</td>
+                <td className="px-3 py-2 stat-number">{row.delta == null ? '—' : row.delta > 0 ? `+${row.delta}` : row.delta}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { practiceMode } from '../../db'
 
 const navLinks = [
   { to: '/tournaments', label: 'Schedule' },
@@ -18,6 +19,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-[#E5E0D4]">
+      {practiceMode && <p className="bg-gold text-forest text-center text-sm font-heading font-semibold py-2 px-3">Practice mode — nothing is saved to the live site.</p>}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2 text-forest-dark" onClick={() => setMenuOpen(false)}>

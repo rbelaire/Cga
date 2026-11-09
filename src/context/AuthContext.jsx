@@ -1,70 +1,52 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { listenForAuthChanges, logout } from '../lib/firebase/auth'
-import { fsListen } from '../db'
+import { DB, practiceMode } from '../db'
+import { isAdminUser } from '../domain/access'
 
 const AuthContext = createContext(null)
+const practiceUser = { email: 'board@cga.local', displayName: 'Board Member', uid: 'practice' }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [cgaUsers, setCgaUsers] = useState(null) // null = not yet loaded
+  const [user, setUser] = useState(practiceMode ? practiceUser : null)
+  const [loading, setLoading] = useState(!practiceMode)
+  const [users, setUsers] = useState([])
+  const [usersReady, setUsersReady] = useState(practiceMode)
 
-  // Listen to cga/users for role information
   useEffect(() => {
-    return fsListen('cga/users', (data) => {
-      setCgaUsers(data?.list ?? [])
+    if (practiceMode) return undefined
+    return DB.listenUsers((list) => {
+      queueMicrotask(() => {
+        setUsers(Array.isArray(list) ? list : [])
+        setUsersReady(true)
+      })
     })
   }, [])
 
   useEffect(() => {
-    let cancelled = false
-
-    const failOpenTimer = setTimeout(() => {
-      if (!cancelled) setLoading(false)
-    }, 10000)
-
-    const unsubAuth = listenForAuthChanges((nextUser) => {
-      clearTimeout(failOpenTimer)
-      setUser(nextUser)
-      setLoading(false)
+    if (practiceMode) return undefined
+    return listenForAuthChanges((nextUser) => {
+      queueMicrotask(() => {
+        setUser(nextUser)
+        setLoading(false)
+      })
     }, () => {
-      clearTimeout(failOpenTimer)
-      if (cancelled) return
-      setUser(null)
-      setLoading(false)
+      queueMicrotask(() => {
+        setUser(null)
+        setLoading(false)
+      })
     })
-
-    return () => {
-      cancelled = true
-      clearTimeout(failOpenTimer)
-      unsubAuth()
-    }
   }, [])
 
-  const isAdmin = useMemo(() => {
-    if (!user?.email) return false
-    // Permanent superadmin — always has access regardless of cga/users list
-    if (user.email.toLowerCase() === 'rjbelaire@gmail.com') return true
-    // Bootstrap: if cga/users is empty or not loaded yet, the first authenticated
-    // user is treated as admin so they can set up the panel.
-    if (!cgaUsers || cgaUsers.length === 0) return !!user
-    const email = user.email.toLowerCase()
-    return cgaUsers.some(
-      u => (u.email ?? '').toLowerCase() === email &&
-           u.role === 'admin' &&
-           u.status !== 'disabled'
-    )
-  }, [user, cgaUsers])
-
+  const isAdmin = practiceMode || isAdminUser(user?.email, users, { loaded: usersReady })
   const value = useMemo(() => ({
     user,
-    profile: user ? { displayName: user.displayName, email: user.email } : null,
     loading,
-    isAuthenticated: !!user,
+    isAuthenticated: Boolean(user),
     isAdmin,
-    signOut: logout,
-  }), [user, loading, isAdmin])
+    usersReady,
+    signOut: practiceMode ? async () => {} : logout,
+  }), [user, loading, isAdmin, usersReady])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

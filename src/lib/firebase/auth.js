@@ -25,16 +25,22 @@ async function upsertUserProfileSafely(user) {
 }
 
 export function listenForAuthChanges(callback, onError) {
+  if (!auth) {
+    callback(null)
+    return () => {}
+  }
   return onAuthStateChanged(auth, callback, onError)
 }
 
 export async function loginWithEmailPassword(email, password) {
+  if (!auth) throw new Error('Firebase is not configured.')
   const cred = await signInWithEmailAndPassword(auth, email, password)
   await upsertUserProfileSafely(cred.user)
   return cred.user
 }
 
 export async function loginWithGoogle() {
+  if (!auth) throw new Error('Firebase is not configured.')
   try {
     const cred = await signInWithPopup(auth, googleProvider)
     await upsertUserProfileSafely(cred.user)

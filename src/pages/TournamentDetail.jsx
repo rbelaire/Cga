@@ -1,157 +1,85 @@
-import { useEffect, useState, useMemo } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
-import PageWrapper from '../components/layout/PageWrapper'
-import CountdownTimer from '../components/ui/CountdownTimer'
-import schedule from '../data/schedule.json'
-import { formatDate, formatDateLong } from '../utils/formatDate'
+import { useEffect, useMemo } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import scheduleData from '../data/schedule.json'
 import { DB } from '../db'
-import { useFireData } from '../hooks/useFireData'
-import { buildFlightWinnerCards } from '../utils/flightWinners'
+import { useSubscription } from '../hooks/useSubscription'
+import { feeLabel, mergeSchedule } from '../domain/schedule'
+import { pairingGroups } from '../domain/pairings'
+import { formatDateFull } from '../utils/formatDate'
 import { buildRoundsByName, capProvisionalLeaderboard } from '../utils/poy'
-import FlightWinnerCards from '../components/ui/FlightWinnerCards'
-
-function DetailItem({ label, value }) {
-  if (!value) return null
-  return (
-    <div>
-      <p className="text-xs text-gray-400 font-sans uppercase tracking-widest mb-1">{label}</p>
-      <p className="text-sm text-darktext font-sans">{value}</p>
-    </div>
-  )
-}
+import { formatName } from '../utils/formatName'
+import { compareFlights, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
+import PageWrapper from '../components/layout/PageWrapper'
+import Empty from '../components/ui/Empty'
 
 export default function TournamentDetail() {
   const { tournamentId } = useParams()
-  const tournament = useMemo(
-    () => schedule.find((item) => item.id === tournamentId),
-    [tournamentId],
-  )
+  const status = useSubscription(DB.listenTournamentStatus, [])
+  const members = useSubscription(DB.listenMembers, [])
+  const event = useMemo(() => mergeSchedule(scheduleData, status).find((item) => item.id === tournamentId), [status, tournamentId])
+  const result = useSubscription((cb) => DB.listenResult(tournamentId, cb), [tournamentId])
+  const pairingDoc = useSubscription((cb) => DB.listenPairingsForTournament(tournamentId, cb), [tournamentId])
+  const groups = pairingGroups(pairingDoc)
+  useEffect(() => { document.title = event ? `${event.name} | CGA` : 'Tournament | CGA' }, [event])
+  const roundsByName = useMemo(() => buildRoundsByName(members || []), [members])
+  const leaderboard = result?.leaderboard ? capProvisionalLeaderboard(result.leaderboard, roundsByName) : null
 
-  // Subscribe only to this tournament's documents instead of the entire
-  // results/pairings/lifecycle maps.  This keeps reads bounded regardless
-  // of how many tournaments have been entered historically.
-  const [result,       setResult]       = useState(null)
-  const [pairingsDoc,  setPairingsDoc]  = useState(null)
-  const [lifecycleDoc, setLifecycleDoc] = useState(null)
-  const { data: members } = useFireData(DB.listenMembers, [])
-
-  // Provisional +/- display cap: 2nd/3rd-round players (1–2 lifetime rounds now)
-  // show at most +2 on this published leaderboard. Rank/POY/score are untouched.
-  const roundsByName = useMemo(() => buildRoundsByName(members), [members])
-  const cappedResult = useMemo(
-    () => (result?.leaderboard
-      ? { ...result, leaderboard: capProvisionalLeaderboard(result.leaderboard, roundsByName) }
-      : result),
-    [result, roundsByName],
-  )
-
-  useEffect(() => {
-    if (!tournamentId) return
-    const u1 = DB.listenResult(tournamentId, setResult)
-    const u2 = DB.listenPairingsForTournament(tournamentId, setPairingsDoc)
-    const u3 = DB.listenLifecycleForTournament(tournamentId, setLifecycleDoc)
-    return () => { u1(); u2(); u3() }
-  }, [tournamentId])
-
-  const pairingsState     = lifecycleDoc?.pairingsState
-  const hasLegacyPairings = Boolean(pairingsDoc)
-  const isPairingsPublished = pairingsState === 'published' || (!pairingsState && hasLegacyPairings)
-  const pairings = isPairingsPublished ? pairingsDoc : null
-
-  const hasPublishedContent = Boolean(result) || Boolean(pairings)
-
-  useEffect(() => {
-    document.title = tournament
-      ? `${tournament.name} | CGA 2026`
-      : 'Tournament | CGA 2026'
-  }, [tournament])
-
-  if (!tournament) {
-    return <Navigate to="/tournaments" replace />
+  if (!event) {
+    return <PageWrapper><Empty title="That event is not on the 2026 schedule."><Link to="/tournaments" className="underline">Back to the schedule</Link></Empty></PageWrapper>
   }
 
   return (
     <PageWrapper>
-      <nav className="flex items-center gap-1.5 text-xs font-sans text-gray-400 mb-6">
-        <Link to="/" className="hover:text-forest transition-colors">Home</Link>
-        <span>/</span>
-        <Link to="/tournaments" className="hover:text-forest transition-colors">Schedule</Link>
-        <span>/</span>
-        <span className="text-darktext font-medium">Tournament</span>
-      </nav>
+      <Link to="/tournaments" className="text-sm text-forest font-heading font-semibold">← Schedule</Link>
+      <h1 className="section-title mt-3">{event.name}</h1>
+      <div className="gold-divider" />
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 text-sm">
+        <div className="bg-white border border-[#E5E0D4] rounded-xl p-4"><dt className="text-gray-500">Date</dt><dd className="font-semibold">{formatDateFull(event.date)}</dd></div>
+        <div className="bg-white border border-[#E5E0D4] rounded-xl p-4"><dt className="text-gray-500">Course</dt><dd className="font-semibold">{event.course}</dd></div>
+        <div className="bg-white border border-[#E5E0D4] rounded-xl p-4"><dt className="text-gray-500">Start</dt><dd className="font-semibold">{event.teeTime} · {event.format}</dd></div>
+        <div className="bg-white border border-[#E5E0D4] rounded-xl p-4"><dt className="text-gray-500">Entry</dt><dd className="font-semibold">{feeLabel(event.entryFee) || 'See the club'}</dd></div>
+      </dl>
 
-      <div className="mb-8">
-        <h1 className="section-title text-3xl sm:text-4xl">{tournament.name}</h1>
-        <div className="gold-divider" />
-        <p className="text-gray-500 font-sans text-sm">{formatDateLong(tournament.date)}</p>
-      </div>
-
-      <section className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <DetailItem label="Date" value={formatDate(tournament.date)} />
-          <DetailItem label="Course" value={tournament.course} />
-          <DetailItem label="Format" value={tournament.format} />
-          <DetailItem label="Entry" value={isNaN(tournament.entryFee) ? tournament.entryFee : `$${tournament.entryFee}`} />
-          <DetailItem label="Tee Time" value={tournament.teeTime} />
+      <h2 className="font-heading font-bold text-xl text-forest mb-3">Results</h2>
+      {!leaderboard ? <Empty title="Results are not posted yet." /> : (
+        <div className="space-y-5 mb-8">
+          {Object.keys(leaderboard).sort((a, b) => compareFlights(a, b)).map((flight) => (
+            <section key={flight} className="bg-white border border-[#E5E0D4] rounded-xl p-4">
+              <h3 className="font-heading font-semibold text-forest mb-2">{flight}</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="text-left text-xs uppercase text-gray-500"><th className="py-1 pr-3">Place</th><th className="py-1 pr-3">Player</th><th className="py-1 pr-3">Score</th>{flight !== NEW_PLAYERS_FLIGHT && <th className="py-1">+/-</th>}</tr></thead>
+                  <tbody>
+                    {(leaderboard[flight] || []).map((row) => (
+                      <tr key={row.name} className="border-t border-[#E5E0D4]">
+                        <td className="py-2 pr-3 stat-number">{row.wd ? 'WD' : row.rank || '—'}</td>
+                        <td className="py-2 pr-3">{formatName(row.name)}</td>
+                        <td className="py-2 pr-3 stat-number">{row.points}</td>
+                        {flight !== NEW_PLAYERS_FLIGHT && <td className="py-2 stat-number">{row.plusMinus > 0 ? `+${row.plusMinus}` : row.plusMinus}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))}
         </div>
-
-        {(tournament.status === 'upcoming') && (
-          <div className="mt-6 pt-5 border-t border-gray-100">
-            <p className="text-xs text-gray-400 font-sans uppercase tracking-widest mb-2">Countdown</p>
-            <CountdownTimer targetDate={tournament.date} />
-          </div>
-        )}
-      </section>
-
-      {tournament.notes && (
-        <section className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
-          <h2 className="text-forest text-xs font-sans font-semibold uppercase tracking-widest mb-2">
-            Details
-          </h2>
-          <p className="text-gray-600 font-sans text-sm">{tournament.notes}</p>
-        </section>
       )}
 
-      {!hasPublishedContent && (
-        <section className="bg-amber-50 border border-amber-100 rounded-lg p-6 mb-6 text-center">
-          <p className="text-amber-800 font-sans text-base font-semibold mb-2">Registration in progress</p>
-          <p className="text-amber-700 font-sans text-sm">
-            Tournament details will be posted soon. Check back for pairings, results, and updates.
-          </p>
-        </section>
+      <h2 className="font-heading font-bold text-xl text-forest mb-3">Pairings</h2>
+      {groups.length === 0 ? <Empty title="Pairings are not posted yet." /> : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {groups.map((group) => (
+            <article key={group.pairing} className="bg-white border border-[#E5E0D4] rounded-xl p-4">
+              <h3 className="font-heading font-semibold text-forest">{group.pairing}</h3>
+              <ul className="mt-2 text-sm space-y-1">
+                {(group.players || []).map((player) => <li key={player.name}>{formatName(player.name)} <span className="text-gray-500">· {player.flight}</span></li>)}
+              </ul>
+            </article>
+          ))}
+        </div>
       )}
-
-      {pairings && (
-        <section className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
-          <h2 className="text-forest text-xs font-sans font-semibold uppercase tracking-widest mb-2">
-            Published Pairings
-          </h2>
-          <p className="text-gray-500 font-sans text-sm mb-4">
-            {pairings.pairings?.length ?? 0} groups are currently posted for this event.
-          </p>
-          <Link to={`/pairings/${tournamentId}`} className="btn-outline text-sm py-2 px-4">
-            View Pairings
-          </Link>
-        </section>
-      )}
-
-      {result && (
-        <section className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5">
-          <h2 className="text-forest text-xs font-sans font-semibold uppercase tracking-widest mb-2.5">
-            Published Results
-          </h2>
-          {buildFlightWinnerCards(cappedResult, tournament.format).length > 0 && (
-            <FlightWinnerCards winners={buildFlightWinnerCards(cappedResult, tournament.format)} className="mb-4" />
-          )}
-          <Link
-            to="/tournaments"
-            state={{ expand: tournamentId }}
-            className="inline-block text-forest text-sm font-sans font-medium hover:text-gold transition-colors"
-          >
-            View Full Results →
-          </Link>
-        </section>
-      )}
+      <Link to={`/pairings/${event.id}`} className="inline-block mt-4 text-sm font-heading font-semibold text-forest underline">Open the pairings page</Link>
     </PageWrapper>
   )
 }

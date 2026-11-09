@@ -1,242 +1,173 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useLocation } from 'react-router-dom'
-import PageWrapper from '../components/layout/PageWrapper'
-import TournamentCard from '../components/ui/TournamentCard'
-import StandingsTable from '../components/ui/StandingsTable'
-import schedule from '../data/schedule.json'
-import { formatDateLong } from '../utils/formatDate'
-import { useFireData } from '../hooks/useFireData'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import scheduleData from '../data/schedule.json'
 import { DB } from '../db'
-import { buildFlightWinnerCards } from '../utils/flightWinners'
-import FlightWinnerCards from '../components/ui/FlightWinnerCards'
-import { buildRoundsByName, capProvisionalLeaderboard } from '../utils/poy'
-import { sortFlights } from '../utils/flightOrder'
 import { useAuth } from '../context/AuthContext'
-import { mergeScheduleStatus } from '../utils/mergeScheduleStatus'
-import {
-  listenSavedFilter,
-  listenSavedView,
-  saveSavedFilter,
-  saveSavedView,
-} from '../lib/firebase/firestore'
+import { useSubscription } from '../hooks/useSubscription'
+import { listenSavedFilter, listenSavedView, saveSavedFilter, saveSavedView } from '../lib/firebase/firestore'
+import { feeLabel, mergeSchedule } from '../domain/schedule'
+import { formatDate } from '../utils/formatDate'
+import { buildRoundsByName, capProvisionalLeaderboard } from '../utils/poy'
+import { buildFlightWinnerCards } from '../utils/flightWinners'
+import { compareFlights, NEW_PLAYERS_FLIGHT } from '../utils/flightOrder'
+import { formatName } from '../utils/formatName'
+import PageWrapper from '../components/layout/PageWrapper'
+import Empty from '../components/ui/Empty'
 
-function FlightLeaderboards({ leaderboard }) {
-  const flights = useMemo(
-    () => sortFlights(Object.keys(leaderboard || {}), { includeNewPlayers: true }),
-    [leaderboard],
-  )
-  const [flight, setFlight] = useState(null)
-  const activeFlight = flights.includes(flight) ? flight : flights[0]
+function useSaved(uid, page, listen, pick) {
+  const [value, setValue] = useState(undefined)
+  useEffect(() => {
+    if (!uid || uid === 'practice') return undefined
+    let alive = true
+    const unsubscribe = listen(uid, page, (doc) => {
+      queueMicrotask(() => { if (alive) setValue(pick(doc)) })
+    })
+    return () => { alive = false; unsubscribe?.() }
+  }, [uid, page, listen, pick])
+  return value
+}
 
-  const scoreColumns = [
-    { key: 'rank', label: 'Rank', sortable: false },
-    { key: 'name', label: 'Player', sortable: true },
-    { key: 'poy', label: 'POY', sortable: true, tooltip: 'Player of the Year points earned at this tournament.' },
-    { key: 'points', label: 'Score', sortable: true, tooltip: 'Stableford score posted at this tournament.' },
-    { key: 'ptm', label: 'PTM', sortable: true, tooltip: 'Points to Make — handicap target for this tournament.' },
-    { key: 'plusMinus', label: '+/−', sortable: true, tooltip: 'Score minus PTM. Positive = above target (better).' },
-  ]
+const pickView = (doc) => doc?.filters?.seasonView
+const pickExpanded = (doc) => doc?.settings?.expandedTournament
 
+function Leaderboard({ result }) {
+  const flights = Object.keys(result?.leaderboard || {}).sort((a, b) => compareFlights(a, b))
+  if (!flights.length) return <Empty title="The leaderboard is not posted yet." />
   return (
-    <div>
-      <h4 className="text-gold text-xs font-heading font-semibold uppercase tracking-widest mb-3">
-        Full Leaderboard
-      </h4>
-      <div className="mb-3 -mx-1 px-1 overflow-x-auto">
-        <div className="flex gap-1.5 w-max min-w-full whitespace-nowrap">
-          {flights.map((f) => (
-            <button
-              key={f}
-              onClick={() => setFlight(f)}
-              className={`px-2.5 py-1 text-xs font-sans font-semibold rounded-md transition-colors border ${
-                activeFlight === f
-                  ? 'bg-forest text-white border-forest shadow-sm'
-                  : 'bg-white text-gray-700 border-gray-200 hover:text-forest hover:border-gold'
-              }`}
-            >
-              {f}
-              <span className={`ml-1 ${activeFlight === f ? 'text-white/80' : 'text-gray-500'}`}>({(leaderboard[f] || []).length})</span>
-            </button>
-          ))}
+    <div className="space-y-4">
+      {flights.map((flight) => (
+        <div key={flight}>
+          <h4 className="font-heading font-semibold text-forest mb-2">{flight}</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                  <th className="py-1 pr-3">Place</th>
+                  <th className="py-1 pr-3">Player</th>
+                  <th className="py-1 pr-3">Score</th>
+                  {flight !== NEW_PLAYERS_FLIGHT && <th className="py-1 pr-3">+/-</th>}
+                  {flight !== NEW_PLAYERS_FLIGHT && <th className="py-1">POY</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {(result.leaderboard[flight] || []).map((row) => (
+                  <tr key={row.name} className="border-t border-[#E5E0D4]">
+                    <td className="py-2 pr-3 stat-number">{row.wd ? 'WD' : row.rank || '—'}</td>
+                    <td className="py-2 pr-3">{formatName(row.name)}</td>
+                    <td className="py-2 pr-3 stat-number">{row.points}</td>
+                    {flight !== NEW_PLAYERS_FLIGHT && <td className="py-2 pr-3 stat-number">{row.plusMinus > 0 ? `+${row.plusMinus}` : row.plusMinus}</td>}
+                    {flight !== NEW_PLAYERS_FLIGHT && <td className="py-2 stat-number">{row.poy}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-      <div key={activeFlight} className="animate-tab-in">
-        <StandingsTable data={leaderboard[activeFlight]} columns={scoreColumns} highlightTop={3} />
-      </div>
+      ))}
     </div>
   )
 }
 
 export default function Tournaments() {
   useEffect(() => { document.title = 'Tournaments | CGA 2026' }, [])
-
   const { state } = useLocation()
   const { user } = useAuth()
+  const status = useSubscription(DB.listenTournamentStatus, [])
+  const results = useSubscription(DB.listenResults, [])
+  const members = useSubscription(DB.listenMembers, [])
+  const schedule = useMemo(() => mergeSchedule(scheduleData, status), [status])
+  const completed = schedule.filter((event) => event.status === 'completed')
+  const upcoming = schedule.filter((event) => event.status === 'upcoming')
+  const savedView = useSaved(user?.uid, 'tournaments', listenSavedFilter, pickView)
+  const savedExpanded = useSaved(user?.uid, 'tournaments', listenSavedView, pickExpanded)
+  const [viewChoice, setViewChoice] = useState(null)
+  const [openChoice, setOpenChoice] = useState(state?.expand ?? null)
+  const seasonView = viewChoice || savedView || 'all'
+  const openId = openChoice ?? savedExpanded ?? completed[0]?.id ?? null
+  const roundsByName = useMemo(() => buildRoundsByName(members || []), [members])
+  const capped = useMemo(() => Object.fromEntries(Object.entries(results || {}).map(([id, result]) => [
+    id,
+    result?.leaderboard ? { ...result, leaderboard: capProvisionalLeaderboard(result.leaderboard, roundsByName) } : result,
+  ])), [results, roundsByName])
 
-  const [seasonView, setSeasonView] = useState('all')
-
-  const { data: tournamentStatus } = useFireData(DB.listenTournamentStatus, null)
-  const mergedSchedule = useMemo(() => mergeScheduleStatus(schedule, tournamentStatus), [tournamentStatus])
-
-  const upcoming = mergedSchedule.filter((t) => t.status === 'upcoming')
-  const completed = mergedSchedule.filter((t) => t.status === 'completed')
-  const pct = Math.round((completed.length / schedule.length) * 100)
-
-  const [expanded, setExpanded] = useState(state?.expand ?? completed[0]?.id ?? null)
-  const { data: allResults, status: resultsStatus } = useFireData(DB.listenResults, {})
-  const { data: members } = useFireData(DB.listenMembers, [])
-
-  // Apply the provisional +/- display cap (2nd/3rd-round players show at most +2)
-  // to published leaderboards, using each player's current lifetime round count.
-  const roundsByName = useMemo(() => buildRoundsByName(members), [members])
-  const cappedResults = useMemo(() => {
-    const out = {}
-    for (const [tid, result] of Object.entries(allResults || {})) {
-      out[tid] = result?.leaderboard
-        ? { ...result, leaderboard: capProvisionalLeaderboard(result.leaderboard, roundsByName) }
-        : result
-    }
-    return out
-  }, [allResults, roundsByName])
-
-  useEffect(() => {
-    if (!user?.uid) return undefined
-    return listenSavedFilter(user.uid, 'tournaments', (doc) => {
-      if (doc?.filters?.seasonView) {
-        setSeasonView(doc.filters.seasonView)
-      }
-    })
-  }, [user?.uid])
-
-  useEffect(() => {
-    if (!user?.uid) return undefined
-    return listenSavedView(user.uid, 'tournaments', (doc) => {
-      if (doc?.settings?.expandedTournament) {
-        setExpanded(doc.settings.expandedTournament)
-      }
-    })
-  }, [user?.uid])
-
-  const saveFilterPreference = async (nextView) => {
-    setSeasonView(nextView)
-    if (user?.uid) {
-      await saveSavedFilter(user.uid, 'tournaments', { seasonView: nextView })
-    }
+  async function chooseView(next) {
+    setViewChoice(next)
+    if (user?.uid && user.uid !== 'practice') await saveSavedFilter(user.uid, 'tournaments', { seasonView: next })
   }
 
-  const onToggleExpanded = async (tournamentId, isOpen) => {
-    const nextExpanded = isOpen ? null : tournamentId
-    setExpanded(nextExpanded)
-
-    if (user?.uid && nextExpanded) {
-      await saveSavedView(user.uid, 'tournaments', { expandedTournament: nextExpanded })
-    }
+  async function toggle(id) {
+    const next = openId === id ? '' : id
+    setOpenChoice(next)
+    if (user?.uid && user.uid !== 'practice' && next) await saveSavedView(user.uid, 'tournaments', { expandedTournament: next })
   }
-
-  const showUpcoming = seasonView === 'all' || seasonView === 'upcoming'
-  const showCompleted = seasonView === 'all' || seasonView === 'completed'
 
   return (
     <PageWrapper>
-      <div className="mb-8">
-        <h1 className="section-title text-3xl sm:text-4xl">2026 Tournaments</h1>
-        <div className="gold-divider" />
-        <p className="text-gray-600 font-sans text-sm max-w-xl">
-          {schedule.length} tournaments scheduled for the 2026 season. Entry fee is paid at the course on the day of play.
-        </p>
+      <h1 className="section-title">2026 Tournaments</h1>
+      <div className="gold-divider" />
+      <p className="text-sm text-gray-600 mb-4">{completed.length} of {schedule.length} events are finished.</p>
+      <div className="h-2 rounded-full bg-[#E5E0D4] mb-6 overflow-hidden">
+        <div className="h-full bg-gold" style={{ width: `${Math.round((completed.length / schedule.length) * 100)}%` }} />
       </div>
-
-      <div className="mb-8 bg-white border border-gray-200 rounded-lg px-5 py-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-sans font-medium text-darktext">Season Progress</span>
-          <span className="stat-number text-sm text-gray-500">
-            {completed.length} of {schedule.length} completed
-          </span>
-        </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full bg-forest rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-        </div>
-      </div>
-
-      <div className="mb-6 flex flex-wrap gap-2 items-center">
-        {['all', 'upcoming', 'completed'].map((view) => (
-          <button
-            key={view}
-            onClick={() => saveFilterPreference(view)}
-            className={`px-3 py-1.5 text-xs rounded-full border ${seasonView === view ? 'bg-forest text-white border-forest' : 'bg-white text-gray-600 border-gray-200'}`}
-          >
-            {view[0].toUpperCase() + view.slice(1)}
-          </button>
+      <div className="flex gap-2 mb-6 overflow-x-auto">
+        {['all', 'upcoming', 'completed'].map((key) => (
+          <button key={key} type="button" onClick={() => chooseView(key)} className={`px-3 py-2 rounded-md text-sm font-heading font-semibold capitalize ${seasonView === key ? 'bg-forest text-white' : 'bg-white border border-[#E5E0D4]'}`}>{key}</button>
         ))}
-        <span className="text-xs text-gray-400">{user ? 'Filter saved to your account' : 'Sign in to save filter preference'}</span>
       </div>
 
-      {showUpcoming && upcoming.length > 0 && (
-        <div className="mb-10">
-          <h2 className="text-lg font-sans font-semibold text-forest uppercase tracking-widest mb-4">Upcoming</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {upcoming.map((t) => (
-              <div key={t.id}>
-                <TournamentCard tournament={t} />
-              </div>
-            ))}
-          </div>
-        </div>
+      {(seasonView === 'all' || seasonView === 'upcoming') && (
+        <section className="mb-8">
+          <h2 className="font-heading font-bold text-xl text-forest mb-3">Upcoming</h2>
+          {upcoming.length === 0 ? <Empty title="No upcoming events." /> : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {upcoming.map((event) => (
+                <Link key={event.id} to={`/tournaments/${event.id}`} className="block bg-white border border-[#E5E0D4] rounded-xl p-4 hover:border-gold">
+                  <p className="text-xs text-gold font-heading font-semibold uppercase">{formatDate(event.date)}</p>
+                  <h3 className="font-heading font-bold text-lg text-forest">{event.name}</h3>
+                  <p className="text-sm text-gray-600">{event.course}</p>
+                  <p className="text-sm text-gray-600">{event.teeTime} · {event.format} · {feeLabel(event.entryFee)}</p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
-      {showCompleted && completed.length > 0 && (
-        <div>
-          <h2 className="text-lg font-sans font-semibold text-forest uppercase tracking-widest mb-4">Completed</h2>
-          <div className="space-y-4">
-            {completed.map((t) => {
-              const result = cappedResults[t.id]
-              const isOpen = expanded === t.id
-              return (
-                <div key={t.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <button
-                    className="w-full text-left p-5 flex items-start justify-between gap-4 hover:bg-gray-50 transition-colors"
-                    onClick={() => onToggleExpanded(t.id, isOpen)}
-                    aria-expanded={isOpen}
-                    aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${t.name} results`}
-                  >
-                    <div>
-                      <h3 className="text-darktext font-heading text-xl font-semibold mb-1">{t.name}</h3>
-                      <p className="text-gray-500 font-sans text-sm">{formatDateLong(t.date)} · {t.course}</p>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="text-xs bg-gray-100 text-gray-600 border border-gray-200 px-2.5 py-1 rounded-full font-sans hidden sm:block">
-                        {t.format}
-                      </span>
-                      <svg className={`w-5 h-5 text-gold transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </button>
-
-                  {isOpen && !result && resultsStatus === 'loading' && (
-                    <div className="border-t border-gray-100 p-5 text-center py-10">
-                      <p className="text-gray-400 font-sans text-sm">Loading results…</p>
-                    </div>
-                  )}
-
-                  {isOpen && result && (
-                    <div className="border-t border-gray-100 p-5">
-                      <h4 className="text-forest text-xs font-heading font-semibold uppercase tracking-widest mb-2.5">Flight Winners</h4>
-                      <FlightWinnerCards winners={buildFlightWinnerCards(result, t.format)} className="mb-4" />
-                      <FlightLeaderboards leaderboard={result.leaderboard} />
-                    </div>
-                  )}
-
-                  {isOpen && !result && resultsStatus !== 'loading' && (
-                    <div className="border-t border-gray-100 p-5 text-center py-8">
-                      <p className="text-gray-400 font-sans text-sm">Results not yet available.</p>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
+      {(seasonView === 'all' || seasonView === 'completed') && (
+        <section>
+          <h2 className="font-heading font-bold text-xl text-forest mb-3">Completed</h2>
+          {completed.length === 0 ? <Empty title="No completed events yet." /> : (
+            <div className="space-y-3">
+              {completed.map((event) => {
+                const result = capped[event.id]
+                const open = openId === event.id
+                return (
+                  <article key={event.id} className="bg-white border border-[#E5E0D4] rounded-xl">
+                    <button type="button" className="w-full text-left px-4 py-3" aria-expanded={open} onClick={() => toggle(event.id)}>
+                      <p className="text-xs text-gold font-heading font-semibold uppercase">{formatDate(event.date)}</p>
+                      <h3 className="font-heading font-bold text-forest">{event.name}</h3>
+                      <p className="text-sm text-gray-500">{event.course}</p>
+                    </button>
+                    {open && (
+                      <div className="px-4 pb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                          {buildFlightWinnerCards(result, event.format).map((card) => (
+                            <div key={card.flight} className="rounded-lg bg-cream px-3 py-2 text-sm">
+                              <p className="text-xs uppercase text-gold font-heading font-semibold">{card.flight}</p>
+                              {card.players.map((player) => <p key={player.name}>{player.name}{player.score ? ` · ${player.score}` : ''}</p>)}
+                            </div>
+                          ))}
+                        </div>
+                        <Leaderboard result={result} />
+                        <Link to={`/tournaments/${event.id}`} className="inline-block mt-3 text-sm font-heading font-semibold text-forest underline">Event page</Link>
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
       )}
     </PageWrapper>
   )

@@ -25,6 +25,7 @@ const dynamicRoutePrefixes = ['/pairings/', '/tournaments/']
 
 function routeExists(target) {
   if (routes.has(target)) return true
+  if ([...routes].some((route) => route.endsWith('/*') && (target === route.slice(0, -2) || target.startsWith(route.slice(0, -1))))) return true
   if (dynamicRoutePrefixes.some(prefix => target.startsWith(prefix))) return true
   return false
 }
@@ -33,12 +34,16 @@ test('all static internal links point to defined routes', () => {
   const filesToCheck = [
     'src/components/layout/Header.jsx',
     'src/components/layout/Footer.jsx',
-    'src/components/sections/QuickLinks.jsx',
-    'src/components/sections/SponsorBar.jsx',
-    'src/components/ui/TournamentCard.jsx',
     'src/pages/Home.jsx',
     'src/pages/Pairings.jsx',
     'src/pages/TournamentDetail.jsx',
+    'src/pages/Tournaments.jsx',
+    'src/pages/Standings.jsx',
+    'src/pages/Members.jsx',
+    'src/pages/Sponsors.jsx',
+    'src/pages/Login.jsx',
+    'src/pages/Info.jsx',
+    'src/admin/AdminApp.jsx',
     'src/App.jsx',
   ]
 
