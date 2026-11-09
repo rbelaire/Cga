@@ -1,63 +1,72 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() {
+    function signedIn() {
       return request.auth != null;
     }
 
-    function isOwner(uid) {
-      return isSignedIn() && request.auth.uid == uid;
+    function email() {
+      return request.auth.token.email;
     }
 
     function isSuperAdmin() {
-      return isSignedIn() && request.auth.token.email == 'rjbelaire@gmail.com';
+      return signedIn() && email() == 'rjbelaire@gmail.com';
+    }
+
+    // cga/users.adminEmails is written beside the existing list. Missing field denies.
+    function isListedAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/cga/users)
+        && 'adminEmails' in get(/databases/$(database)/documents/cga/users).data
+        && email().lower() in get(/databases/$(database)/documents/cga/users).data.adminEmails;
+    }
+
+    function hasProfileAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
 
     function isAdmin() {
-      return isSuperAdmin() || (
-        isSignedIn() && (
-          // Bootstrap: allow any authenticated user when cga/users doesn't exist yet
-          !exists(/databases/$(database)/documents/cga/users) ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin'])
-        )
-      );
+      return isSuperAdmin() || isListedAdmin() || hasProfileAdmin();
     }
 
-    // ── Per-user data ────────────────────────────────────────────────────────
+    function ownsIncoming() {
+      return signedIn() && request.resource.data.uid == request.auth.uid;
+    }
+
+    function ownsExisting() {
+      return signedIn() && resource.data.uid == request.auth.uid;
+    }
+
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if signedIn() && request.auth.uid == userId;
     }
 
     match /savedFilters/{docId} {
-      allow read, write: if isOwner(request.resource.data.uid) || isOwner(resource.data.uid);
+      allow create: if ownsIncoming();
+      allow read, update, delete: if ownsExisting();
     }
 
     match /savedViews/{docId} {
-      allow read, write: if isOwner(request.resource.data.uid) || isOwner(resource.data.uid);
+      allow create: if ownsIncoming();
+      allow read, update, delete: if ownsExisting();
     }
 
     match /favorites/{docId} {
-      allow read, write: if isOwner(request.resource.data.uid) || isOwner(resource.data.uid);
+      allow create: if ownsIncoming();
+      allow read, update, delete: if ownsExisting();
     }
 
-    // ── Fixed-size CGA documents (public read, admin write) ──────────────────
-    // members, standings, poy, credits, users, ptm, beginningOfYearPtm,
-    // changelog, creditTransactions
+    // Public club records. Operational money and draft scores are admin-only.
     match /cga/{docId} {
-      allow read: if true;
+      allow read: if docId in [
+        'members', 'standings', 'poy', 'ptm', 'beginningOfYearPtm', 'tournamentStatus'
+      ] || isAdmin();
       allow write: if isAdmin();
     }
-
-    // ── Per-tournament collections (public read, admin write) ────────────────
-    // Each collection stores one document per tournament ID, preventing any
-    // single document from growing toward Firestore's 1 MB limit.
 
     match /cgaResults/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /cgaScores/{docId} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -67,24 +76,36 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /cgaPayments/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
     match /cgaLifecycle/{docId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /cgaPaymentMeta/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
+    match /cgaScores/{docId} {
+      allow read, write: if isAdmin();
     }
 
-    // ── Snapshot collection (admin only — contains full data copies) ─────────
+    match /cgaPayments/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /cgaPaymentMeta/{docId} {
+      allow read, write: if isAdmin();
+    }
+
     match /cgaSnapshots/{docId} {
       allow read, write: if isAdmin();
+    }
+
+    // New log entries are their own documents. The old array docs are still read.
+    match /cgaChangelog/{docId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /cgaCreditTx/{docId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
     }
   }
 }

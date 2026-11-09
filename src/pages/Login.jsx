@@ -1,116 +1,56 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import PageWrapper from '../components/layout/PageWrapper'
-import { useAuth } from '../context/AuthContext'
+import { Link, useNavigate } from 'react-router-dom'
 import { loginWithEmailPassword, loginWithGoogle } from '../lib/firebase/auth'
-
-function formatAuthError(error) {
-  const code = error?.code ?? ''
-
-  if (code === 'auth/unauthorized-domain') {
-    return 'This domain is not authorized for Google sign-in in Firebase Auth settings.'
-  }
-
-  if (code === 'auth/popup-closed-by-user') {
-    return 'Google sign-in popup was closed before completing sign-in.'
-  }
-
-  if (code === 'firestore/permission-denied') {
-    return 'Signed in, but your account does not have the required Firestore permissions yet.'
-  }
-
-  return error?.message ?? 'Sign-in failed. Please try again.'
-}
+import { practiceMode } from '../db'
+import { useAuth } from '../context/AuthContext'
+import PageWrapper from '../components/layout/PageWrapper'
 
 export default function Login() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { isAuthenticated } = useAuth()
-  const redirectTo = location.state?.from?.pathname ?? '/admin'
-
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { document.title = 'Sign in | CGA' }, [])
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate(redirectTo, { replace: true })
-    }
-  }, [isAuthenticated, navigate, redirectTo])
-
-  const onEmailLogin = async (event) => {
+  async function submit(event) {
     event.preventDefault()
-    setLoading(true)
+    setBusy(true)
     setError('')
     try {
       await loginWithEmailPassword(email, password)
-      navigate(redirectTo, { replace: true })
+      navigate('/admin')
     } catch (err) {
-      setError(formatAuthError(err))
+      setError(err?.message || 'Sign-in failed.')
     } finally {
-      setLoading(false)
-    }
-  }
-
-  const onGoogleLogin = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const user = await loginWithGoogle()
-      if (user) {
-        navigate(redirectTo, { replace: true })
-      }
-    } catch (err) {
-      setError(formatAuthError(err))
-    } finally {
-      setLoading(false)
+      setBusy(false)
     }
   }
 
   return (
-    <PageWrapper>
-      <div className="max-w-md mx-auto mt-12 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-        <h1 className="section-title text-2xl mb-2">Sign in</h1>
-        <p className="text-sm text-gray-500 mb-6">Use your Firebase account to access protected tools.</p>
-
-        <form className="space-y-3" onSubmit={onEmailLogin}>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="Email"
-            className="w-full border rounded px-3 py-2 text-sm"
-          />
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Password"
-            className="w-full border rounded px-3 py-2 text-sm"
-          />
-          <button className="btn-primary w-full" disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign in with Email'}
-          </button>
+    <PageWrapper className="max-w-md">
+      <h1 className="section-title">Sign in</h1>
+      <div className="gold-divider" />
+      {practiceMode ? (
+        <div className="bg-white border border-[#E5E0D4] rounded-xl p-5">
+          <p className="text-sm text-gray-600">Practice mode is already signed in as a board member. Nothing here is written to the live site.</p>
+          <Link to="/admin" className="btn-primary mt-4">Open the practice admin</Link>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="bg-white border border-[#E5E0D4] rounded-xl p-5 space-y-3">
+          {isAuthenticated && <p className="text-sm text-gray-600">You are already signed in. <Link to="/admin" className="underline">Go to admin</Link>.</p>}
+          <label className="block text-sm">Email
+            <input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1 w-full rounded-md border border-[#E5E0D4] px-3 py-2" />
+          </label>
+          <label className="block text-sm">Password
+            <input type="password" required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 w-full rounded-md border border-[#E5E0D4] px-3 py-2" />
+          </label>
+          {error && <p className="text-sm text-red-700">{error}</p>}
+          <button type="submit" disabled={busy} className="btn-primary w-full">{busy ? 'Signing in…' : 'Sign in'}</button>
+          <button type="button" className="btn-outline w-full" onClick={() => loginWithGoogle().then(() => navigate('/admin')).catch((err) => setError(err?.message || 'Google sign-in failed.'))}>Sign in with Google</button>
         </form>
-
-        <button
-          type="button"
-          className="mt-3 w-full px-4 py-2 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-          onClick={onGoogleLogin}
-          disabled={loading}
-        >
-          Continue with Google
-        </button>
-
-        {error && <p className="mt-3 text-xs text-red-500 break-all">{error}</p>}
-
-        <p className="mt-6 text-xs text-gray-500">
-          Need public content? <Link to="/" className="text-forest underline">Return home</Link>.
-        </p>
-      </div>
+      )}
     </PageWrapper>
   )
 }

@@ -1,194 +1,44 @@
-# Carencro Golf Association (CGA) — Engineering Context
+# Carencro Golf Association — engineering context
 
 ## Architecture
-- **React 19 + Vite**, Tailwind CSS, React Router v7 (HashRouter)
-- **Firebase Firestore + Firebase Auth** back end for live and admin data
-- Static JSON retained for baseline site metadata (schedule, board, sponsors)
-- Build output goes to `out/` (gitignored); run with `node_modules/.bin/vite build --outDir out`
+React 19 + Vite, Tailwind, React Router v7 (`HashRouter`). Firebase Auth + Cloud Firestore. Static JSON for the schedule, board, and sponsors. Build output is `out/` (`npm run build`). Dev base is `/`. Production base is `/Cga/`.
 
-## Routing
-Uses `HashRouter` (`#/path`). Routes defined in `src/App.jsx`.
+`npm run dev:seed` sets `VITE_DATA_BACKEND=seed` and uses an in-memory club. It never writes live Firestore.
 
-**Main routes:**
-- `/` — Home
-- `/tournaments` — schedule cards + completed results view
-- `/tournaments/:tournamentId` — tournament detail
-- `/standings` — PTM standings + HDCP/Scratch POY displays + Most/Least Improved tab (PTM delta from season start)
-- `/pairings/:tournamentId` — member pairings (public)
-- `/members` — member directory
-- `/info` — rules, eligibility, board tabs
-- `/sponsors` — sponsor directory
-- `/login` — Firebase Auth login
-- `/admin` — auth-gated admin panel (lazy-loaded)
+## Routes
+Defined in `src/App.jsx`.
 
-**Legacy redirects:** `/schedule`, `/results` → `/tournaments` · `/points-to-make`, `/poy`, `/most-improved` → `/standings` · `/rules`, `/board`, `/eligibility` → `/info`
+- `/` home
+- `/tournaments` and `/tournaments/:tournamentId`
+- `/standings` (handicap, scratch, points to make, most/least improved)
+- `/pairings/:tournamentId`
+- `/members`, `/info`, `/sponsors`, `/login`
+- `/admin` event steps (`?event=&step=`), `/admin/roster`, `/admin/people`, `/admin/exports`, `/admin/history`
 
-## Data sources
-### Static (`src/data/`)
-- `schedule.json` — season tournament metadata
-- `board.json` — board page content
-- `sponsors.json` — sponsor content
+Legacy redirects: `/schedule` and `/results` → tournaments; `/points-to-make`, `/poy`, `/most-improved` → standings; `/rules`, `/board`, `/eligibility` → info.
 
-### Firestore
-Public views subscribe via `useFireData` and fall back gracefully when data is unavailable.
+An error boundary remounts when the route changes.
 
-**Single-document collections (`cga/*`):**
-| Document | Purpose |
-|---|---|
-| `members` | Member roster (PTM, tee). `flight` is retained internally as each member's most-recent-tournament flight (set by the flight calculator on Save Flights) but is NOT shown as a permanent attribute in season views — flights are per-tournament (results/pairings) |
-| `standings` | Current PTM standings per flight |
-| `poy` | Player-of-Year points per flight |
-| `ptm` | PTM list (redundant with members in some flows) |
-| `beginningOfYearPtm` | Season-start PTM snapshot for Most Improved |
-| `credits` | Credit balances per member |
-| `users` | Admin/user roles |
-| `changelog` | Append-only audit log |
-| `creditTransactions` | Append-only credit transaction log |
-| `tournamentStatus` | Site-wide tournament lifecycle overrides |
+## Firestore (unchanged documents)
+`cga/members` `{ list }`, `cga/standings` `{ flights }` (public handicap points are `poy`), `cga/poy` `{ flights }` (field `points`), `cga/ptm` `{ list }`, `cga/beginningOfYearPtm`, `cga/credits` `{ balances }`, `cga/users` `{ list, adminEmails }`, `cga/changelog` `{ entries }`, `cga/creditTransactions` `{ entries }`, `cga/tournamentStatus` `{ completed }`, `cga/pairingRules` `{ rules }`.
 
-**Per-tournament collections (key = tournament ID):**
-| Collection | Purpose |
-|---|---|
-| `cgaResults/{tid}` | Published result doc (leaderboard, winners) |
-| `cgaScores/{tid}` | Score entry data (pre-publish) |
-| `cgaPairings/{tid}` | Pairing groups |
-| `cgaPayments/{tid}` | Paid/entered player map |
-| `cgaPaymentMeta/{tid}` | Payment metadata (credit used, timestamps) |
-| `cgaLifecycle/{tid}` | Pairings state, memo/payout flags |
+Per event: `cgaResults/{tid}`, `cgaScores/{tid}`, `cgaPairings/{tid}` (`{ pairings, tournament, source }` or a legacy array), `cgaPayments/{tid}`, `cgaPaymentMeta/{tid}`, `cgaLifecycle/{tid}`.
 
-**Append-only:** `cgaSnapshots/{autoId}` — snapshot/restore records
+`cgaSnapshots` are individual documents. New log lines prefer `cgaChangelog` / `cgaCreditTx` and fall back to the legacy arrays (latest 200) if the rules reject the new collections.
 
-`DB.batchPublish(tid, {resultDoc, newPoy, newStandings})` writes all three in a single Firestore batch.
+Saves go straight to Firestore after the first snapshot arrives. There is no localStorage draft.
 
-## Admin panel (`src/pages/Admin.jsx`)
+## Scoring
+- POY: 350 for the flight winner, −25 per place, ties share the average, `eligible: false` gets 0. Eligibility is 7 rounds. Ranking uses the true plus/minus. A player with lifetime `rounds` of 1 or 2 displays at most +2.
+- PTM from the last 7 scores: 1 score → that score; 2 → the higher; 3–6 → drop the low and average; 7 → drop the two low scores and average the rest. Floor is 6.
+- Publishing adds this event’s points onto the season and, on a republish, subtracts the previous result for that event first. Players who did not play stay. `cga/ptm` is updated because the public points tab reads it.
+- Most improved: `currentPtm - beginningPtm`, qualified at 7 total rounds and 3 rounds whose result date is this calendar year.
+- A past calendar date, a static `completed` status, or `tournamentStatus.completed[id]` marks an event finished. The next event is the first one still upcoming. Countdown dates are local calendar dates.
 
-`Admin.jsx` holds the auth gate and the `AdminPanel` orchestrator (all shared
-state, save/publish workflow, and dirty-tracking). Each mode's UI is a separate
-component under `src/pages/admin/` receiving data via props — they hold no
-cross-panel state of their own.
+## Admin
+`src/admin/AdminApp.jsx` is the shell. Steps live in `src/admin/steps/`. Club listeners live in `ClubProvider.jsx`. Publish math is `src/domain/publish.js`. Pairing shape and generation are `src/domain/pairings.js`.
 
-### adminMode values
-| Value | Nav label | What it shows |
-|---|---|---|
-| `'dashboard'` | Overview | Workflow status cards per tournament |
-| `'payments'` | Entries | Mark players paid/entered |
-| `'pairings'` | Pairings | Generate/edit pairings + Pairing Rules tab |
-| `'scores'` | Scores | Score entry per flight |
-| `'exports'` | Exports | PDF/XLSX exports |
-| `'operations'` | Player Management | PTM, tee, name, credit overrides (no flight — flights are per-tournament) |
-| `'users'` | Member Management | User account management |
-| `'snapshots'` | Snapshots | Snapshot/restore |
-| `'changelog'` | Changelog | Audit log |
+Access: owner email, or a loaded `cga/users` row with role `admin` and status not `disabled`. The rules file also accepts `users/{uid}.roles` and `cga/users.adminEmails`. An empty list is not a bootstrap admin. Rules in the repo are not deployed by the app.
 
-### dirtyRegistry sections
-Tracks unsaved local state vs. cloud for: `scores`, `pairings`, `members`, `credits`, `payments`, `users`. Each has a `saveAction` string; `saveAllDirtyDrafts()` iterates them.
-
-### localStorage keys (all drafts are browser-local until saved)
-| Key | Contents |
-|---|---|
-| `cga_admin_v1` | Score entry data |
-| `cga_pairings_v1` | Pairings by tournament |
-| `cga_members_v1` | Member flight/PTM/tee overrides |
-| `cga_credits_v1` | Credits |
-| `cga_payments_v1` | Payments |
-| `cga_users_v1` | Users draft |
-| `cga_tournament_info_v1` | Tournament info drafts |
-| `cga_tournament_lifecycle_v1` | Pairings state, memo/payout flags |
-| `cga_payment_meta_v1` | Payment metadata |
-| `cga_pairing_rules_v1` | Pairing rules (global, not per-tournament) |
-
-### Publish workflow
-1. Admin enters scores in **Scores** panel (`data` state, keyed by `[tid][flight]`)
-2. **Preview** builds payload via `buildPublishPayload()` in `publishService.js`. Post-event PTM is derived automatically — no manual PTM edit needed: `computePublishMemberUpdates()` prepends each scored player's new score to their `history` (capped at 7) and recomputes PTM via `calcPtmFromHistory()`; those values become `ptmLookup` for the payload.
-3. On confirm, snapshots current results/standings/poy, then `publishTournament()` writes atomically:
-   - `DB.batchPublish` → `cgaResults/{tid}` (leaderboard, flight winners, status = 'completed'), `cga/standings` (updated PTM, PTM delta, trend, event count), `cga/poy` (updated POY points per flight)
-   - `DB.saveMembers(updatedMembers)` persists each scored player's new history + recomputed PTM
-
-**Key distinction:** score-row PTM = pre-event (used for plus/minus); the post-event PTM written to `members` and `standings` at publish is computed from history + the new score, not hand-entered.
-
-## Pairings system
-
-### Auto-generate algorithm
-1. **Always-together rules** — seed those players into the same group first (capped at 4; extras fall into normal distribution)
-2. **Flight-diversity distribution** — round-robin across flight queues so each group gets players from different flights
-3. **Never-together enforcement** — post-process: relocate violating players to groups with open slots and no other rule members (best-effort)
-
-### Pairing rules (`pairingRules` state)
-```
-[{ id: string, type: 'always' | 'never', players: string[] }]
-```
-- Stored globally in `cga_pairing_rules_v1` (not per-tournament)
-- Managed in the **Pairing Rules** tab inside the Pairings panel
-- Rules with fewer than 2 players are automatically deleted
-
-### Editing pairings after generation
-The auto-generated card grid is directly editable — no mode switch needed:
-- Drag players between cards
-- Hover a player row → `×` to remove (player returns to unassigned)
-- Unassigned players shown as draggable chips; click to select, then click a card to assign
-- "Build Your Own" mode retained for building from blank groups
-
-## Most Improved / Least Improved logic
-Rendered as a tab inside `Standings.jsx` (`buildMostImprovedRows`, `MostImprovedTab`).
-- Qualification: `totalRounds >= 7` AND `currentYearRounds >= 3`
-- `currentYearRounds` = results whose `date` starts with current calendar year
-- `delta = currentPtm − beginningPtm` (positive = improved; higher PTM = better scorer)
-- Non-qualified rows: amber highlight + NQ badge; top qualified = Leader badge
-- No 6-point floor on display values
-- Beginning-of-year snapshot stored in `cga/beginningOfYearPtm`, set via BeginningPtmPanel — either from the current live PTM or by uploading a Points-to-Make `.xlsx` (`parseBeginningPtmXlsx` in `xlsxExports.js`; name column + `PTM`/"Points to make" column, first sheet)
-
-## PTM standings display
-- PTM change after last tournament shown inline as colored arrow + whole number
-- Up arrow (red) = PTM increased; down arrow (green) = PTM decreased
-- No separate PTM Δ column in HDCP or Scratch tabs
-
-## POY calculation
-`calcFlightPOY` in `src/utils/poy.js` (shared by publish, exports, and score entry):
-- Base: 350 pts for flight winner, −25 pts per rank below first
-- Ties share the average of their tied positions' points
-- Players marked `eligible: false` receive 0 POY points
-- **2nd/3rd-round display cap:** a player with `rounds` of 1 or 2 (their 2nd/3rd round ever) shows a plus/minus of at most +2. Ranking and POY use the true plus/minus — only the displayed value is capped. Score rows are stamped with `rounds` (from `roundsLookup`) alongside `eligible` so `calcFlightPOY` can apply it at publish time.
-- **Retroactive display cap (already-published tournaments):** published leaderboards store a frozen plus/minus and no per-row round count, so the cap is re-applied at display time using each player's *current lifetime* `member.rounds` (1 or 2 → cap at +2). `buildRoundsByName(members)` + `capProvisionalLeaderboard(leaderboard, roundsByName)` in `src/utils/poy.js` do this; they run on the public results views (`Home.jsx` Latest Results, `Tournaments.jsx`, `TournamentDetail.jsx`) before rendering. Rank/POY/score are never altered, and the clamp is idempotent (values already ≤ +2 are unchanged). Scratch rankings read raw scores, so they stay on the uncapped results.
-
-## Key files
-| File | Purpose |
-|---|---|
-| `src/db.js` | All Firestore read/write wrappers |
-| `src/hooks/useFireData.js` | Real-time Firestore subscription hook |
-| `src/pages/Admin.jsx` | Auth gate + `AdminPanel` orchestrator (shared state + workflow) |
-| `src/pages/admin/*.jsx` | Individual admin panels (Dashboard, ScoreEntry, Pairings, Users, Exports, FlightManagement, Changelog, Snapshots, etc.) + shared `icons.jsx` / `ui.jsx` |
-| `src/utils/adminFormat.js` | Admin display helpers: `fmtPM`, `fmtPOY`, `fmtCurrency`, `fmtPtmValue`, `fmtLogTime` |
-| `src/pages/Standings.jsx` | PTM standings + HDCP/Scratch tabs + Most/Least Improved tab |
-| `src/components/ui/StandingsTable.jsx` | Reusable standings table |
-| `src/services/admin/publishService.js` | `buildPublishPayload()` — all publish math |
-| `src/services/admin/auditService.js` | Changelog/audit payload helpers |
-| `src/services/admin/snapshotService.js` | Snapshot/restore helpers |
-| `src/services/admin/validation/index.js` | All validation functions (scores, pairings, members, publish, etc.) |
-| `src/exports/pdfExports.js` | PDF exports: tournament info, pairings, field roster, results, PTM |
-| `src/exports/xlsxExports.js` | XLSX exports (credits, results, birdie pool, payout, roster, PTM) + `parseRosterXlsx` |
-| `src/exports/creditsPdf.js` | Credit-on-books PDF (navy-bar header/footer style) |
-| `src/exports/utils/loadAsset.js` | Shared image→base64 loader for PDF embedding |
-| `src/utils/poy.js` | `calcFlightPOY` — POY points per flight |
-| `src/utils/tournamentWorkflow.js` | `computeTournamentWorkflowState()` — dashboard status logic |
-| `src/utils/flightOrder.js` | `FLIGHT_ORDER`, `compareFlights`, `NEW_PLAYERS_FLIGHT` |
-| `src/utils/roundPtm.js` | Shared PTM rounding utility |
-
-## Validation functions (`src/services/admin/validation/index.js`)
-- `validateTournamentId` — tournament exists in schedule
-- `validateMembers` — no duplicate names, PTM 0–500
-- `validateUsers` — no duplicate emails, valid format
-- `validateCredits` — numeric balances, known members
-- `validatePayments` — valid member/tournament references
-- `validateScoresForTournament` — no duplicate players, valid PTM/score
-- `validatePairingsForTournament` — players exist in scores, max 4 per group
-- `validatePublishPayload` — leaderboard structure, member references
-- `formatValidationErrors` — first error + count summary for UI display
-
-## Styling conventions
-- `forest` = dark green (primary)
-- `gold` = accent/highlight
-- `section-title` = serif heading utility
-- `gold-divider` = section underline utility
-- `stat-number` = monospace stat display
-- `btn-primary` = primary button styling
-- `flightTagStyles` map in Admin.jsx — flight name → Tailwind color classes
+## Checks
+`npm test` covers PTM, POY accumulation, the provisional display cap, pairings shape, schedule status, snapshots, and the workflow checklist. `npm run lint` is part of CI.

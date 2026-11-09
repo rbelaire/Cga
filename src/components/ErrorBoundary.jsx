@@ -10,8 +10,14 @@ export default class ErrorBoundary extends Component {
     return { error }
   }
 
+  componentDidUpdate(prev) {
+    if (prev.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null })
+    }
+  }
+
   componentDidCatch(error, info) {
-    console.error('[CGA] Uncaught render error:', error, info.componentStack)
+    console.error('[CGA] Uncaught render error:', error, info?.componentStack)
   }
 
   render() {
@@ -19,14 +25,9 @@ export default class ErrorBoundary extends Component {
       return (
         <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-24">
           <p className="text-gold font-mono text-4xl font-bold mb-4">!</p>
-          <h1 className="text-darktext font-serif text-2xl font-bold mb-2">Something went wrong</h1>
-          <p className="text-gray-500 font-sans text-sm mb-6">An unexpected error occurred. Try refreshing the page.</p>
-          <button
-            className="btn-primary"
-            onClick={() => this.setState({ error: null })}
-          >
-            Try again
-          </button>
+          <h1 className="text-darktext font-heading text-2xl font-bold mb-2">Something went wrong</h1>
+          <p className="text-gray-500 text-sm mb-6 max-w-md">This page hit an error. Open another page, or try this one again.</p>
+          <button type="button" className="btn-primary" onClick={() => this.setState({ error: null })}>Try again</button>
         </div>
       )
     }
